@@ -1,7 +1,7 @@
 # Spritesheet Editor
 
 <p align="center">
-  <img src="https://renderpopstudio.com/SpritesheetEditor/logo.png" alt="Spritesheet Editor" width="520" />
+  <img src="https://renderpopstudio.com/SpritesheetEditor/logo_big.png" alt="Spritesheet Editor" width="520" />
 </p>
 
 <p align="center">
