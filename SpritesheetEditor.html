@@ -1,0 +1,2014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spritesheet Editor</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <style>
+    :root {
+      --bg: #10131b;
+      --input: #202638;
+      --text: #f6f8ff;
+      --muted: #aeb8d0;
+      --accent: #70cdf8;
+      --green: #84f0b4;
+      --warning: #f0c868;
+      --pivot: #ff4f73;
+      --danger: #ff7b7b;
+      --border: rgba(255,255,255,.12);
+      --shadow: 0 24px 80px rgba(0,0,0,.36);
+      --radius: 26px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(112,205,248,.16), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(132,240,180,.10), transparent 34rem),
+        var(--bg);
+      padding: 24px;
+    }
+
+    .app {
+      width: min(1740px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px minmax(520px, 1fr) minmax(620px, 640px);
+      grid-template-areas:
+        "left center side"
+        "timeline timeline timeline";
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.026));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .left-panel { grid-area: left; padding: 8px 24px 24px; height: 100%; }
+    .stage-card { grid-area: center; min-width: 0; height: 100%; aspect-ratio: 1 / 1; justify-self: center; width: auto; max-width: 100%; }
+    .side-panels { grid-area: side; display: grid; grid-template-columns: 320px 300px; gap: 20px; align-items: stretch; }
+    .right-panel, .index-panel { padding: 20px; height: 100%; }
+    .timeline-card { grid-area: timeline; }
+
+    .brand { display: flex; align-items: center; justify-content: center; width: 100%; margin-bottom: 6px; }
+    .brand-logo { width: 100%; height: auto; aspect-ratio: 512 / 173; flex: 0 0 auto; object-fit: contain; display: block; }
+    h1 { margin: 0 0 8px; font-size: clamp(31px, 4vw, 44px); line-height: .92; letter-spacing: -.06em; }
+    .brand h1 { margin: 0; }
+    .subtitle { margin: 0 0 22px; color: var(--muted); line-height: 1.48; font-size: 15px; }
+
+    .upload {
+      display: grid; place-items: center; min-height: 112px; padding: 18px;
+      border: 1.5px dashed rgba(255,255,255,.22); border-radius: 20px;
+      background: rgba(255,255,255,.035); text-align: center; cursor: pointer; transition: 160ms ease;
+    }
+    .upload:hover, .upload.dragover { border-color: var(--accent); background: rgba(112,205,248,.08); transform: translateY(-1px); }
+    .upload strong { display: block; margin-bottom: 6px; font-size: 15px; }
+    .upload span { color: var(--muted); font-size: 13px; }
+    input[type="file"] { display: none; }
+
+    .controls { display: grid; gap: 16px; margin-top: 18px; }
+    .right-panel .controls, .index-panel .controls { margin-top: 0; }
+    .group { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 20px; background: rgba(255,255,255,.026); }
+    .group-title { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 850; }
+    .field { display: grid; gap: 8px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { color: var(--muted); font-size: 13px; font-weight: 750; }
+
+    input[type="number"], input[type="range"], input[type="text"], select { width: 100%; }
+    input[type="number"], input[type="text"], select {
+      appearance: none; border: 1px solid var(--border); background: var(--input); color: var(--text);
+      border-radius: 14px; padding: 12px 13px; font-size: 15px; font-weight: 700; outline: none; text-align: center;
+    }
+    input[type="number"] { cursor: ew-resize; -moz-appearance: textfield; }
+    input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"].scrubbing { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(112,205,248,.13); }
+    body.scrub-active { cursor: ew-resize; user-select: none; }
+    input[type="number"]:focus, input[type="text"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(112,205,248,.13); }
+    input[type="range"] { accent-color: var(--accent); }
+
+    .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
+    .value-pill {
+      display: inline-flex; align-items: center; justify-content: center; color: var(--text);
+      background: rgba(255,255,255,.08); border: 1px solid var(--border); border-radius: 999px;
+      padding: 5px 10px; min-height: 28px; font-size: 13px; font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+
+    button {
+      border: 0; color: #071018; background: var(--accent); border-radius: 16px; padding: 13px 16px;
+      font-size: 13px; font-weight: 850; cursor: pointer; transition: 160ms ease;
+    }
+    button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
+    button:disabled { cursor: not-allowed; opacity: .42; }
+    button.secondary { color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); }
+    button.secondary.active { color: #071018; background: var(--warning); border-color: transparent; }
+    button.green { background: var(--green); }
+    button.warning { background: var(--warning); }
+    .two-buttons, .tool-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mask-tool-buttons { display: flex; gap: 10px; }
+    .icon-row, .transport-row { display: grid; grid-template-columns: repeat(4, 42px); gap: 8px; align-items: end; }
+    .icon-row { justify-content: space-between; }
+    .transport-row { justify-content: end; }
+    .icon-button { width: 42px; height: 42px; min-width: 42px; min-height: 42px; display: grid; place-items: center; padding: 0; border-radius: 12px; font-size: 13px; line-height: 1; }
+    .tool-button { color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); }
+    .tool-button.active { color: #071018; background: var(--warning); border-color: transparent; }
+    .small-button { padding: 10px 12px; border-radius: 13px; font-size: 13px; }
+    #rulerVButton, #rulerHButton, #repackButton, #showHaloButton, #haloRemoverButton, #indexButton, #resetIndexButton, #indexFrameButton, #indexAllButton, #truePixelButton, #truePixelAllButton, #truePixelResetButton, #truePixelPreviewButton, #saveActButton, #savePalButton { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+    .standalone-button { width: 100%; }
+    .fill-icon-button { width: 100%; min-width: 0; }
+    .project-icon-button { width: 100%; min-width: 0; height: 44px; min-height: 44px; }
+    .check-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .check-field {
+      min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 8px;
+      color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--border);
+      border-radius: 13px; font-size: 13px; font-weight: 850; cursor: pointer; user-select: none;
+    }
+    .check-field input { width: auto; accent-color: var(--warning); }
+    .project-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .palette-wrap { display: grid; gap: 10px; }
+    .palette-stage {
+      border: 1px solid var(--border); border-radius: 18px; padding: 10px; background: rgba(255,255,255,.03);
+    }
+    .palette-canvas {
+      display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; image-rendering: pixelated;
+      cursor: pointer;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,.12) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.12) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.12) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.12) 75%);
+      background-size: 12px 12px; background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+    }
+    .palette-info { color: var(--muted); font-size: 13px; min-height: 18px; }
+    .swatch-button {
+      width: 54px; height: 54px; min-width: 54px; padding: 0; display: grid; place-items: center;
+      color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--border); border-radius: 16px;
+    }
+    #pencilColorButton { margin-left: auto; }
+    .swatch-chip {
+      width: 34px; height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,.22); background: #b6c0cf;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.18);
+    }
+    .tool-swatch-row { display: flex; align-items: center; justify-content: flex-start; gap: 10px; }
+    .tool-icon-button {
+      width: 54px; height: 54px; min-width: 54px; min-height: 54px; padding: 0; border-radius: 16px;
+      display: grid; place-items: center;
+    }
+    .tool-icon-button.fill-icon-button { width: 100%; min-width: 0; }
+    .mask-tool-buttons .tool-icon-button { flex: 0 0 auto; width: 54px; min-width: 54px; height: 54px; min-height: 54px; aspect-ratio: auto; }
+    .tool-icon-image {
+      width: 22px; height: 22px; display: block; object-fit: contain;
+      filter: brightness(0) saturate(100%) invert(96%) sepia(6%) saturate(171%) hue-rotate(183deg) brightness(103%) contrast(96%);
+      pointer-events: none;
+    }
+    .icon-row .tool-icon-image { width: 18px; height: 18px; }
+    .project-buttons .tool-icon-image { width: 18px; height: 18px; }
+    .tool-icon-button.active .tool-icon-image,
+    .tool-button.active .tool-icon-image,
+    button.secondary.active .tool-icon-image {
+      filter: brightness(0) saturate(100%);
+    }
+    .button-with-icon {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .button-with-icon .tool-icon-image { width: 16px; height: 16px; }
+    .lock-button {
+      width: 34px; height: 28px; min-width: 34px; padding: 0; border-radius: 999px; display: grid; place-items: center;
+      color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); font-size: 13px; line-height: 1;
+    }
+    .group-title-actions { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+    .title-mode-button {
+      min-width: 88px; min-height: 28px; padding: 5px 10px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .lock-button.active { color: #071018; background: var(--warning); border-color: transparent; }
+    .lock-icon { width: 16px; height: 16px; display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .stage-wrap {
+      height: 100%; padding: 20px; display: grid; place-items: center;
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,.033) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.033) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.033) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.033) 75%);
+      background-size: 28px 28px; background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+    }
+    .canvas-shell {
+      position: relative; width: 100%; aspect-ratio: 1 / 1; display: grid; place-items: center;
+      border: 1px solid var(--border); border-radius: 26px; overflow: hidden; cursor: grab; touch-action: none; user-select: none;
+      background-color: rgba(7,10,18,.52);
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,.14) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.14) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.14) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.14) 75%);
+      background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    }
+    .canvas-shell.dragging { cursor: grabbing; border-color: var(--accent); }
+    .canvas-shell.mask-mode { cursor: crosshair; border-color: var(--warning); }
+    .canvas-shell.bg-dark { background-color: #071018; background-image: none; }
+    .canvas-shell.bg-light { background-color: #f4f7fb; background-image: none; }
+    .canvas-shell.bg-transparent { background-color: transparent; background-image: none; }
+    .canvas-shell.bg-custom { background-image: none; }
+    .canvas-shell > canvas { image-rendering: pixelated; max-width: none; max-height: none; width: auto; height: auto; background: transparent; transform-origin: center center; }
+    .thumb canvas { image-rendering: pixelated; }
+
+    .empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 28px; text-align: center; color: var(--muted); line-height: 1.45; pointer-events: none; }
+    .empty strong { display: block; color: var(--text); font-size: 20px; margin-bottom: 8px; }
+
+    .timeline-toolbar { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.025); }
+    .timeline-toolbar strong { flex: 0 0 auto; font-size: 15px; }
+    .timeline-slider-wrap { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .timeline-slider-wrap input[type="range"] { flex: 1; min-width: 260px; }
+    .filmstrip { padding: 18px 20px 20px; overflow-x: auto; background: rgba(255,255,255,.025); scrollbar-width: thin; }
+    .frames { display: flex; gap: 10px; align-items: center; justify-content: center; width: max-content; min-width: 100%; min-height: 84px; }
+    .thumb, .add-frame-button {
+      flex: 0 0 auto; width: 74px; height: 74px; border: 1px solid var(--border); border-radius: 14px;
+      background-color: rgba(7,10,18,.46);
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,.13) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.13) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.13) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.13) 75%);
+      background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      display: grid; place-items: center; overflow: hidden; cursor: pointer; color: var(--text); padding: 0;
+      transition: transform 140ms ease, opacity 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+    }
+    .thumb.active { border-color: var(--green); box-shadow: 0 0 0 3px rgba(132,240,180,.16); transform: translateY(-1px); }
+    .thumb.dragging { opacity: .34; transform: scale(.92); }
+    .thumb canvas { max-width: 92%; max-height: 92%; }
+    .drop-gap { flex: 0 0 34px; height: 74px; border-radius: 12px; border: 1px dashed rgba(132,240,180,.78); background: rgba(132,240,180,.10); box-shadow: 0 0 0 3px rgba(132,240,180,.08); }
+    .add-frame-button { font-size: 13px; font-weight: 700; color: var(--muted); border-style: dashed; }
+    .add-frame-button:hover:not(:disabled) { color: var(--text); border-color: var(--accent); background-color: rgba(112,205,248,.08); }
+    .error { display: none; margin-top: 14px; color: var(--danger); font-size: 13px; line-height: 1.45; }
+    .error.show { display: block; }
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 20px;
+      background: rgba(0,0,0,.56);
+    }
+    .modal-backdrop.show { display: grid; }
+    .modal {
+      width: min(420px, 100%); border: 1px solid var(--border); border-radius: 18px;
+      background: #171c29; box-shadow: var(--shadow); padding: 18px; display: grid; gap: 14px;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .modal-title { margin: 0; font-size: 14px; font-weight: 850; }
+    .shortcut-list { display: grid; gap: 8px; margin: 0; }
+    .shortcut-list div { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--muted); font-size: 13px; }
+    .shortcut-list kbd { min-width: 84px; text-align: center; color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); border-radius: 9px; padding: 5px 8px; font-family: inherit; font-weight: 850; }
+    .color-modal { width: min(560px, calc(100vw - 24px)); }
+    .color-picker-body { display: grid; gap: 14px; }
+    .color-field-canvas, .color-hue-canvas {
+      display: block; width: 100%; cursor: crosshair;
+    }
+    .color-field-canvas {
+      aspect-ratio: 1 / 1; border-radius: 24px; border: 1px solid rgba(112,205,248,.92); background: #0d1320;
+    }
+    .color-hue-canvas {
+      height: 18px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.04);
+    }
+    .rgb-row { grid-template-columns: repeat(3, 1fr); }
+    .color-picker-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .context-menu {
+      position: fixed; z-index: 40; min-width: 168px; padding: 8px; display: none; gap: 6px;
+      border-radius: 16px; border: 1px solid var(--border); background: #171c28; box-shadow: var(--shadow);
+    }
+    .context-menu.show { display: grid; }
+    .context-menu button {
+      width: 100%; padding: 10px 12px; text-align: left; border-radius: 12px; color: var(--text);
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08);
+    }
+
+    @media (max-width: 1180px) {
+      .app { grid-template-columns: 1fr; grid-template-areas: "left" "center" "side" "timeline"; }
+      .side-panels { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      body { padding: 14px; }
+      .transport-row { justify-content: start; }
+      .timeline-toolbar { flex-direction: column; align-items: stretch; }
+      .field-row { grid-template-columns: 1fr; }
+      .stage-card { width: 100%; height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="card left-panel">
+      <div class="brand">
+        <img class="brand-logo" src="logo.png" alt="Spritesheet Editor" />
+      </div>
+      <p class="subtitle">Upload a spritesheet, set its grid, adjust each frame offset, draw removal masks, and export a repacked PNG.</p>
+
+      <div class="project-buttons">
+        <button id="newButton" class="secondary icon-button project-icon-button" type="button" aria-label="New" title="New">
+          <img class="tool-icon-image" src="icons/new.svg" alt="" aria-hidden="true" />
+        </button>
+        <button id="loadButton" class="secondary icon-button project-icon-button" type="button" aria-label="Load" title="Load">
+          <img class="tool-icon-image" src="icons/load.svg" alt="" aria-hidden="true" />
+        </button>
+        <button id="saveButton" class="secondary icon-button project-icon-button" type="button" disabled aria-label="Save" title="Save">
+          <img class="tool-icon-image" src="icons/save.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+      <label class="upload" id="dropZone">
+        <input id="fileInput" type="file" accept="image/*" />
+        <div><strong>Upload spritesheet</strong><span>Click here or drag an image file</span></div>
+      </label>
+      <input id="frameFileInput" type="file" accept="image/*" multiple />
+      <input id="projectFileInput" type="file" accept=".json,application/json" />
+      <input id="paletteFileInput" type="file" accept=".act,.pal,.png,.bmp,.pcx,image/png,image/bmp,image/x-pcx" />
+      <div class="error" id="errorBox"></div>
+
+      <div class="controls">
+        <div class="group">
+          <p class="group-title">Spritesheet Grid</p>
+          <div class="field-row">
+            <div class="field"><label for="rowsInput">Rows</label><input id="rowsInput" type="number" min="1" max="100" step="1" value="1" /></div>
+            <div class="field"><label for="colsInput">Columns</label><input id="colsInput" type="number" min="1" max="100" step="1" value="4" /></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="startFrameInput">Start frame</label><input id="startFrameInput" type="number" min="1" step="1" value="1" /></div>
+            <div class="field"><label for="endFrameInput">End frame</label><input id="endFrameInput" type="number" min="1" step="1" value="0" /></div>
+          </div>
+          <div class="field">
+            <div class="line"><label for="speedInput">Speed</label><span class="value-pill"><span id="speedValue">12</span> FPS</span></div>
+            <input id="speedInput" type="range" min="1" max="60" step="1" value="12" />
+          </div>
+        </div>
+
+        <div class="group">
+          <p class="group-title">Cage Size & Ruler</p>
+          <div class="field-row">
+            <div class="field"><label for="cageWidthInput">Cage Width</label><input id="cageWidthInput" type="number" min="1" step="1" value="1" /></div>
+            <div class="field"><label for="cageHeightInput">Cage Height</label><input id="cageHeightInput" type="number" min="1" step="1" value="1" /></div>
+          </div>
+          <div class="two-buttons">
+            <button id="rulerVButton" class="tool-button" type="button" disabled>Add Ruler V</button>
+            <button id="rulerHButton" class="tool-button" type="button" disabled>Add Ruler H</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <p class="group-title">Preview & Export</p>
+          <div class="field">
+            <label for="backgroundInput">Preview background</label>
+            <select id="backgroundInput">
+              <option value="checker">Checker</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="transparent">Transparent</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="two-buttons">
+            <button id="resetButton" disabled aria-label="Reset View (F)" title="Reset View (F)">Reset View</button>
+            <button id="repackButton" class="warning" disabled>Repack PNG</button>
+          </div>
+        </div>
+        <button id="shortcutsButton" class="secondary small-button standalone-button" type="button">Shortcuts</button>
+      </div>
+    </section>
+
+    <section class="card stage-card">
+      <div class="stage-wrap">
+        <div class="canvas-shell" id="canvasShell" aria-label="Animation preview">
+          <canvas id="mainCanvas"></canvas>
+          <div class="empty" id="emptyState"><div><strong>Animation preview</strong>Your selected frame will appear here.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="side-panels">
+    <aside class="card right-panel">
+      <div class="controls">
+        <div class="group">
+          <p class="group-title">Pencil Tool</p>
+          <div class="field">
+            <div class="line"><label for="brushSizeInput">Brush size</label><span class="value-pill"><span id="brushSizeValue">18</span> px</span></div>
+            <input id="brushSizeInput" type="range" min="1" max="120" step="1" value="18" />
+          </div>
+          <div class="tool-swatch-row">
+            <button id="eyedropperButton" class="secondary icon-button tool-icon-button" type="button" disabled aria-label="Dropper (D)" title="Dropper (D)">
+              <img class="tool-icon-image" src="icons/pipette.svg" alt="" aria-hidden="true" />
+            </button>
+            <button id="pencilButton" class="tool-button icon-button tool-icon-button" type="button" disabled aria-label="Pencil Tool (P)" title="Pencil Tool (P)">
+              <img class="tool-icon-image" src="icons/pencil.svg" alt="" aria-hidden="true" />
+            </button>
+            <button id="paintBucketButton" class="tool-button icon-button tool-icon-button" type="button" disabled aria-label="Paint Bucket Tool" title="Paint Bucket Tool">
+              <img class="tool-icon-image" src="icons/paint-bucket.svg" alt="" aria-hidden="true" />
+            </button>
+            <button id="pencilColorButton" class="swatch-button" type="button" disabled aria-label="Choose pencil color">
+              <span id="pencilColorSwatch" class="swatch-chip"></span>
+            </button>
+          </div>
+        </div>
+        <div class="group">
+          <p class="group-title">Mask</p>
+          <div class="tool-buttons mask-tool-buttons">
+            <button id="maskBrushButton" class="tool-button icon-button tool-icon-button fill-icon-button" type="button" disabled aria-label="Mask Brush (M)" title="Mask Brush (M)">
+              <img class="tool-icon-image" src="icons/brush.svg" alt="" aria-hidden="true" />
+            </button>
+            <button id="restoreBrushButton" class="tool-button icon-button tool-icon-button fill-icon-button" type="button" disabled aria-label="Erase Mask (E)" title="Erase Mask (E)">
+              <img class="tool-icon-image" src="icons/eraser.svg" alt="" aria-hidden="true" />
+            </button>
+            <button id="magicWandButton" class="tool-button icon-button tool-icon-button fill-icon-button" type="button" disabled aria-label="Magic Wand (W)" title="Magic Wand (W)">
+              <img class="tool-icon-image" src="icons/wand.svg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <div class="tool-buttons">
+            <button id="hideMaskButton" class="tool-button" type="button" disabled aria-label="Hide Mask (H)" title="Hide Mask (H)">Hide Mask</button>
+          </div>
+          <div class="field">
+            <div class="line"><label for="magicToleranceInput">Wand tolerance</label><span class="value-pill"><span id="magicToleranceValue">32</span></span></div>
+            <input id="magicToleranceInput" type="range" min="0" max="255" step="1" value="32" />
+          </div>
+          <div class="check-row">
+            <label class="check-field"><input id="magicAntialiasInput" type="checkbox" checked /> Anti-alias</label>
+            <label class="check-field"><input id="magicContiguousInput" type="checkbox" checked /> Contiguous</label>
+          </div>
+          <div class="field">
+            <div class="line"><label for="autoBgToleranceInput">Auto background tolerance</label><span class="value-pill"><span id="autoBgToleranceValue">12</span></span></div>
+            <input id="autoBgToleranceInput" type="range" min="0" max="30" step="1" value="12" />
+          </div>
+          <div class="two-buttons">
+            <button id="autoMaskFrameButton" class="secondary small-button" disabled>Mask BG</button>
+            <button id="autoMaskAllButton" class="secondary small-button" disabled>Mask BG All</button>
+          </div>
+          <div class="field">
+            <div class="line"><label for="haloToleranceInput">Halo tolerance</label><span class="value-pill"><span id="haloToleranceValue">12</span></span></div>
+            <input id="haloToleranceInput" type="range" min="0" max="30" step="1" value="12" />
+          </div>
+          <div class="two-buttons">
+            <button id="showHaloButton" class="secondary small-button" disabled>Show Halo</button>
+            <button id="haloRemoverButton" class="secondary small-button" disabled>Apply Halo</button>
+          </div>
+          <div class="two-buttons">
+            <button id="clearMaskButton" class="secondary small-button" disabled>Clear Frame Mask</button>
+            <button id="clearAllMasksButton" class="secondary small-button" disabled>Clear All Masks</button>
+          </div>
+        </div>
+        <div class="group">
+          <p class="group-title">True Pixel Filter</p>
+          <div class="field">
+            <label for="truePixelResolutionInput">Pixel resolution</label>
+            <select id="truePixelResolutionInput">
+              <option value="16">16</option>
+              <option value="32">32</option>
+              <option value="64">64</option>
+              <option value="128" selected>128</option>
+              <option value="256">256</option>
+              <option value="512">512</option>
+            </select>
+          </div>
+          <div class="two-buttons">
+            <button id="truePixelButton" class="secondary small-button" type="button" disabled>Apply</button>
+            <button id="truePixelAllButton" class="secondary small-button" type="button" disabled>Apply All</button>
+          </div>
+          <div class="two-buttons">
+            <button id="truePixelResetButton" class="secondary small-button" type="button" disabled>Reset</button>
+            <button id="truePixelPreviewButton" class="secondary small-button" type="button" disabled>Preview</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+      <aside class="card index-panel">
+        <div class="controls">
+          <div class="group">
+            <p class="group-title">Index Color</p>
+            <div class="field">
+              <div class="line"><label for="indexColorsInput">Colors</label><span class="value-pill"><span id="indexColorsValue">256</span></span></div>
+              <input id="indexColorsInput" type="range" min="3" max="256" step="1" value="256" />
+            </div>
+            <label class="check-field"><input id="indexKeepTransparencyInput" type="checkbox" checked /> Keep transparency</label>
+            <div class="two-buttons">
+              <button id="indexButton" class="secondary small-button" type="button" disabled>Apply</button>
+              <button id="indexAllButton" class="secondary small-button" type="button" disabled>Apply All</button>
+            </div>
+            <div class="two-buttons">
+              <button id="resetIndexButton" class="secondary small-button" type="button" disabled>Reset</button>
+              <button id="indexFrameButton" class="secondary small-button" type="button" disabled>Preview</button>
+            </div>
+            <div class="palette-wrap">
+              <div class="line"><label>Color Table</label><span class="value-pill" id="paletteInfo">0 colors</span></div>
+              <div class="palette-stage">
+                <canvas id="paletteCanvas" class="palette-canvas" width="256" height="256" aria-label="Indexed color table preview"></canvas>
+              </div>
+            </div>
+            <button id="loadPaletteButton" class="secondary small-button button-with-icon standalone-button" type="button" disabled><img class="tool-icon-image" src="icons/load.svg" alt="" aria-hidden="true" /> Color Table</button>
+            <div class="two-buttons">
+              <button id="saveActButton" class="secondary small-button button-with-icon" type="button" disabled><img class="tool-icon-image" src="icons/save.svg" alt="" aria-hidden="true" /> ACT</button>
+              <button id="savePalButton" class="secondary small-button button-with-icon" type="button" disabled><img class="tool-icon-image" src="icons/save.svg" alt="" aria-hidden="true" /> PAL</button>
+            </div>
+          </div>
+          <div class="group">
+            <p class="group-title"><span>Scale</span><span class="group-title-actions"><button id="scaleModeButton" class="secondary title-mode-button" type="button" disabled aria-label="Scale Applies To All" title="Scale Applies To All">All</button><button id="scaleLockButton" class="lock-button active" type="button" title="Unlock Scale X/Y" aria-label="Unlock Scale X/Y"></button></span></p>
+            <div class="field-row">
+              <div class="field"><label for="scaleXInput">Scale X</label><input id="scaleXInput" type="number" min="0.01" step="0.01" value="1" /></div>
+              <div class="field"><label for="scaleYInput">Scale Y</label><input id="scaleYInput" type="number" min="0.01" step="0.01" value="1" /></div>
+            </div>
+          </div>
+          <div class="group">
+            <p class="group-title">Pivot & Frame Offset</p>
+            <div class="field-row">
+              <div class="field"><label for="pivotOnlyYInput">Offset Y Pivot</label><input id="pivotOnlyYInput" type="number" step="1" value="0" /></div>
+              <div class="field"><label for="pivotYInput">Offset Y All</label><input id="pivotYInput" type="number" step="1" value="0" /></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="offsetXInput">Current Frame Offset X</label><input id="offsetXInput" type="number" step="1" value="0" /></div>
+              <div class="field"><label for="offsetYInput">Current Frame Offset Y</label><input id="offsetYInput" type="number" step="1" value="0" /></div>
+            </div>
+            <div class="icon-row">
+              <button id="nudgeLeftButton" class="secondary icon-button" type="button" disabled aria-label="Nudge Left" title="Nudge Left"><img class="tool-icon-image" src="icons/arrow-left.svg" alt="" aria-hidden="true" /></button>
+              <button id="nudgeRightButton" class="secondary icon-button" type="button" disabled aria-label="Nudge Right" title="Nudge Right"><img class="tool-icon-image" src="icons/arrow-right.svg" alt="" aria-hidden="true" /></button>
+              <button id="nudgeUpButton" class="secondary icon-button" type="button" disabled aria-label="Nudge Up" title="Nudge Up"><img class="tool-icon-image" src="icons/arrow-up.svg" alt="" aria-hidden="true" /></button>
+              <button id="nudgeDownButton" class="secondary icon-button" type="button" disabled aria-label="Nudge Down" title="Nudge Down"><img class="tool-icon-image" src="icons/arrow-down.svg" alt="" aria-hidden="true" /></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="card timeline-card">
+      <div class="timeline-toolbar">
+        <strong>Timeline</strong>
+        <div class="transport-row">
+          <button id="prevButton" class="secondary icon-button" disabled>⏮</button>
+          <button id="playButton" class="icon-button" disabled>▶</button>
+          <button id="stopButton" class="secondary icon-button" disabled>■</button>
+          <button id="nextButton" class="secondary icon-button" disabled>⏭</button>
+        </div>
+        <div class="timeline-slider-wrap">
+          <input id="frameInput" type="range" min="0" max="0" step="1" value="0" />
+          <span class="value-pill"><span id="frameValue">0</span>/<span id="totalFramesValue">0</span></span>
+        </div>
+      </div>
+      <div class="filmstrip"><div class="frames" id="frames"></div></div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <p class="modal-title" id="shortcutsTitle">Shortcuts</p>
+        <button id="closeShortcutsButton" class="secondary icon-button" type="button" aria-label="Close shortcuts">×</button>
+      </div>
+      <div class="shortcut-list">
+        <div><kbd>M</kbd><span>Mask Brush on/off</span></div>
+        <div><kbd>E</kbd><span>Erase Mask on/off</span></div>
+        <div><kbd>W</kbd><span>Magic Wand on/off</span></div>
+        <div><kbd>P</kbd><span>Pencil on/off</span></div>
+        <div><kbd>D</kbd><span>Dropper on/off</span></div>
+        <div><kbd>H</kbd><span>Hide Mask on/off</span></div>
+        <div><kbd>F</kbd><span>Reset View</span></div>
+        <div><kbd>Mouse Wheel</kbd><span>Zoom in/out</span></div>
+        <div><kbd>Shift + Wheel</kbd><span>Brush size</span></div>
+        <div><kbd>Shift + Arrows</kbd><span>Move current frame</span></div>
+        <div><kbd>Space</kbd><span>Play/Pause</span></div>
+        <div><kbd>← / →</kbd><span>Previous/Next frame</span></div>
+        <div><kbd>Ctrl/Cmd + Z</kbd><span>Undo</span></div>
+        <div><kbd>Ctrl/Cmd + Shift + Z</kbd><span>Redo</span></div>
+        <div><kbd>Ctrl/Cmd + Y</kbd><span>Redo</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="context-menu" id="frameContextMenu" role="menu" aria-label="Frame actions">
+    <button id="addFrameNextMenuButton" type="button" role="menuitem">Add Frame Next</button>
+    <button id="deleteFrameMenuButton" type="button" role="menuitem">Delete Frame</button>
+  </div>
+
+  <div class="modal-backdrop" id="colorModal" role="dialog" aria-modal="true" aria-labelledby="colorModalTitle">
+    <div class="modal color-modal">
+      <div class="modal-header">
+        <p class="modal-title" id="colorModalTitle">Color</p>
+        <button id="closeColorButton" class="secondary icon-button" type="button" aria-label="Close color picker">×</button>
+      </div>
+      <div class="color-picker-body">
+        <canvas id="colorFieldCanvas" class="color-field-canvas" width="360" height="360" aria-label="Color field"></canvas>
+        <div class="field">
+          <label for="colorHueCanvas">Hue</label>
+          <canvas id="colorHueCanvas" class="color-hue-canvas" width="360" height="18" aria-label="Hue"></canvas>
+        </div>
+        <div class="field-row rgb-row">
+          <div class="field"><label for="colorRInput">R</label><input id="colorRInput" type="number" min="0" max="255" step="1" value="182" /></div>
+          <div class="field"><label for="colorGInput">G</label><input id="colorGInput" type="number" min="0" max="255" step="1" value="192" /></div>
+          <div class="field"><label for="colorBInput">B</label><input id="colorBInput" type="number" min="0" max="255" step="1" value="207" /></div>
+        </div>
+        <div class="field">
+          <label for="colorHexInput">HEX</label>
+          <input id="colorHexInput" type="text" maxlength="7" value="#B6C0CF" />
+        </div>
+        <div class="color-picker-actions">
+          <button id="applyColorButton" type="button">Apply</button>
+          <button id="cancelColorButton" class="secondary" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), dropZone: $('dropZone'),
+      rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'),
+      frameInput: $('frameInput'), frameValue: $('frameValue'), totalFramesValue: $('totalFramesValue'), backgroundInput: $('backgroundInput'),
+      cageWidthInput: $('cageWidthInput'), cageHeightInput: $('cageHeightInput'), scaleXInput: $('scaleXInput'), scaleYInput: $('scaleYInput'), scaleModeButton: $('scaleModeButton'), scaleLockButton: $('scaleLockButton'),
+      rulerVButton: $('rulerVButton'), rulerHButton: $('rulerHButton'), pivotOnlyYInput: $('pivotOnlyYInput'), pivotYInput: $('pivotYInput'), offsetXInput: $('offsetXInput'), offsetYInput: $('offsetYInput'),
+      brushSizeInput: $('brushSizeInput'), brushSizeValue: $('brushSizeValue'), pencilButton: $('pencilButton'), paintBucketButton: $('paintBucketButton'), eyedropperButton: $('eyedropperButton'), pencilColorButton: $('pencilColorButton'), pencilColorSwatch: $('pencilColorSwatch'), magicToleranceInput: $('magicToleranceInput'), magicToleranceValue: $('magicToleranceValue'), magicAntialiasInput: $('magicAntialiasInput'), magicContiguousInput: $('magicContiguousInput'),
+      autoBgToleranceInput: $('autoBgToleranceInput'), autoBgToleranceValue: $('autoBgToleranceValue'), haloToleranceInput: $('haloToleranceInput'), haloToleranceValue: $('haloToleranceValue'), showHaloButton: $('showHaloButton'), haloRemoverButton: $('haloRemoverButton'),
+      indexKeepTransparencyInput: $('indexKeepTransparencyInput'), indexColorsInput: $('indexColorsInput'), indexColorsValue: $('indexColorsValue'), indexButton: $('indexButton'), resetIndexButton: $('resetIndexButton'), indexFrameButton: $('indexFrameButton'), indexAllButton: $('indexAllButton'), loadPaletteButton: $('loadPaletteButton'), saveActButton: $('saveActButton'), savePalButton: $('savePalButton'), paletteCanvas: $('paletteCanvas'), paletteInfo: $('paletteInfo'),
+      truePixelResolutionInput: $('truePixelResolutionInput'), truePixelButton: $('truePixelButton'), truePixelAllButton: $('truePixelAllButton'), truePixelResetButton: $('truePixelResetButton'), truePixelPreviewButton: $('truePixelPreviewButton'),
+      autoMaskFrameButton: $('autoMaskFrameButton'), autoMaskAllButton: $('autoMaskAllButton'), maskBrushButton: $('maskBrushButton'), restoreBrushButton: $('restoreBrushButton'), magicWandButton: $('magicWandButton'), hideMaskButton: $('hideMaskButton'), clearMaskButton: $('clearMaskButton'), clearAllMasksButton: $('clearAllMasksButton'),
+      playButton: $('playButton'), stopButton: $('stopButton'), prevButton: $('prevButton'), nextButton: $('nextButton'), nudgeLeftButton: $('nudgeLeftButton'), nudgeRightButton: $('nudgeRightButton'), nudgeUpButton: $('nudgeUpButton'), nudgeDownButton: $('nudgeDownButton'),
+      newButton: $('newButton'), loadButton: $('loadButton'), saveButton: $('saveButton'), shortcutsButton: $('shortcutsButton'), shortcutsModal: $('shortcutsModal'), closeShortcutsButton: $('closeShortcutsButton'),
+      resetButton: $('resetButton'), repackButton: $('repackButton'), frameContextMenu: $('frameContextMenu'), addFrameNextMenuButton: $('addFrameNextMenuButton'), deleteFrameMenuButton: $('deleteFrameMenuButton'), colorModal: $('colorModal'), colorModalTitle: $('colorModalTitle'), closeColorButton: $('closeColorButton'), cancelColorButton: $('cancelColorButton'), applyColorButton: $('applyColorButton'), colorFieldCanvas: $('colorFieldCanvas'), colorHueCanvas: $('colorHueCanvas'), colorRInput: $('colorRInput'), colorGInput: $('colorGInput'), colorBInput: $('colorBInput'), colorHexInput: $('colorHexInput'), errorBox: $('errorBox'), framesEl: $('frames'), canvasShell: $('canvasShell'), mainCanvas: $('mainCanvas'), emptyState: $('emptyState')
+    };
+    const ctx = els.mainCanvas.getContext('2d', { alpha: true });
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+    const TRUE_PIXEL_RESOLUTIONS = [16, 32, 64, 128, 256, 512];
+    const normalizeTruePixelResolution = value => TRUE_PIXEL_RESOLUTIONS.includes(Number(value)) ? Number(value) : 128;
+
+    const state = {
+      sheetImage: null, imageName: 'spritesheet', frames: [], importedId: 0,
+      rows: 1, cols: 4, totalFrames: 0, currentFrame: 0, startFrame: 0, endFrame: 0,
+      fps: 12, playing: false, animationId: null, lastTick: 0,
+      frameWidth: 0, frameHeight: 0, cageWidth: 1, cageHeight: 1, cageCustom: false,
+      scaleX: 1, scaleY: 1, scaleLocked: true, scaleAll: true, frameScales: [], pivotY: 0, rulersV: [], rulersH: [],
+      background: 'checker', backgroundCustomColor: { r: 32, g: 40, b: 52, a: 255 }, frameOffsets: [], frameMasks: [], maskDirty: [], indexedFrames: [],
+      maskMode: false, hideMask: false, pencilMode: false, paintBucketMode: false, eyedropperMode: false, brushAction: 'mask', brushSize: 18, pencilColor: { r: 182, g: 192, b: 207, a: 255 }, magicTolerance: 32, magicAntialias: true, magicContiguous: true, autoBgTolerance: 12, haloTolerance: 12, showHalo: false, indexColors: 256, indexKeepTransparency: true, indexPreviewVisible: false, importedPaletteInfo: null, importedPaletteRevision: 0, frameBitmapRevision: 0, indexPreviewKey: '', indexPreviewResult: null,
+      truePixelResolution: 128, truePixelPreviewVisible: false, truePixelPreviewKey: '', truePixelPreviewResult: null,
+      brushCursorVisible: false, brushX: 0, brushY: 0, zoom: 1, panX: 0, panY: 0,
+      dragging: false, dragMode: 'offset', dragLastX: 0, dragLastY: 0, maskLastX: 0, maskLastY: 0,
+      draggedFrameIndex: null, dropIndex: null, contextFrameIndex: null, timelineDragging: false, undoStack: [], redoStack: [], restoring: false
+    };
+    const hasFrames = () => state.frames.length > 0;
+
+    function showError(message = '') { els.errorBox.textContent = message; els.errorBox.classList.toggle('show', !!message); }
+    function setVal(el, value) { if (el && document.activeElement !== el) el.value = String(value); }
+    function canvasClone(src) { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d', { alpha: true }).drawImage(src, 0, 0); return c; }
+    function canvasFromImageData(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d', { alpha: true }).putImageData(img, 0, 0); return c; }
+    function cloneColor(color = { r: 0, g: 0, b: 0, a: 255 }) { return { r: Math.round(color.r || 0), g: Math.round(color.g || 0), b: Math.round(color.b || 0), a: color.a === 0 ? 0 : 255 }; }
+    function clonePalette(palette = []) { return palette.map(color => ({ ...color })); }
+    function cloneIndexedFrameInfo(info) { return info ? { palette: clonePalette(info.palette), colorLimit: info.colorLimit, keepTransparency: info.keepTransparency } : null; }
+    function cloneImportedPaletteInfo(info) { return info ? { palette: clonePalette(info.palette), colorLimit: info.colorLimit, keepTransparency: info.keepTransparency, sourceName: info.sourceName || 'Color Table' } : null; }
+    function clearIndexPreviewCache() { state.indexPreviewKey = ''; state.indexPreviewResult = null; }
+    function clearTruePixelPreviewCache() { state.truePixelPreviewKey = ''; state.truePixelPreviewResult = null; }
+    function markFrameBitmapsDirty() { state.frameBitmapRevision += 1; clearIndexPreviewCache(); clearTruePixelPreviewCache(); }
+    function setButtons(enabled) {
+      [els.saveButton, els.playButton, els.stopButton, els.prevButton, els.nextButton, els.nudgeLeftButton, els.nudgeRightButton, els.nudgeUpButton, els.nudgeDownButton, els.resetButton, els.repackButton, els.scaleModeButton, els.pencilButton, els.paintBucketButton, els.eyedropperButton, els.pencilColorButton, els.maskBrushButton, els.restoreBrushButton, els.magicWandButton, els.hideMaskButton, els.autoMaskFrameButton, els.autoMaskAllButton, els.showHaloButton, els.haloRemoverButton, els.clearMaskButton, els.clearAllMasksButton, els.rulerVButton, els.rulerHButton, els.indexButton, els.resetIndexButton, els.indexFrameButton, els.indexAllButton, els.truePixelButton, els.truePixelAllButton, els.truePixelResetButton, els.truePixelPreviewButton, els.loadPaletteButton, els.saveActButton, els.savePalButton].forEach(b => { if (b) b.disabled = !enabled; });
+    }
+    function setScaleLockIcon() {
+      const body = state.scaleLocked
+        ? '<rect x="5" y="8" width="14" height="10" rx="2"></rect><path d="M8 8V6a4 4 0 0 1 8 0v2"></path>'
+        : '<rect x="5" y="8" width="14" height="10" rx="2"></rect><path d="M15 8V6a4 4 0 0 0-7.5-2"></path>';
+      const label = state.scaleLocked ? 'Unlock Scale X/Y' : 'Lock Scale X/Y';
+      els.scaleLockButton.title = label;
+      els.scaleLockButton.setAttribute('aria-label', label);
+      els.scaleLockButton.innerHTML = `<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+    }
+
+    function snapshot() {
+      return {
+        frames: state.frames.map(f => ({ ...f, canvas: canvasClone(f.canvas), sourceCanvas: canvasClone(f.sourceCanvas || f.canvas) })), rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame,
+        frameWidth: state.frameWidth, frameHeight: state.frameHeight, cageWidth: state.cageWidth, cageHeight: state.cageHeight, cageCustom: state.cageCustom,
+        scaleX: state.scaleX, scaleY: state.scaleY, scaleLocked: state.scaleLocked, scaleAll: state.scaleAll, frameScales: state.frameScales.map(s => ({ ...s })), pivotY: state.pivotY, rulersV: [...state.rulersV], rulersH: [...state.rulersH],
+        frameOffsets: state.frameOffsets.map(o => ({ ...o })), frameMasks: state.frameMasks.map(m => canvasClone(m)), maskDirty: [...state.maskDirty], indexedFrames: state.indexedFrames.map(info => cloneIndexedFrameInfo(info)),
+        maskMode: state.maskMode, hideMask: state.hideMask, pencilMode: state.pencilMode, paintBucketMode: state.paintBucketMode, eyedropperMode: state.eyedropperMode, brushAction: state.brushAction, brushSize: state.brushSize, pencilColor: cloneColor(state.pencilColor), magicTolerance: state.magicTolerance, magicAntialias: state.magicAntialias, magicContiguous: state.magicContiguous, autoBgTolerance: state.autoBgTolerance, haloTolerance: state.haloTolerance, showHalo: state.showHalo, indexColors: state.indexColors, indexKeepTransparency: state.indexKeepTransparency, importedPaletteInfo: cloneImportedPaletteInfo(state.importedPaletteInfo), importedPaletteRevision: state.importedPaletteRevision,
+        truePixelResolution: state.truePixelResolution, truePixelPreviewVisible: state.truePixelPreviewVisible,
+        backgroundCustomColor: cloneColor(state.backgroundCustomColor),
+        zoom: state.zoom, panX: state.panX, panY: state.panY
+      };
+    }
+    function restore(s) {
+      state.restoring = true;
+      Object.assign(state, s);
+      state.rulersV = s.rulersV ? [...s.rulersV] : (s.rulerV === null || s.rulerV === undefined ? [] : [s.rulerV]);
+      state.rulersH = s.rulersH ? [...s.rulersH] : (s.rulerH === null || s.rulerH === undefined ? [] : [s.rulerH]);
+      state.frames = s.frames.map(f => ({ ...f, canvas: canvasClone(f.canvas), sourceCanvas: canvasClone(f.sourceCanvas || f.canvas) }));
+      state.frameOffsets = s.frameOffsets.map(o => ({ ...o }));
+      state.frameMasks = s.frameMasks.map(m => canvasClone(m));
+      state.maskDirty = [...s.maskDirty];
+      state.indexedFrames = (s.indexedFrames || []).map(info => cloneIndexedFrameInfo(info));
+      state.frameScales = (s.frameScales || []).map(scale => ({ x: clamp(parseFloat(scale.x) || state.scaleX, .01, 100), y: clamp(parseFloat(scale.y) || state.scaleY, .01, 100) }));
+      state.importedPaletteInfo = cloneImportedPaletteInfo(s.importedPaletteInfo);
+      state.importedPaletteRevision = s.importedPaletteRevision || 0;
+      state.truePixelResolution = normalizeTruePixelResolution(s.truePixelResolution || 128);
+      state.truePixelPreviewVisible = !!s.truePixelPreviewVisible;
+      state.pencilColor = cloneColor(s.pencilColor || state.pencilColor);
+      state.backgroundCustomColor = cloneColor(s.backgroundCustomColor || state.backgroundCustomColor);
+      state.paintBucketMode = !!s.paintBucketMode;
+      state.eyedropperMode = !!s.eyedropperMode;
+      markFrameBitmapsDirty();
+      syncAfterDataChange(false);
+      state.restoring = false;
+    }
+    function pushHistory() { if (state.restoring) return; state.undoStack.push(snapshot()); if (state.undoStack.length > 40) state.undoStack.shift(); state.redoStack = []; }
+    function undo() { if (!state.undoStack.length) return; state.redoStack.push(snapshot()); restore(state.undoStack.pop()); }
+    function redo() { if (!state.redoStack.length) return; state.undoStack.push(snapshot()); restore(state.redoStack.pop()); }
+
+    function makeFrameCanvas(image, sx = 0, sy = 0, sw = image.naturalWidth || image.width, sh = image.naturalHeight || image.height) {
+      const c = document.createElement('canvas'); c.width = Math.max(1, Math.floor(sw)); c.height = Math.max(1, Math.floor(sh));
+      const cctx = c.getContext('2d', { alpha: true }); cctx.imageSmoothingEnabled = false; cctx.clearRect(0, 0, c.width, c.height); cctx.drawImage(image, sx, sy, sw, sh, 0, 0, c.width, c.height);
+      return c;
+    }
+    function createSheetFrames(image, rows, cols) {
+      const fw = Math.floor(image.width / cols), fh = Math.floor(image.height / rows);
+      if (fw < 1 || fh < 1) { showError('Rows/columns create frames smaller than 1px.'); return []; }
+      const out = [];
+      for (let i = 0; i < rows * cols; i++) {
+        const canvas = makeFrameCanvas(image, (i % cols) * fw, Math.floor(i / cols) * fh, fw, fh);
+        out.push({ kind: 'sheet', id: `sheet-${i}-${Date.now()}`, name: `Frame ${i + 1}`, canvas, sourceCanvas: canvasClone(canvas) });
+      }
+      return out;
+    }
+    function makeMask(w = state.cageWidth, h = state.cageHeight) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+    function ensureArrays() {
+      state.frameOffsets = state.frames.map((_, i) => state.frameOffsets[i] ? { x: Math.round(state.frameOffsets[i].x || 0), y: Math.round(state.frameOffsets[i].y || 0) } : { x: 0, y: 0 });
+      state.frameMasks = state.frames.map((_, i) => {
+        const old = state.frameMasks[i];
+        if (!old) return makeMask();
+        if (old.width === state.cageWidth && old.height === state.cageHeight) return old;
+        const n = makeMask(); n.getContext('2d').drawImage(old, 0, 0); return n;
+      });
+      state.maskDirty = state.frames.map((_, i) => !!state.maskDirty[i]);
+      state.indexedFrames = state.frames.map((_, i) => cloneIndexedFrameInfo(state.indexedFrames[i]));
+      state.frameScales = state.frames.map((_, i) => {
+        const old = state.frameScales[i];
+        return old ? { x: clamp(parseFloat(old.x) || state.scaleX, .01, 100), y: clamp(parseFloat(old.y) || state.scaleY, .01, 100) } : { x: state.scaleX, y: state.scaleY };
+      });
+    }
+    function ensureRows() {
+      state.cols = clamp(parseInt(els.colsInput.value || state.cols, 10) || 1, 1, 100);
+      state.rows = Math.max(clamp(parseInt(els.rowsInput.value || state.rows, 10) || 1, 1, 100), Math.max(1, Math.ceil(Math.max(1, state.frames.length) / state.cols)));
+    }
+    function clampRulers() {
+      state.rulersV = (state.rulersV || []).map(v => clamp(Math.round(v), 0, state.cageHeight));
+      state.rulersH = (state.rulersH || []).map(v => clamp(Math.round(v), 0, state.cageWidth));
+    }
+    function updateMetrics() {
+      if (!hasFrames()) return;
+      state.frameWidth = state.frames[0].canvas.width; state.frameHeight = state.frames[0].canvas.height;
+      if (!state.cageCustom) { state.cageWidth = state.frameWidth; state.cageHeight = state.frameHeight; }
+      state.cageWidth = clamp(Math.round(state.cageWidth), 1, 8192); state.cageHeight = clamp(Math.round(state.cageHeight), 1, 8192);
+      state.pivotY = clamp(Math.round(state.pivotY), 0, state.cageHeight);
+      clampRulers();
+      ensureArrays();
+    }
+    function setRangeAll() { state.startFrame = 0; state.endFrame = Math.max(0, state.frames.length - 1); state.currentFrame = clamp(state.currentFrame, state.startFrame, state.endFrame); }
+    function readRange() {
+      if (!hasFrames()) { state.startFrame = state.endFrame = state.currentFrame = 0; return; }
+      state.startFrame = clamp((parseInt(els.startFrameInput.value, 10) || 1) - 1, 0, state.frames.length - 1);
+      state.endFrame = clamp((parseInt(els.endFrameInput.value, 10) || state.frames.length) - 1, state.startFrame, state.frames.length - 1);
+      state.currentFrame = clamp(state.currentFrame, state.startFrame, state.endFrame);
+    }
+    function syncAfterDataChange(resetRange = true) {
+      ensureRows(); updateMetrics(); if (resetRange) setRangeAll(); else readRange();
+      if (hasFrames()) { els.emptyState.style.display = 'none'; buildFilmstrip(); drawFrame(state.currentFrame); } else { els.emptyState.style.display = 'grid'; buildFilmstrip(); }
+      updateInfo();
+    }
+
+    function drawCageGuide(t, x = 0, y = 0) { t.save(); t.strokeStyle = 'rgba(255,79,115,1)'; t.lineWidth = 1; t.setLineDash([4,4]); t.strokeRect(Math.round(x)+.5, Math.round(y)+.5, Math.max(1, Math.round(state.cageWidth)-1), Math.max(1, Math.round(state.cageHeight)-1)); t.restore(); }
+    function drawRulers(t, x = 0, y = 0) {
+      t.save(); t.strokeStyle = 'rgba(255,79,115,1)'; t.lineWidth = 1; t.setLineDash([4,4]);
+      state.rulersV.forEach(v => { const yy = Math.round(y + v) + .5; t.beginPath(); t.moveTo(Math.round(x)+.5, yy); t.lineTo(Math.round(x + state.cageWidth)+.5, yy); t.stroke(); });
+      state.rulersH.forEach(v => { const xx = Math.round(x + v) + .5; t.beginPath(); t.moveTo(xx, Math.round(y)+.5); t.lineTo(xx, Math.round(y + state.cageHeight)+.5); t.stroke(); });
+      t.restore();
+    }
+    function drawPivot(t, x = 0, y = 0) {
+      const px = Math.round(x + state.cageWidth / 2) + .5, py = Math.round(y + state.pivotY) + .5, size = Math.max(6, Math.round(Math.min(state.cageWidth, state.cageHeight) * .045));
+      t.save(); t.strokeStyle = 'rgba(255,79,115,1)'; t.fillStyle = 'rgba(255,79,115,1)'; t.lineWidth = 1; t.setLineDash([4,4]); t.beginPath(); t.moveTo(Math.round(x)+.5, py); t.lineTo(Math.round(x + state.cageWidth)+.5, py); t.stroke(); t.setLineDash([]); t.beginPath(); t.moveTo(px - size, py); t.lineTo(px + size, py); t.moveTo(px, py - size); t.lineTo(px, py + size); t.stroke(); t.fillRect(Math.round(px - 1.5), Math.round(py - 1.5), 3, 3); t.restore();
+    }
+    function applyMask(t, i, x = 0, y = 0) { if (!state.maskDirty[i]) return; t.save(); t.globalCompositeOperation = 'destination-out'; t.drawImage(state.frameMasks[i], x, y); t.restore(); }
+    function drawMaskOverlay(t, i, x = 0, y = 0) {
+      if (!state.maskDirty[i]) return; const o = makeMask(); const oc = o.getContext('2d'); oc.drawImage(state.frameMasks[i], 0, 0); oc.globalCompositeOperation = 'source-in'; oc.fillStyle = 'rgb(240,200,104)'; oc.fillRect(0,0,o.width,o.height); t.save(); t.globalAlpha = .34; t.drawImage(o, x, y); t.restore();
+    }
+    function drawHaloPreview(t, i, x = 0, y = 0) {
+      const halo = computeHaloSelection(i); if (!halo) return; const alpha = state.maskDirty[i] ? halo.addAlpha : halo.resultAlpha; if (!alpha.some(a=>a>0)) return;
+      const o = makeMask(), oc = o.getContext('2d'), img = oc.createImageData(o.width,o.height), d = img.data;
+      for(let id=0;id<alpha.length;id++){if(!alpha[id])continue;const p=id*4;d[p]=43;d[p+1]=169;d[p+2]=255;d[p+3]=118;}
+      oc.putImageData(img,0,0); t.save(); t.drawImage(o,x,y); t.restore();
+    }
+    function frameScale(i) {
+      const scale = state.scaleAll ? { x: state.scaleX, y: state.scaleY } : (state.frameScales[i] || { x: state.scaleX, y: state.scaleY });
+      return { x: clamp(parseFloat(scale.x) || 1, .01, 100), y: clamp(parseFloat(scale.y) || 1, .01, 100) };
+    }
+    function setFrameScale(i, x, y) {
+      ensureArrays();
+      state.frameScales[i] = { x: clamp(parseFloat(x) || 1, .01, 100), y: clamp(parseFloat(y) || 1, .01, 100) };
+    }
+    function framePos(i) { const f = state.frames[i], o = state.frameOffsets[i] || {x:0,y:0}, s = frameScale(i); return { x: Math.round((state.cageWidth - f.canvas.width * s.x) / 2 + o.x), y: Math.round((state.cageHeight - f.canvas.height * s.y) / 2 + o.y) }; }
+    function framePixelPoint(i, cx, cy) {
+      const f = state.frames[i];
+      if (!f) return null;
+      const p = framePos(i), s = frameScale(i), lx = Math.floor((cx - p.x) / s.x), ly = Math.floor((cy - p.y) / s.y);
+      if (lx < 0 || ly < 0 || lx >= f.canvas.width || ly >= f.canvas.height) return null;
+      return { x: lx, y: ly };
+    }
+    function drawBrush(t) {
+      if (!state.brushCursorVisible) return;
+      if (state.pencilMode) {
+        const point = framePixelPoint(state.currentFrame, state.brushX, state.brushY);
+        if (!point) return;
+        const p = framePos(state.currentFrame), fs = frameScale(state.currentFrame), sx = Math.max(1, Math.round(state.brushSize * fs.x)), sy = Math.max(1, Math.round(state.brushSize * fs.y));
+        const left = Math.floor(p.x + point.x * fs.x - sx / 2), top = Math.floor(p.y + point.y * fs.y - sy / 2);
+        t.save();
+        t.fillStyle = `rgba(${state.pencilColor.r}, ${state.pencilColor.g}, ${state.pencilColor.b}, 0.45)`;
+        t.strokeStyle = '#000';
+        t.lineWidth = 1;
+        t.fillRect(left, top, sx, sy);
+        t.strokeRect(left - .5, top - .5, sx + 1, sy + 1);
+        if (sx > 2 && sy > 2) {
+          t.strokeStyle = 'rgba(255,255,255,.72)';
+          t.strokeRect(left + 1.5, top + 1.5, Math.max(0, sx - 3), Math.max(0, sy - 3));
+        }
+        t.restore();
+        return;
+      }
+      if (!state.maskMode || state.brushAction === 'wand') return;
+      const s = Math.max(1, Math.round(state.brushSize)), l = Math.floor(state.brushX - s / 2), top = Math.floor(state.brushY - s / 2);
+      t.save(); t.strokeStyle = '#000'; t.lineWidth = 1; t.setLineDash([]); t.strokeRect(l - .5, top - .5, s + 1, s + 1); if (s > 2) t.strokeRect(l + 1.5, top + 1.5, s - 3, s - 3); t.restore();
+    }
+    function drawSprite(t, i, x = 0, y = 0, opt = {}) {
+      const f = state.frames[i]; if (!f) return; const p = framePos(i), preview = opt.indexPreview ? currentIndexPreview(i) : null, pixelPreview = opt.truePixelPreview ? currentTruePixelPreview(i) : null;
+      t.save(); t.beginPath(); t.rect(x, y, state.cageWidth, state.cageHeight); t.clip(); t.imageSmoothingEnabled = false;
+      if (preview?.canvas) t.drawImage(preview.canvas, x, y);
+      else { const s = frameScale(i), canvas = pixelPreview?.canvas || f.canvas; t.drawImage(canvas, x + p.x, y + p.y, canvas.width * s.x, canvas.height * s.y); }
+      if (opt.applyMask) applyMask(t, i, x, y); if (opt.maskOverlay) drawMaskOverlay(t, i, x, y); if (opt.haloPreview) drawHaloPreview(t, i, x, y); if (opt.guides) { drawCageGuide(t,x,y); drawRulers(t,x,y); drawPivot(t,x,y); } if (opt.brush) drawBrush(t); t.restore();
+    }
+    function fitScale() { const r = els.canvasShell.getBoundingClientRect(); return (!r.width || !state.cageWidth) ? 1 : Math.min((r.width*.92)/state.cageWidth, (r.height*.92)/state.cageHeight); }
+    function updateCanvasZoom() { const s = fitScale() * state.zoom; els.mainCanvas.style.width = `${state.cageWidth * s}px`; els.mainCanvas.style.height = `${state.cageHeight * s}px`; els.mainCanvas.style.transform = `translate(${state.panX}px, ${state.panY}px)`; }
+    function drawFrame(i) {
+      if (!hasFrames()) return; updateMetrics(); els.mainCanvas.width = state.cageWidth; els.mainCanvas.height = state.cageHeight; updateCanvasZoom(); ctx.clearRect(0,0,els.mainCanvas.width,els.mainCanvas.height);
+      drawSprite(ctx, i, 0, 0, { guides: true, maskOverlay: state.maskMode && !state.hideMask, haloPreview: state.showHalo, applyMask: !state.maskMode || state.hideMask, brush: state.maskMode || state.pencilMode, indexPreview: state.indexPreviewVisible, truePixelPreview: state.truePixelPreviewVisible }); updateActiveThumb();
+    }
+
+    function updateInfo() {
+      const o = state.frameOffsets[state.currentFrame] || {x:0,y:0};
+      setVal(els.rowsInput, state.rows); setVal(els.colsInput, state.cols); setVal(els.startFrameInput, hasFrames() ? state.startFrame+1 : 1); setVal(els.endFrameInput, hasFrames() ? state.endFrame+1 : 0);
+      setVal(els.speedInput, state.fps); setVal(els.backgroundInput, state.background); setVal(els.brushSizeInput, state.brushSize); setVal(els.magicToleranceInput, state.magicTolerance); setVal(els.autoBgToleranceInput, state.autoBgTolerance); setVal(els.haloToleranceInput, state.haloTolerance); setVal(els.indexColorsInput, state.indexColors); setVal(els.truePixelResolutionInput, state.truePixelResolution);
+      const currentScale = frameScale(state.currentFrame);
+      setVal(els.cageWidthInput, Math.round(state.cageWidth)); setVal(els.cageHeightInput, Math.round(state.cageHeight)); setVal(els.scaleXInput, Number(currentScale.x.toFixed(3))); setVal(els.scaleYInput, Number(currentScale.y.toFixed(3)));
+      setVal(els.pivotOnlyYInput, Math.round(state.pivotY)); setVal(els.pivotYInput, Math.round(state.pivotY)); setVal(els.offsetXInput, Math.round(o.x)); setVal(els.offsetYInput, Math.round(o.y));
+      els.speedValue.textContent = state.fps; els.brushSizeValue.textContent = state.brushSize; els.magicToleranceValue.textContent = state.magicTolerance; els.autoBgToleranceValue.textContent = state.autoBgTolerance; els.haloToleranceValue.textContent = state.haloTolerance; els.indexColorsValue.textContent = state.indexColors;
+      els.magicAntialiasInput.checked = !!state.magicAntialias; els.magicContiguousInput.checked = !!state.magicContiguous; els.indexKeepTransparencyInput.checked = !!state.indexKeepTransparency;
+      els.frameValue.textContent = hasFrames() ? state.currentFrame + 1 : 0; els.totalFramesValue.textContent = state.frames.length; els.frameInput.min = hasFrames() ? state.startFrame : 0; els.frameInput.max = hasFrames() ? state.endFrame : 0; if (!state.timelineDragging) els.frameInput.value = state.currentFrame;
+      els.scaleModeButton.textContent = state.scaleAll ? 'All' : 'Individual';
+      els.scaleModeButton.classList.toggle('active', state.scaleAll);
+      els.scaleModeButton.title = state.scaleAll ? 'Scale applies to all frames' : 'Scale applies to the current frame only';
+      els.scaleModeButton.setAttribute('aria-label', els.scaleModeButton.title);
+      els.scaleLockButton.classList.toggle('active', state.scaleLocked); setScaleLockIcon(); els.pencilButton.classList.toggle('active', state.pencilMode); els.paintBucketButton.classList.toggle('active', state.paintBucketMode); els.eyedropperButton.classList.toggle('active', state.eyedropperMode); els.maskBrushButton.classList.toggle('active', state.maskMode && state.brushAction === 'mask'); els.restoreBrushButton.classList.toggle('active', state.maskMode && state.brushAction === 'restore'); els.magicWandButton.classList.toggle('active', state.maskMode && state.brushAction === 'wand'); els.hideMaskButton.classList.toggle('active', state.hideMask); els.showHaloButton.classList.toggle('active', state.showHalo); els.indexFrameButton.classList.toggle('active', state.indexPreviewVisible); els.truePixelPreviewButton.classList.toggle('active', state.truePixelPreviewVisible); els.rulerVButton.classList.remove('active'); els.rulerHButton.classList.remove('active');
+      els.playButton.textContent = state.playing ? '⏸' : '▶';
+      els.pencilColorSwatch.style.background = `rgb(${state.pencilColor.r}, ${state.pencilColor.g}, ${state.pencilColor.b})`;
+      els.canvasShell.classList.remove('bg-dark','bg-light','bg-transparent','bg-custom','mask-mode');
+      els.canvasShell.style.backgroundColor = '';
+      if (state.background === 'custom') {
+        els.canvasShell.classList.add('bg-custom');
+        els.canvasShell.style.backgroundColor = `rgb(${state.backgroundCustomColor.r}, ${state.backgroundCustomColor.g}, ${state.backgroundCustomColor.b})`;
+      } else if (state.background !== 'checker') els.canvasShell.classList.add(`bg-${state.background}`);
+      if (state.maskMode || state.pencilMode || state.paintBucketMode || state.eyedropperMode) els.canvasShell.classList.add('mask-mode');
+      updateIndexPreview();
+      setButtons(hasFrames());
+    }
+
+    function clearPaletteTable() {
+      const pc = els.paletteCanvas.getContext('2d', { alpha: true });
+      pc.clearRect(0, 0, els.paletteCanvas.width, els.paletteCanvas.height);
+      els.paletteInfo.textContent = '0 colors';
+    }
+    function frameSourceImageData(i) {
+      const canvas = state.frames[i]?.canvas;
+      return canvas ? canvas.getContext('2d', { alpha: true }).getImageData(0, 0, canvas.width, canvas.height) : null;
+    }
+    function collectOpaqueHistogram(img) {
+      const map = new Map(); let hasTransparency = false;
+      for (let p = 0; p < img.data.length; p += 4) {
+        const a = img.data[p + 3];
+        if (a < 16) { hasTransparency = true; continue; }
+        const r = img.data[p], g = img.data[p + 1], b = img.data[p + 2];
+        const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+        const found = map.get(key);
+        if (found) {
+          found.r += r; found.g += g; found.b += b; found.count += 1;
+        } else map.set(key, { r, g, b, count: 1 });
+      }
+      return {
+        entries: [...map.values()].map(c => ({
+          r: Math.round(c.r / c.count),
+          g: Math.round(c.g / c.count),
+          b: Math.round(c.b / c.count),
+          count: c.count
+        })),
+        hasTransparency
+      };
+    }
+    function colorDistanceSq(a, b) {
+      const dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
+      return dr * dr * 0.299 + dg * dg * 0.587 + db * db * 0.114;
+    }
+    function selectiveEntryWeight(c) {
+      const max = Math.max(c.r, c.g, c.b), min = Math.min(c.r, c.g, c.b), sat = max ? (max - min) / max : 0, luma = (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+      let weight = Math.sqrt(c.count);
+      weight *= 0.65 + sat * 1.35;
+      if (sat < 0.1) weight *= 0.55;
+      if (luma > 0.88 && sat < 0.18) weight *= 0.4;
+      return Math.max(0.0001, weight);
+    }
+    function buildIndexedPalette(entries, limit) {
+      if (!entries.length) return [];
+      const prepared = entries.map(c => ({ ...c, weight: selectiveEntryWeight(c) }));
+      if (prepared.length <= limit) return prepared.map(({ weight, ...c }) => ({ ...c, a: 255 })).sort((a, b) => b.count - a.count);
+      const centers = [];
+      const first = prepared.reduce((best, c) => !best || c.weight > best.weight ? c : best, null);
+      if (!first) return [];
+      centers.push({ r: first.r, g: first.g, b: first.b });
+      while (centers.length < limit && centers.length < prepared.length) {
+        let best = null, bestScore = -1;
+        prepared.forEach(c => {
+          let minDist = Infinity;
+          centers.forEach(center => { minDist = Math.min(minDist, colorDistanceSq(c, center)); });
+          const score = minDist * c.weight;
+          if (score > bestScore) { bestScore = score; best = c; }
+        });
+        if (!best || bestScore <= 0.01) break;
+        centers.push({ r: best.r, g: best.g, b: best.b });
+      }
+      for (let iter = 0; iter < 10; iter++) {
+        const sums = centers.map(() => ({ r: 0, g: 0, b: 0, w: 0 }));
+        prepared.forEach(c => {
+          let bestIndex = 0, bestDist = Infinity;
+          for (let i = 0; i < centers.length; i++) {
+            const dist = colorDistanceSq(c, centers[i]);
+            if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+          }
+          sums[bestIndex].r += c.r * c.weight;
+          sums[bestIndex].g += c.g * c.weight;
+          sums[bestIndex].b += c.b * c.weight;
+          sums[bestIndex].w += c.weight;
+        });
+        let changed = false;
+        for (let i = 0; i < centers.length; i++) {
+          if (!sums[i].w) continue;
+          const nr = Math.round(sums[i].r / sums[i].w), ng = Math.round(sums[i].g / sums[i].w), nb = Math.round(sums[i].b / sums[i].w);
+          if (nr !== centers[i].r || ng !== centers[i].g || nb !== centers[i].b) changed = true;
+          centers[i] = { r: nr, g: ng, b: nb };
+        }
+        if (!changed) break;
+      }
+      const final = centers.map(() => ({ r: 0, g: 0, b: 0, w: 0, count: 0 }));
+      prepared.forEach(c => {
+        let bestIndex = 0, bestDist = Infinity;
+        for (let i = 0; i < centers.length; i++) {
+          const dist = colorDistanceSq(c, centers[i]);
+          if (dist < bestDist) { bestDist = dist; bestIndex = i; }
+        }
+        final[bestIndex].r += c.r * c.weight;
+        final[bestIndex].g += c.g * c.weight;
+        final[bestIndex].b += c.b * c.weight;
+        final[bestIndex].w += c.weight;
+        final[bestIndex].count += c.count;
+      });
+      return final.filter(c => c.w > 0).map(c => ({
+        r: Math.round(c.r / c.w),
+        g: Math.round(c.g / c.w),
+        b: Math.round(c.b / c.w),
+        a: 255,
+        count: c.count
+      })).sort((a, b) => b.count - a.count);
+    }
+    function renderFrameForIndex(i) {
+      if (!hasFrames()) return null;
+      const c = makeMask(state.cageWidth, state.cageHeight), cc = c.getContext('2d', { alpha: true });
+      cc.clearRect(0, 0, c.width, c.height);
+      drawSprite(cc, i, 0, 0, { applyMask: true });
+      return { canvas: c, imageData: cc.getImageData(0, 0, c.width, c.height) };
+    }
+    function sampleVisibleFrameColor(i, cx, cy) {
+      if (!hasFrames()) return null;
+      const c = makeMask(state.cageWidth, state.cageHeight), cc = c.getContext('2d', { alpha: true });
+      cc.clearRect(0, 0, c.width, c.height);
+      drawSprite(cc, i, 0, 0, { applyMask: true, indexPreview: state.indexPreviewVisible, truePixelPreview: state.truePixelPreviewVisible });
+      const sample = cc.getImageData(clamp(cx, 0, c.width - 1), clamp(cy, 0, c.height - 1), 1, 1).data;
+      if (sample[3] < 16) return null;
+      return { r: sample[0], g: sample[1], b: sample[2], a: 255 };
+    }
+    function buildIndexPaletteInfo(img, maxColors, keepTransparency) {
+      const histogram = collectOpaqueHistogram(img), colorLimit = clamp(Math.round(maxColors) || 256, 3, 256), reserveTransparency = keepTransparency && histogram.hasTransparency ? 1 : 0, opaqueLimit = Math.max(1, colorLimit - reserveTransparency);
+      const opaquePalette = buildIndexedPalette(histogram.entries, opaqueLimit);
+      const palette = reserveTransparency ? [{ r: 0, g: 0, b: 0, a: 0, count: 0, transparent: true }, ...opaquePalette] : [...opaquePalette];
+      return { palette, opaquePalette, hasTransparency: histogram.hasTransparency, opaqueCount: opaquePalette.length, colorLimit, keepTransparency };
+    }
+    function nearestPaletteColor(r, g, b, palette, cache) {
+      const key = (r << 16) | (g << 8) | b;
+      if (cache.has(key)) return cache.get(key);
+      let best = palette[0] || { r, g, b, a: 255 }, bestDist = Infinity;
+      palette.forEach(color => {
+        const dist = colorDistanceSq({ r, g, b }, color);
+        if (dist < bestDist) { bestDist = dist; best = color; }
+      });
+      cache.set(key, best);
+      return best;
+    }
+    function quantizeImageToPalette(img, paletteInfo) {
+      const opaquePalette = paletteInfo.opaquePalette?.length ? paletteInfo.opaquePalette : paletteInfo.palette.filter(color => color.a !== 0);
+      const out = new ImageData(img.width, img.height), cache = new Map();
+      for (let p = 0; p < img.data.length; p += 4) {
+        if (img.data[p + 3] < 16) { out.data[p + 3] = 0; continue; }
+        const color = nearestPaletteColor(img.data[p], img.data[p + 1], img.data[p + 2], opaquePalette.length ? opaquePalette : [{ r: img.data[p], g: img.data[p + 1], b: img.data[p + 2], a: 255 }], cache);
+        out.data[p] = color.r; out.data[p + 1] = color.g; out.data[p + 2] = color.b; out.data[p + 3] = 255;
+      }
+      return { palette: clonePalette(paletteInfo.palette), opaquePalette: clonePalette(opaquePalette), imageData: out, hasTransparency: paletteInfo.hasTransparency, opaqueCount: opaquePalette.length, colorLimit: paletteInfo.colorLimit, keepTransparency: paletteInfo.keepTransparency };
+    }
+    function paletteInfoFromPalette(palette, colorLimit, keepTransparency) {
+      const nextPalette = clonePalette(palette), opaquePalette = nextPalette.filter(color => color.a !== 0), hasTransparency = nextPalette.some(color => color.a === 0);
+      return { palette: nextPalette, opaquePalette, hasTransparency, opaqueCount: opaquePalette.length, colorLimit, keepTransparency };
+    }
+    function drawPaletteTable(palette) {
+      const pc = els.paletteCanvas.getContext('2d', { alpha: true }), cols = 16, rows = 16, cell = 16;
+      els.paletteCanvas.width = cols * cell; els.paletteCanvas.height = rows * cell; pc.clearRect(0, 0, els.paletteCanvas.width, els.paletteCanvas.height);
+      for (let i = 0; i < cols * rows; i++) {
+        const x = (i % cols) * cell, y = Math.floor(i / cols) * cell, swatch = palette[i];
+        pc.fillStyle = swatch ? (swatch.a === 0 ? 'rgba(255,255,255,0.08)' : `rgb(${swatch.r},${swatch.g},${swatch.b})`) : 'rgba(255,255,255,0.12)';
+        pc.fillRect(x, y, cell, cell);
+        pc.strokeStyle = 'rgba(0,0,0,0.45)';
+        pc.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1);
+      }
+    }
+    function paletteInfoForIndex(img) {
+      if (state.importedPaletteInfo?.palette?.length) return paletteInfoFromPalette(state.importedPaletteInfo.palette, state.importedPaletteInfo.colorLimit, state.importedPaletteInfo.keepTransparency);
+      return buildIndexPaletteInfo(img, state.indexColors, state.indexKeepTransparency);
+    }
+    function currentIndexPreviewKey(i = state.currentFrame) { return [i, state.frameBitmapRevision, state.indexColors, state.indexKeepTransparency ? 1 : 0, state.importedPaletteRevision].join('|'); }
+    function currentIndexPreview(i = state.currentFrame) {
+      if (!hasFrames()) return null;
+      const key = currentIndexPreviewKey(i);
+      if (state.indexPreviewKey === key && state.indexPreviewResult) return state.indexPreviewResult;
+      const rendered = renderFrameForIndex(i);
+      if (!rendered) return null;
+      const paletteInfo = paletteInfoForIndex(rendered.imageData);
+      const preview = quantizeImageToPalette(rendered.imageData, paletteInfo);
+      preview.canvas = canvasFromImageData(preview.imageData);
+      state.indexPreviewKey = key;
+      state.indexPreviewResult = preview;
+      return preview;
+    }
+    function displayedPaletteInfo() {
+      if (!hasFrames()) return null;
+      if (state.indexPreviewVisible) {
+        const preview = currentIndexPreview();
+        return preview ? { mode: 'preview', palette: preview.palette, colorLimit: preview.colorLimit, keepTransparency: preview.keepTransparency } : null;
+      }
+      if (state.importedPaletteInfo?.palette?.length) return { mode: 'loaded', palette: state.importedPaletteInfo.palette, colorLimit: state.importedPaletteInfo.colorLimit, keepTransparency: state.importedPaletteInfo.keepTransparency };
+      const applied = state.indexedFrames[state.currentFrame];
+      return applied?.palette?.length ? { mode: 'applied', palette: applied.palette, colorLimit: applied.colorLimit, keepTransparency: applied.keepTransparency } : null;
+    }
+    function paletteInfoForApply() {
+      const visible = displayedPaletteInfo();
+      if (visible?.palette?.length) return paletteInfoFromPalette(visible.palette, visible.colorLimit || visible.palette.length, visible.keepTransparency);
+      const rendered = renderFrameForIndex(state.currentFrame);
+      return rendered ? buildIndexPaletteInfo(rendered.imageData, state.indexColors, state.indexKeepTransparency) : null;
+    }
+    function buildFrameIndexResult(i = state.currentFrame, sharedPaletteInfo = null) {
+      const source = frameSourceImageData(i);
+      if (!source) return null;
+      const rendered = renderFrameForIndex(i);
+      if (!rendered) return null;
+      const paletteInfo = sharedPaletteInfo
+        ? paletteInfoFromPalette(sharedPaletteInfo.palette, sharedPaletteInfo.colorLimit, sharedPaletteInfo.keepTransparency)
+        : state.importedPaletteInfo?.palette?.length
+          ? paletteInfoFromPalette(state.importedPaletteInfo.palette, state.importedPaletteInfo.colorLimit, state.importedPaletteInfo.keepTransparency)
+          : buildIndexPaletteInfo(rendered.imageData, state.indexColors, state.indexKeepTransparency);
+      const result = quantizeImageToPalette(source, paletteInfo);
+      const visiblePreview = quantizeImageToPalette(rendered.imageData, paletteInfo);
+      result.canvas = canvasFromImageData(visiblePreview.imageData);
+      return result;
+    }
+    function updateIndexPreview() {
+      if (!hasFrames()) { clearPaletteTable(); return; }
+      if (state.indexPreviewVisible) {
+        const preview = currentIndexPreview();
+        if (!preview) { clearPaletteTable(); return; }
+        drawPaletteTable(preview.palette);
+        els.paletteInfo.textContent = `${preview.palette.length}/${preview.colorLimit} colors`;
+        return;
+      }
+      if (state.importedPaletteInfo?.palette?.length) {
+        drawPaletteTable(state.importedPaletteInfo.palette);
+        els.paletteInfo.textContent = `${state.importedPaletteInfo.palette.length}/${state.importedPaletteInfo.colorLimit} colors`;
+        return;
+      }
+      const applied = state.indexedFrames[state.currentFrame];
+      if (!applied?.palette?.length) { clearPaletteTable(); return; }
+      drawPaletteTable(applied.palette);
+      els.paletteInfo.textContent = `${applied.palette.length}/${applied.colorLimit} colors`;
+    }
+    function applyIndexedResultToFrame(i, result) {
+      const canvas = state.frames[i].canvas;
+      canvas.getContext('2d', { alpha: true }).putImageData(result.imageData, 0, 0);
+      state.indexedFrames[i] = cloneIndexedFrameInfo({ palette: result.palette, colorLimit: result.colorLimit, keepTransparency: result.keepTransparency });
+    }
+    function toggleIndexPreview() {
+      if (!hasFrames()) return;
+      state.indexPreviewVisible = !state.indexPreviewVisible;
+      if (state.indexPreviewVisible) {
+        state.truePixelPreviewVisible = false;
+        clearTruePixelPreviewCache();
+      }
+      if (!state.indexPreviewVisible) clearIndexPreviewCache();
+      drawFrame(state.currentFrame);
+      updateInfo();
+    }
+    function indexCurrentFrame() {
+      if (!hasFrames()) return;
+      pushHistory();
+      const result = buildFrameIndexResult(state.currentFrame, paletteInfoForApply());
+      if (!result) return;
+      applyIndexedResultToFrame(state.currentFrame, result);
+      state.indexPreviewVisible = false;
+      state.truePixelPreviewVisible = false;
+      markFrameBitmapsDirty();
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function resetIndexedCurrentFrame() {
+      if (!hasFrames()) return;
+      const frame = state.frames[state.currentFrame];
+      if (!frame?.sourceCanvas) return;
+      pushHistory();
+      frame.canvas = canvasClone(frame.sourceCanvas);
+      state.indexedFrames[state.currentFrame] = null;
+      state.indexPreviewVisible = false;
+      state.truePixelPreviewVisible = false;
+      markFrameBitmapsDirty();
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function indexAllFrames() {
+      if (!hasFrames()) return;
+      pushHistory();
+      const sharedPaletteInfo = paletteInfoForApply();
+      if (!sharedPaletteInfo?.palette?.length) return;
+      state.frames.forEach((_, i) => {
+        const result = buildFrameIndexResult(i, sharedPaletteInfo);
+        if (result) applyIndexedResultToFrame(i, result);
+      });
+      state.indexPreviewVisible = false;
+      state.truePixelPreviewVisible = false;
+      markFrameBitmapsDirty();
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function truePixelCanvas(src, resolution = state.truePixelResolution) {
+      const out = document.createElement('canvas');
+      out.width = Math.max(1, src.width);
+      out.height = Math.max(1, src.height);
+      const maxSide = Math.max(out.width, out.height), targetMax = Math.min(normalizeTruePixelResolution(resolution), maxSide);
+      const targetW = Math.max(1, Math.round(out.width * targetMax / maxSide)), targetH = Math.max(1, Math.round(out.height * targetMax / maxSide));
+      const small = document.createElement('canvas');
+      small.width = targetW;
+      small.height = targetH;
+      const sc = small.getContext('2d', { alpha: true });
+      sc.imageSmoothingEnabled = false;
+      sc.clearRect(0, 0, targetW, targetH);
+      sc.drawImage(src, 0, 0, targetW, targetH);
+      const oc = out.getContext('2d', { alpha: true });
+      oc.imageSmoothingEnabled = false;
+      oc.clearRect(0, 0, out.width, out.height);
+      oc.drawImage(small, 0, 0, targetW, targetH, 0, 0, out.width, out.height);
+      return out;
+    }
+    function currentTruePixelPreviewKey(i = state.currentFrame) { return [i, state.frameBitmapRevision, state.truePixelResolution].join('|'); }
+    function currentTruePixelPreview(i = state.currentFrame) {
+      if (!hasFrames()) return null;
+      const key = currentTruePixelPreviewKey(i);
+      if (state.truePixelPreviewKey === key && state.truePixelPreviewResult) return state.truePixelPreviewResult;
+      const frame = state.frames[i];
+      if (!frame?.canvas) return null;
+      const result = { canvas: truePixelCanvas(frame.canvas, state.truePixelResolution), resolution: state.truePixelResolution };
+      state.truePixelPreviewKey = key;
+      state.truePixelPreviewResult = result;
+      return result;
+    }
+    function toggleTruePixelPreview() {
+      if (!hasFrames()) return;
+      state.truePixelPreviewVisible = !state.truePixelPreviewVisible;
+      if (state.truePixelPreviewVisible) {
+        state.indexPreviewVisible = false;
+        clearIndexPreviewCache();
+      } else clearTruePixelPreviewCache();
+      drawFrame(state.currentFrame);
+      updateInfo();
+    }
+    function applyTruePixelToFrame(i) {
+      const frame = state.frames[i];
+      if (!frame?.canvas) return false;
+      frame.canvas = truePixelCanvas(frame.canvas, state.truePixelResolution);
+      return true;
+    }
+    function truePixelCurrentFrame() {
+      if (!hasFrames()) return;
+      pushHistory();
+      state.indexPreviewVisible = false;
+      state.truePixelPreviewVisible = false;
+      if (!applyTruePixelToFrame(state.currentFrame)) return;
+      markFrameBitmapsDirty();
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function resetTruePixelCurrentFrame() {
+      if (!hasFrames()) return;
+      const frame = state.frames[state.currentFrame];
+      if (!frame?.sourceCanvas) return;
+      pushHistory();
+      frame.canvas = canvasClone(frame.sourceCanvas);
+      state.indexedFrames[state.currentFrame] = null;
+      state.indexPreviewVisible = false;
+      state.truePixelPreviewVisible = false;
+      markFrameBitmapsDirty();
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function truePixelAllFrames() {
+      if (!hasFrames()) return;
+      pushHistory();
+      state.indexPreviewVisible = false;
+      state.truePixelPreviewVisible = false;
+      state.frames.forEach((_, i) => applyTruePixelToFrame(i));
+      markFrameBitmapsDirty();
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function paletteFileBase(ext) { return `${state.imageName.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '_') || 'spritesheet'}_frame${state.currentFrame + 1}_palette.${ext}`; }
+    function savePaletteACT() {
+      const info = displayedPaletteInfo();
+      if (!info?.palette?.length) return showError('There is no indexed color table to save yet.');
+      showError('');
+      const bytes = new Uint8Array(256 * 3);
+      for (let i = 0; i < 256; i++) {
+        const color = info.palette[i] || { r: 0, g: 0, b: 0 };
+        bytes[i * 3] = color.r || 0;
+        bytes[i * 3 + 1] = color.g || 0;
+        bytes[i * 3 + 2] = color.b || 0;
+      }
+      downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }), paletteFileBase('act'));
+    }
+    function savePalettePAL() {
+      const info = displayedPaletteInfo();
+      if (!info?.palette?.length) return showError('There is no indexed color table to save yet.');
+      showError('');
+      const lines = ['JASC-PAL', '0100', String(info.palette.length), ...info.palette.map(color => `${color.r || 0} ${color.g || 0} ${color.b || 0}`)];
+      downloadBlob(new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' }), paletteFileBase('pal'));
+    }
+    function normalizeImportedPalette(colors, keepTransparency = state.indexKeepTransparency) {
+      const palette = (colors || []).map(color => ({
+        r: clamp(Math.round(color.r || 0), 0, 255),
+        g: clamp(Math.round(color.g || 0), 0, 255),
+        b: clamp(Math.round(color.b || 0), 0, 255),
+        a: 255
+      })).slice(0, 256);
+      if (!palette.length) return [];
+      if (!keepTransparency) return palette;
+      const trimmed = palette.length >= 256 ? palette.slice(0, 255) : palette.slice();
+      return [{ r: 0, g: 0, b: 0, a: 0, transparent: true }, ...trimmed];
+    }
+    function parseActPalette(bytes) {
+      const count = Math.min(256, Math.floor(bytes.length / 3));
+      if (count < 1) throw new Error('That ACT file does not contain any palette colors.');
+      const colors = [];
+      for (let i = 0; i < count; i++) colors.push({ r: bytes[i * 3], g: bytes[i * 3 + 1], b: bytes[i * 3 + 2] });
+      return colors;
+    }
+    function readFourCC(bytes, offset) {
+      return String.fromCharCode(bytes[offset] || 0, bytes[offset + 1] || 0, bytes[offset + 2] || 0, bytes[offset + 3] || 0);
+    }
+    function parseRiffPal(bytes) {
+      if (bytes.length < 24 || readFourCC(bytes, 0) !== 'RIFF' || readFourCC(bytes, 8) !== 'PAL ' || readFourCC(bytes, 12) !== 'data') return null;
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const count = Math.min(256, view.getUint16(22, true), Math.floor((bytes.length - 24) / 4));
+      if (count < 1) throw new Error('That PAL file does not contain any palette colors.');
+      const colors = [];
+      for (let i = 0; i < count; i++) {
+        const offset = 24 + i * 4;
+        colors.push({ r: bytes[offset], g: bytes[offset + 1], b: bytes[offset + 2] });
+      }
+      return colors;
+    }
+    function parseTextPal(bytes) {
+      const text = new TextDecoder('utf-8').decode(bytes).replace(/\0/g, '');
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      if (!lines.length) throw new Error('That PAL file is empty.');
+      const colors = [];
+      const parseRgbLine = (line) => {
+        const match = line.match(/^(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})$/);
+        if (!match) return null;
+        return { r: clamp(parseInt(match[1], 10), 0, 255), g: clamp(parseInt(match[2], 10), 0, 255), b: clamp(parseInt(match[3], 10), 0, 255) };
+      };
+      if (lines[0].toUpperCase() === 'JASC-PAL') {
+        for (let i = 3; i < lines.length && colors.length < 256; i++) {
+          const color = parseRgbLine(lines[i]);
+          if (color) colors.push(color);
+        }
+      } else {
+        lines.forEach(line => {
+          if (colors.length >= 256 || line.startsWith('#') || line.startsWith(';')) return;
+          const color = parseRgbLine(line);
+          if (color) colors.push(color);
+        });
+      }
+      if (!colors.length) throw new Error('That PAL file format is not supported.');
+      return colors;
+    }
+    function parsePalPalette(bytes) {
+      return parseRiffPal(bytes) || parseTextPal(bytes);
+    }
+    function parsePcxPalette(bytes) {
+      if (bytes.length >= 769 && bytes[bytes.length - 769] === 12) {
+        const colors = [];
+        const start = bytes.length - 768;
+        for (let i = 0; i < 256; i++) colors.push({ r: bytes[start + i * 3], g: bytes[start + i * 3 + 1], b: bytes[start + i * 3 + 2] });
+        return colors;
+      }
+      throw new Error('Only 256-color PCX palette files are supported.');
+    }
+    function loadImageAny(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file), img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image as a color table.')); };
+        img.src = url;
+      });
+    }
+    async function paletteFromImageFile(file) {
+      const img = await loadImageAny(file), canvas = makeFrameCanvas(img), ctx2d = canvas.getContext('2d', { alpha: true });
+      const imageData = ctx2d.getImageData(0, 0, canvas.width, canvas.height), exact = new Map();
+      for (let p = 0; p < imageData.data.length; p += 4) {
+        if (imageData.data[p + 3] < 16) continue;
+        const key = `${imageData.data[p]},${imageData.data[p + 1]},${imageData.data[p + 2]}`;
+        if (!exact.has(key)) exact.set(key, { r: imageData.data[p], g: imageData.data[p + 1], b: imageData.data[p + 2] });
+        if (exact.size > 256) break;
+      }
+      if (exact.size <= 256) return [...exact.values()];
+      return buildIndexedPalette(collectOpaqueHistogram(imageData).entries, 256);
+    }
+    async function importPaletteFile(file) {
+      if (!file) return;
+      if (!hasFrames()) return showError('Load a spritesheet or frames before opening a color table.');
+      try {
+        showError('');
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const colors = ext === 'act' ? parseActPalette(bytes)
+          : ext === 'pal' ? parsePalPalette(bytes)
+          : ext === 'pcx' ? parsePcxPalette(bytes)
+          : ['png','bmp'].includes(ext) ? await paletteFromImageFile(file)
+          : null;
+        if (!colors) throw new Error('Only .ACT, .PAL, .PNG, .BMP, and 256-color .PCX color tables are supported.');
+        const palette = normalizeImportedPalette(colors, state.indexKeepTransparency);
+        if (!palette.length) throw new Error('That color table does not contain any usable colors.');
+        const colorLimit = clamp(Math.max(3, palette.length), 3, 256);
+        state.importedPaletteInfo = { palette, colorLimit, keepTransparency: state.indexKeepTransparency, sourceName: file.name || 'Color Table' };
+        state.importedPaletteRevision += 1;
+        state.indexColors = colorLimit;
+        state.indexPreviewVisible = false;
+        state.truePixelPreviewVisible = false;
+        clearIndexPreviewCache();
+        clearTruePixelPreviewCache();
+        if (hasFrames()) drawFrame(state.currentFrame);
+        updateInfo();
+      } catch (error) {
+        showError(error.message || 'Could not open that color table.');
+      }
+    }
+    function cloneFrameRecord(frame, name = frame.name) {
+      return { kind: 'image', id: `image-${Date.now()}-${state.importedId++}`, name, canvas: canvasClone(frame.canvas), sourceCanvas: canvasClone(frame.sourceCanvas || frame.canvas) };
+    }
+    function addFrameNext(i = state.currentFrame) {
+      if (!hasFrames()) return;
+      pushHistory();
+      const insertAt = clamp(i + 1, 0, state.frames.length), frame = state.frames[i], offset = state.frameOffsets[i] || { x: 0, y: 0 }, mask = state.frameMasks[i] || makeMask();
+      state.frames.splice(insertAt, 0, cloneFrameRecord(frame, `${frame.name || `Frame ${i + 1}`} Copy`));
+      state.frameOffsets.splice(insertAt, 0, { x: Math.round(offset.x || 0), y: Math.round(offset.y || 0) });
+      state.frameMasks.splice(insertAt, 0, canvasClone(mask));
+      state.maskDirty.splice(insertAt, 0, !!state.maskDirty[i]);
+      state.indexedFrames.splice(insertAt, 0, cloneIndexedFrameInfo(state.indexedFrames[i]));
+      state.frameScales.splice(insertAt, 0, { ...frameScale(i) });
+      state.currentFrame = insertAt;
+      state.indexPreviewVisible = false;
+      markFrameBitmapsDirty();
+      syncAfterDataChange(true);
+    }
+    function deleteFrameAt(i = state.currentFrame) {
+      if (!hasFrames()) return;
+      pushHistory();
+      state.frames.splice(i, 1);
+      state.frameOffsets.splice(i, 1);
+      state.frameMasks.splice(i, 1);
+      state.maskDirty.splice(i, 1);
+      state.indexedFrames.splice(i, 1);
+      state.frameScales.splice(i, 1);
+      state.indexPreviewVisible = false;
+      markFrameBitmapsDirty();
+      if (!hasFrames()) {
+        pause();
+        state.currentFrame = state.startFrame = state.endFrame = 0;
+        state.frameWidth = 0;
+        state.frameHeight = 0;
+        els.emptyState.style.display = 'grid';
+        buildFilmstrip();
+        els.mainCanvas.width = 1;
+        els.mainCanvas.height = 1;
+        ctx.clearRect(0, 0, 1, 1);
+        updateCanvasZoom();
+        updateInfo();
+        setButtons(false);
+        return;
+      }
+      state.currentFrame = clamp(i, 0, state.frames.length - 1);
+      syncAfterDataChange(true);
+    }
+    function openFrameContextMenu(i, clientX, clientY) {
+      if (!hasFrames()) return;
+      pause();
+      state.currentFrame = clamp(i, 0, state.frames.length - 1);
+      state.contextFrameIndex = state.currentFrame;
+      drawFrame(state.currentFrame);
+      updateInfo();
+      const maxX = window.innerWidth - 188, maxY = window.innerHeight - 108;
+      els.frameContextMenu.style.left = `${Math.max(8, Math.min(clientX, maxX))}px`;
+      els.frameContextMenu.style.top = `${Math.max(8, Math.min(clientY, maxY))}px`;
+      els.frameContextMenu.classList.add('show');
+    }
+    function closeFrameContextMenu() {
+      state.contextFrameIndex = null;
+      els.frameContextMenu.classList.remove('show');
+    }
+
+    function buildFilmstrip() {
+      els.framesEl.innerHTML = '';
+      state.frames.forEach((f, i) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'thumb frame-thumb'; b.dataset.frame = i; b.draggable = true; b.title = `Frame ${i+1}`;
+        const c = document.createElement('canvas'); c.width = state.cageWidth; c.height = state.cageHeight; drawSprite(c.getContext('2d', {alpha:true}), i, 0, 0, { applyMask: true }); b.appendChild(c);
+        b.addEventListener('click', () => { pause(); state.currentFrame = i; drawFrame(i); updateInfo(); });
+        b.addEventListener('contextmenu', e => { e.preventDefault(); openFrameContextMenu(i, e.clientX, e.clientY); });
+        b.addEventListener('dragstart', e => { state.draggedFrameIndex = i; e.dataTransfer.setData('text/plain', String(i)); requestAnimationFrame(() => b.classList.add('dragging')); });
+        b.addEventListener('dragend', () => { state.draggedFrameIndex = null; state.dropIndex = null; removeDropGap(); b.classList.remove('dragging'); });
+        els.framesEl.appendChild(b);
+      });
+      const add = document.createElement('button'); add.type = 'button'; add.className = 'add-frame-button'; add.textContent = '+'; add.title = 'Import individual frame(s)'; add.addEventListener('click', () => els.frameFileInput.click()); els.framesEl.appendChild(add); updateActiveThumb();
+    }
+    function updateActiveThumb() { els.framesEl.querySelectorAll('.thumb').forEach(t => t.classList.toggle('active', Number(t.dataset.frame) === state.currentFrame)); }
+    function removeDropGap() { els.framesEl.querySelectorAll('.drop-gap').forEach(g => g.remove()); }
+    function dropIndex(x) { const thumbs = [...els.framesEl.querySelectorAll('.frame-thumb:not(.dragging)')]; for (let i=0;i<thumbs.length;i++) { const r = thumbs[i].getBoundingClientRect(); if (x < r.left + r.width/2) return i; } return thumbs.length; }
+    function showDropGap(i) { removeDropGap(); const g = document.createElement('div'); g.className = 'drop-gap'; const thumbs = [...els.framesEl.querySelectorAll('.frame-thumb:not(.dragging)')]; els.framesEl.insertBefore(g, thumbs[i] || els.framesEl.querySelector('.add-frame-button')); }
+    function moveItem(a, from, to) { const item = a.splice(from,1)[0]; a.splice(to,0,item); }
+    function moveFrame(from, to) { if (from == null || to == null || from === to) return; pushHistory(); to = clamp(to, 0, state.frames.length - 1); moveItem(state.frames, from, to); moveItem(state.frameOffsets, from, to); moveItem(state.frameMasks, from, to); moveItem(state.maskDirty, from, to); moveItem(state.indexedFrames, from, to); moveItem(state.frameScales, from, to); state.currentFrame = to; syncAfterDataChange(true); }
+
+    function loadImage(file) { return new Promise((resolve,reject) => { if (!file || !file.type.startsWith('image/')) return reject(new Error('Please upload a valid image file.')); const url = URL.createObjectURL(file); const img = new Image(); img.onload = () => { URL.revokeObjectURL(url); resolve(img); }; img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not load that image.')); }; img.src = url; }); }
+    async function loadSpritesheet(file) {
+      try {
+        showError(''); const img = await loadImage(file); state.sheetImage = img; state.imageName = file.name || 'spritesheet'; state.rows = clamp(parseInt(els.rowsInput.value,10)||1,1,100); state.cols = clamp(parseInt(els.colsInput.value,10)||1,1,100); state.frames = createSheetFrames(img, state.rows,state.cols); state.currentFrame = 0; state.frameOffsets = []; state.frameMasks = []; state.maskDirty = []; state.indexedFrames = []; state.frameScales = []; state.rulersV = []; state.rulersH = []; state.cageCustom = false; state.zoom = 1; state.panX = 0; state.panY = 0; state.maskMode = false; state.pencilMode = false; state.paintBucketMode = false; state.eyedropperMode = false; state.hideMask = false; state.indexPreviewVisible = false; state.truePixelPreviewVisible = false; state.importedPaletteInfo = null; state.importedPaletteRevision = 0; state.undoStack = []; state.redoStack = []; closeFrameContextMenu(); closeColorPicker(); markFrameBitmapsDirty(); updateMetrics(); state.pivotY = state.cageHeight; syncAfterDataChange(true);
+      } catch (e) { showError(e.message); }
+    }
+    async function importFrames(files) {
+      const list = [...(files || [])].filter(f => f.type.startsWith('image/')); if (!list.length) return; pushHistory(); const start = state.frames.length;
+      for (const file of list) { try { const img = await loadImage(file); const canvas = makeFrameCanvas(img); state.frames.push({ kind: 'image', id: `image-${Date.now()}-${state.importedId++}`, name: file.name, canvas, sourceCanvas: canvasClone(canvas) }); state.frameOffsets.push({x:0,y:0}); state.frameMasks.push(makeMask()); state.maskDirty.push(false); state.indexedFrames.push(null); state.frameScales.push({ x: state.scaleX, y: state.scaleY }); } catch(e) { showError(e.message); } }
+      state.currentFrame = start; markFrameBitmapsDirty(); if (!state.cageCustom) updateMetrics(); syncAfterDataChange(true);
+    }
+
+    function imageToDataURL(img) { const c=document.createElement('canvas'); c.width=img.naturalWidth||img.width; c.height=img.naturalHeight||img.height; const cc=c.getContext('2d',{alpha:true}); cc.imageSmoothingEnabled=false; cc.drawImage(img,0,0); return c.toDataURL('image/png'); }
+    function loadDataURL(src) { return new Promise((resolve,reject)=>{ const img=new Image(); img.onload=()=>resolve(img); img.onerror=()=>reject(new Error('Could not load saved project image data.')); img.src=src; }); }
+    async function canvasFromDataURL(src) { const img=await loadDataURL(src); return makeFrameCanvas(img); }
+    function downloadBlob(blob, filename) { const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+    function projectName() { return `${state.imageName.replace(/\.[^.]+$/,'').replace(/[^a-z0-9_-]+/gi,'_') || 'spritesheet'}_project.json`; }
+    function projectData() {
+      let sheetImage = null; try { if (state.sheetImage) sheetImage = imageToDataURL(state.sheetImage); } catch (_) { sheetImage = null; }
+      return {
+        format: 'spritesheet-editor-project', version: 1, imageName: state.imageName, importedId: state.importedId, sheetImage,
+        settings: {
+          rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, fps: state.fps,
+          frameWidth: state.frameWidth, frameHeight: state.frameHeight, cageWidth: state.cageWidth, cageHeight: state.cageHeight, cageCustom: state.cageCustom,
+          scaleX: state.scaleX, scaleY: state.scaleY, scaleLocked: state.scaleLocked, scaleAll: state.scaleAll, frameScales: state.frameScales.map(scale => ({ ...scale })), pivotY: state.pivotY, rulersV: [...state.rulersV], rulersH: [...state.rulersH],
+          background: state.background, backgroundCustomColor: cloneColor(state.backgroundCustomColor), brushAction: state.brushAction, brushSize: state.brushSize, pencilColor: cloneColor(state.pencilColor), magicTolerance: state.magicTolerance, magicAntialias: state.magicAntialias, magicContiguous: state.magicContiguous, autoBgTolerance: state.autoBgTolerance, haloTolerance: state.haloTolerance, indexColors: state.indexColors, indexKeepTransparency: state.indexKeepTransparency, importedPaletteInfo: cloneImportedPaletteInfo(state.importedPaletteInfo), importedPaletteRevision: state.importedPaletteRevision, truePixelResolution: state.truePixelResolution,
+          maskMode: state.maskMode, hideMask: state.hideMask, pencilMode: state.pencilMode, paintBucketMode: state.paintBucketMode, eyedropperMode: state.eyedropperMode, zoom: state.zoom, panX: state.panX, panY: state.panY
+        },
+        frames: state.frames.map((f,i)=>({ kind:f.kind, id:f.id, name:f.name, canvas:f.canvas.toDataURL('image/png'), sourceCanvas:(f.sourceCanvas || f.canvas).toDataURL('image/png'), offset:state.frameOffsets[i]||{x:0,y:0}, mask:state.maskDirty[i]?state.frameMasks[i].toDataURL('image/png'):null, maskDirty:!!state.maskDirty[i], indexed: state.indexedFrames[i] ? cloneIndexedFrameInfo(state.indexedFrames[i]) : null }))
+      };
+    }
+    function saveProject() { if(!hasFrames())return; showError(''); downloadBlob(new Blob([JSON.stringify(projectData())],{type:'application/json'}), projectName()); }
+    function resetProject() {
+      pause(); showError('');
+      closeFrameContextMenu(); closeColorPicker();
+      Object.assign(state,{ sheetImage:null, imageName:'spritesheet', frames:[], importedId:0, rows:1, cols:4, totalFrames:0, currentFrame:0, startFrame:0, endFrame:0, fps:12, playing:false, animationId:null, lastTick:0, frameWidth:0, frameHeight:0, cageWidth:1, cageHeight:1, cageCustom:false, scaleX:1, scaleY:1, scaleLocked:true, scaleAll:true, frameScales:[], pivotY:0, rulersV:[], rulersH:[], background:'checker', backgroundCustomColor:{ r: 32, g: 40, b: 52, a: 255 }, frameOffsets:[], frameMasks:[], maskDirty:[], indexedFrames:[], maskMode:false, hideMask:false, pencilMode:false, paintBucketMode:false, eyedropperMode:false, brushAction:'mask', brushSize:18, pencilColor:{ r: 182, g: 192, b: 207, a: 255 }, magicTolerance:32, magicAntialias:true, magicContiguous:true, autoBgTolerance:12, haloTolerance:12, showHalo:false, indexColors:256, indexKeepTransparency:true, indexPreviewVisible:false, importedPaletteInfo:null, importedPaletteRevision:0, frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, truePixelResolution:128, truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, brushCursorVisible:false, brushX:0, brushY:0, zoom:1, panX:0, panY:0, dragging:false, dragMode:'offset', dragLastX:0, dragLastY:0, maskLastX:0, maskLastY:0, draggedFrameIndex:null, dropIndex:null, contextFrameIndex:null, timelineDragging:false, undoStack:[], redoStack:[], restoring:false });
+      [els.fileInput, els.frameFileInput, els.projectFileInput, els.paletteFileInput].forEach(input=>{ if(input) input.value=''; });
+      els.emptyState.style.display='grid'; buildFilmstrip(); els.mainCanvas.width=1; els.mainCanvas.height=1; ctx.clearRect(0,0,1,1); updateCanvasZoom(); updateInfo(); setButtons(false);
+    }
+    async function loadProjectFile(file) {
+      try {
+        if(!file)return; showError(''); pause(); closeFrameContextMenu(); closeColorPicker();
+        const project=JSON.parse(await file.text()); if(project.format!=='spritesheet-editor-project'||!Array.isArray(project.frames)) throw new Error('That is not a valid Spritesheet Editor project file.');
+        const s=project.settings||{}, frames=[], masks=[];
+        const indexedFrames = [];
+        for(const f of project.frames){ frames.push({kind:f.kind||'image', id:f.id||`image-${Date.now()}-${frames.length}`, name:f.name||`Frame ${frames.length+1}`, canvas:await canvasFromDataURL(f.canvas), sourceCanvas:await canvasFromDataURL(f.sourceCanvas || f.canvas)}); masks.push(f.mask?await canvasFromDataURL(f.mask):null); indexedFrames.push(f.indexed ? cloneIndexedFrameInfo(f.indexed) : null); }
+        const savedCurrent=parseInt(s.currentFrame,10), savedStart=parseInt(s.startFrame,10), savedEnd=parseInt(s.endFrame,10), savedMagicTolerance=parseInt(s.magicTolerance,10);
+        Object.assign(state,{ sheetImage:project.sheetImage?await loadDataURL(project.sheetImage):null, imageName:project.imageName||file.name||'spritesheet', frames, importedId:project.importedId||0, rows:clamp(parseInt(s.rows,10)||1,1,100), cols:clamp(parseInt(s.cols,10)||1,1,100), currentFrame:Number.isFinite(savedCurrent)?savedCurrent:0, startFrame:Number.isFinite(savedStart)?savedStart:0, endFrame:Number.isFinite(savedEnd)?savedEnd:Math.max(0,frames.length-1), fps:clamp(parseInt(s.fps,10)||12,1,60), frameWidth:s.frameWidth||0, frameHeight:s.frameHeight||0, cageWidth:clamp(Math.round(s.cageWidth||frames[0]?.canvas.width||1),1,8192), cageHeight:clamp(Math.round(s.cageHeight||frames[0]?.canvas.height||1),1,8192), cageCustom:!!s.cageCustom, scaleX:clamp(parseFloat(s.scaleX)||1,.01,100), scaleY:clamp(parseFloat(s.scaleY)||1,.01,100), scaleLocked:s.scaleLocked!==false, pivotY:Math.round(s.pivotY||0), rulersV:Array.isArray(s.rulersV)?s.rulersV:[], rulersH:Array.isArray(s.rulersH)?s.rulersH:[], background:['checker','dark','light','transparent','custom'].includes(s.background)?s.background:'checker', backgroundCustomColor:cloneColor(s.backgroundCustomColor || { r: 32, g: 40, b: 52, a: 255 }), frameOffsets:project.frames.map(f=>({x:Math.round(f.offset?.x||0),y:Math.round(f.offset?.y||0)})), frameMasks:masks.map(m=>m||makeMask()), maskDirty:project.frames.map(f=>!!f.mask), indexedFrames, maskMode:!!s.maskMode, hideMask:!!s.hideMask, pencilMode:!!s.pencilMode, eyedropperMode:!!s.eyedropperMode, brushAction:['mask','restore','wand'].includes(s.brushAction)?s.brushAction:'mask', brushSize:clamp(parseInt(s.brushSize,10)||18,1,120), pencilColor:cloneColor(s.pencilColor || { r: 182, g: 192, b: 207, a: 255 }), magicTolerance:clamp(Number.isFinite(savedMagicTolerance)?savedMagicTolerance:32,0,255), magicAntialias:s.magicAntialias!==false, magicContiguous:s.magicContiguous!==false, autoBgTolerance:clamp(parseInt(s.autoBgTolerance,10)||12,0,30), haloTolerance:clamp(parseInt(s.haloTolerance,10)||12,0,30), showHalo:false, indexColors:clamp(parseInt(s.indexColors,10)||256,3,256), indexKeepTransparency:s.indexKeepTransparency!==false, indexPreviewVisible:false, frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, truePixelResolution:normalizeTruePixelResolution(s.truePixelResolution || 128), truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, zoom:clamp(parseFloat(s.zoom)||1,.25,8), panX:parseFloat(s.panX)||0, panY:parseFloat(s.panY)||0, undoStack:[], redoStack:[], restoring:false });
+        state.scaleAll = s.scaleAll !== false;
+        state.frameScales = Array.isArray(s.frameScales) ? s.frameScales.map(scale => ({ x: clamp(parseFloat(scale.x) || state.scaleX, .01, 100), y: clamp(parseFloat(scale.y) || state.scaleY, .01, 100) })) : [];
+        state.importedPaletteInfo = cloneImportedPaletteInfo(s.importedPaletteInfo);
+        state.importedPaletteRevision = s.importedPaletteRevision || 0;
+        state.paintBucketMode = !!s.paintBucketMode;
+        markFrameBitmapsDirty(); els.rowsInput.value=state.rows; els.colsInput.value=state.cols; els.startFrameInput.value=state.startFrame+1; els.endFrameInput.value=state.endFrame+1; els.speedInput.value=state.fps; els.brushSizeInput.value=state.brushSize; els.magicToleranceInput.value=state.magicTolerance; els.magicAntialiasInput.checked=state.magicAntialias; els.magicContiguousInput.checked=state.magicContiguous; els.autoBgToleranceInput.value=state.autoBgTolerance; els.haloToleranceInput.value=state.haloTolerance; els.indexColorsInput.value=state.indexColors; els.indexKeepTransparencyInput.checked=state.indexKeepTransparency; els.truePixelResolutionInput.value=state.truePixelResolution; els.backgroundInput.value=state.background;
+        syncAfterDataChange(false);
+      } catch(e) { showError(e.message || 'Could not load that project file.'); }
+    }
+
+    function resetView() { state.zoom = 1; state.panX = 0; state.panY = 0; updateCanvasZoom(); updateInfo(); }
+    function setCage(w,h) { if (!hasFrames()) return; pushHistory(); state.cageCustom = true; state.cageWidth = clamp(Math.round(w),1,8192); state.cageHeight = clamp(Math.round(h),1,8192); state.pivotY = clamp(state.pivotY,0,state.cageHeight); clampRulers(); ensureArrays(); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function setOffset(i,x,y) { ensureArrays(); state.frameOffsets[i] = { x: Math.round(x), y: Math.round(y) }; }
+    function nudge(dx,dy) { if (!hasFrames()) return; pushHistory(); const o = state.frameOffsets[state.currentFrame] || {x:0,y:0}; setOffset(state.currentFrame, o.x+dx, o.y+dy); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function applyOffset() { if (!hasFrames()) return; pushHistory(); setOffset(state.currentFrame, parseFloat(els.offsetXInput.value)||0, parseFloat(els.offsetYInput.value)||0); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function applyPivotOnly() { if (!hasFrames()) return; pushHistory(); state.pivotY = clamp(Math.round(parseFloat(els.pivotOnlyYInput.value)||0),0,state.cageHeight); drawFrame(state.currentFrame); updateInfo(); }
+    function applyPivotAll() { if (!hasFrames()) return; pushHistory(); const next = clamp(Math.round(parseFloat(els.pivotYInput.value)||0),0,state.cageHeight), d = next - state.pivotY; state.pivotY = next; state.frameOffsets = state.frameOffsets.map(o => ({x:o.x,y:o.y+d})); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function applyScale(axis) {
+      if (!hasFrames()) return;
+      pushHistory();
+      const inputX = clamp(parseFloat(els.scaleXInput.value)||1,.01,100), inputY = clamp(parseFloat(els.scaleYInput.value)||1,.01,100);
+      const next = state.scaleLocked ? { x: axis === 'y' ? inputY : inputX, y: axis === 'y' ? inputY : inputX } : { x: inputX, y: inputY };
+      if (state.scaleAll) {
+        state.scaleX = next.x;
+        state.scaleY = next.y;
+        state.frameScales = state.frames.map(() => ({ ...next }));
+      } else {
+        setFrameScale(state.currentFrame, next.x, next.y);
+      }
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function toggleScaleLock() {
+      state.scaleLocked = !state.scaleLocked;
+      if (state.scaleLocked) {
+        if (state.scaleAll) state.scaleY = state.scaleX;
+        else {
+          const current = frameScale(state.currentFrame);
+          setFrameScale(state.currentFrame, current.x, current.x);
+        }
+      }
+      if (hasFrames()) { buildFilmstrip(); drawFrame(state.currentFrame); }
+      updateInfo();
+    }
+    function toggleScaleMode() {
+      if (!hasFrames()) return;
+      pushHistory();
+      state.scaleAll = !state.scaleAll;
+      if (state.scaleAll) {
+        const current = frameScale(state.currentFrame);
+        state.scaleX = current.x;
+        state.scaleY = current.y;
+        state.frameScales = state.frames.map(() => ({ ...current }));
+      } else {
+        state.frameScales = state.frames.map((_, i) => ({ ...frameScale(i) }));
+      }
+      buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+    }
+    function nextRulerValue(values, max) { const center=Math.round(max/2), step=Math.max(4,Math.round(max/20)); for(let i=0;i<=values.length;i++){const offset=i===0?0:Math.ceil(i/2)*step*(i%2?-1:1), v=clamp(center+offset,0,max); if(!values.some(n=>Math.abs(n-v)<2))return v} return center; }
+    function addRuler(kind) { if (!hasFrames()) return; pushHistory(); if (kind === 'v') state.rulersV.push(nextRulerValue(state.rulersV,state.cageHeight)); else state.rulersH.push(nextRulerValue(state.rulersH,state.cageWidth)); drawFrame(state.currentFrame); updateInfo(); }
+
+    function clearMask(i) { const m = state.frameMasks[i]; if (m) m.getContext('2d').clearRect(0,0,m.width,m.height); state.maskDirty[i] = false; }
+    function clearCurrentMask() { if (!hasFrames()) return; pushHistory(); clearMask(state.currentFrame); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function clearAllMasks() { if (!hasFrames()) return; pushHistory(); state.frames.forEach((_,i)=>clearMask(i)); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function maskHasPixels(m) { const d = m.getContext('2d').getImageData(0,0,m.width,m.height).data; for (let i=3;i<d.length;i+=4) if (d[i]) return true; return false; }
+    function paintMaskLine(i,x1,y1,x2,y2) { const m = state.frameMasks[i], mc = m.getContext('2d'), s = Math.max(1,Math.round(state.brushSize)), half=s/2, dx=x2-x1, dy=y2-y1, dist=Math.hypot(dx,dy), steps=Math.max(1,Math.ceil(dist/Math.max(1,s*.35))); mc.save(); mc.globalCompositeOperation = state.brushAction === 'restore' ? 'destination-out' : 'source-over'; mc.fillStyle = '#000'; for (let k=0;k<=steps;k++) { const t=k/steps, x=x1+dx*t, y=y1+dy*t; mc.fillRect(Math.floor(x-half), Math.floor(y-half), s, s); } mc.restore(); state.maskDirty[i] = maskHasPixels(m); }
+    function paintPencilLine(i,x1,y1,x2,y2) {
+      const frame = state.frames[i];
+      if (!frame) return;
+      const size = Math.max(1, Math.round(state.brushSize)), half = Math.floor(size / 2), dx = x2 - x1, dy = y2 - y1;
+      const fs = frameScale(i), dist = Math.hypot(dx, dy), steps = Math.max(1, Math.ceil(dist / Math.max(1, Math.min(fs.x, fs.y) * Math.max(1, size * .35))));
+      const paintOn = (canvas) => {
+        const c = canvas.getContext('2d', { alpha: true });
+        c.save();
+        c.fillStyle = `rgba(${state.pencilColor.r}, ${state.pencilColor.g}, ${state.pencilColor.b}, 1)`;
+        for (let k = 0; k <= steps; k++) {
+          const t = k / steps, point = framePixelPoint(i, x1 + dx * t, y1 + dy * t);
+          if (!point) continue;
+          c.fillRect(point.x - half, point.y - half, size, size);
+        }
+        c.restore();
+      };
+      paintOn(frame.sourceCanvas || frame.canvas);
+      paintOn(frame.canvas);
+      state.indexedFrames[i] = null;
+      markFrameBitmapsDirty();
+    }
+    function paintBucketFill(i, cx, cy) {
+      const frame = state.frames[i], point = framePixelPoint(i, cx, cy);
+      if (!frame || !point) return false;
+      const canvas = frame.canvas, ctx2d = canvas.getContext('2d', { alpha: true }), img = ctx2d.getImageData(0, 0, canvas.width, canvas.height), data = img.data, w = img.width, h = img.height;
+      const start = point.y * w + point.x, sp = start * 4, target = { r: data[sp], g: data[sp + 1], b: data[sp + 2], a: data[sp + 3] };
+      const fill = cloneColor(state.pencilColor), tol = clamp(Math.round(state.magicTolerance) || 0, 0, 255);
+      const matches = (id) => {
+        const p = id * 4;
+        return Math.max(Math.abs(data[p] - target.r), Math.abs(data[p + 1] - target.g), Math.abs(data[p + 2] - target.b), Math.abs(data[p + 3] - target.a)) <= tol;
+      };
+      const selected = new Uint8Array(w * h);
+      let count = 0;
+      if (state.magicContiguous) {
+        const q = new Int32Array(w * h), seen = new Uint8Array(w * h); let head = 0, tail = 0;
+        const enqueue = (x, y) => {
+          if (x < 0 || y < 0 || x >= w || y >= h) return;
+          const id = y * w + x;
+          if (seen[id]) return;
+          seen[id] = 1;
+          if (!matches(id)) return;
+          selected[id] = 1;
+          q[tail++] = id;
+          count++;
+        };
+        enqueue(point.x, point.y);
+        while (head < tail) {
+          const id = q[head++], x = id % w, y = Math.floor(id / w);
+          enqueue(x + 1, y); enqueue(x - 1, y); enqueue(x, y + 1); enqueue(x, y - 1);
+        }
+      } else {
+        for (let id = 0; id < selected.length; id++) if (matches(id)) { selected[id] = 1; count++; }
+      }
+      if (!count) return false;
+      const applyTo = (targetCanvas) => {
+        const c = targetCanvas.getContext('2d', { alpha: true }), out = c.getImageData(0, 0, targetCanvas.width, targetCanvas.height), outData = out.data;
+        for (let id = 0; id < selected.length; id++) {
+          if (!selected[id]) continue;
+          const p = id * 4;
+          outData[p] = fill.r; outData[p + 1] = fill.g; outData[p + 2] = fill.b; outData[p + 3] = 255;
+        }
+        c.putImageData(out, 0, 0);
+      };
+      applyTo(frame.sourceCanvas || canvas);
+      applyTo(canvas);
+      state.indexedFrames[i] = null;
+      markFrameBitmapsDirty();
+      return true;
+    }
+    function recolorFramePaletteSlot(i, paletteIndex, color) {
+      const info = state.indexedFrames[i], target = info?.palette?.[paletteIndex];
+      if (!target || target.a === 0) return false;
+      const next = cloneColor(color), canvas = state.frames[i]?.canvas;
+      if (!canvas) return false;
+      const ctx2d = canvas.getContext('2d', { alpha: true }), img = ctx2d.getImageData(0, 0, canvas.width, canvas.height), data = img.data;
+      for (let p = 0; p < data.length; p += 4) {
+        if (data[p + 3] < 16) continue;
+        if (data[p] === target.r && data[p + 1] === target.g && data[p + 2] === target.b) {
+          data[p] = next.r; data[p + 1] = next.g; data[p + 2] = next.b;
+        }
+      }
+      ctx2d.putImageData(img, 0, 0);
+      info.palette[paletteIndex] = { ...target, ...next, a: 255 };
+      markFrameBitmapsDirty();
+      return true;
+    }
+    function updatePreviewPaletteSlot(paletteIndex, color) {
+      const preview = currentIndexPreview(state.currentFrame);
+      if (!preview?.palette?.[paletteIndex] || preview.palette[paletteIndex].a === 0) return false;
+      const rendered = renderFrameForIndex(state.currentFrame);
+      if (!rendered) return false;
+      const palette = clonePalette(preview.palette);
+      palette[paletteIndex] = { ...palette[paletteIndex], ...cloneColor(color), a: 255 };
+      const result = quantizeImageToPalette(rendered.imageData, paletteInfoFromPalette(palette, preview.colorLimit, preview.keepTransparency));
+      result.canvas = canvasFromImageData(result.imageData);
+      state.indexPreviewKey = currentIndexPreviewKey(state.currentFrame);
+      state.indexPreviewResult = result;
+      return true;
+    }
+    function applyMagicWand(i,x,y) {
+      ensureArrays(); const w=state.cageWidth,h=state.cageHeight,tmp=makeMask(w,h),tc=tmp.getContext('2d',{alpha:true}); tc.clearRect(0,0,w,h); drawSprite(tc,i,0,0,{applyMask:false});
+      const img=tc.getImageData(0,0,w,h),d=img.data,tol=clamp(Math.round(state.magicTolerance)||0,0,255),start=y*w+x,sp=start*4,tr=d[sp],tg=d[sp+1],tb=d[sp+2],ta=d[sp+3],sel=new Uint8ClampedArray(w*h);
+      const deltaAt=p=>Math.max(Math.abs(d[p]-tr),Math.abs(d[p+1]-tg),Math.abs(d[p+2]-tb),Math.abs(d[p+3]-ta));
+      const match=id=>deltaAt(id*4)<=tol; let count=0;
+      if(state.magicContiguous){const q=new Int32Array(w*h),seen=new Uint8Array(w*h);let head=0,tail=0;const en=(nx,ny)=>{if(nx<0||ny<0||nx>=w||ny>=h)return;const id=ny*w+nx;if(seen[id])return;seen[id]=1;if(!match(id))return;sel[id]=255;q[tail++]=id;count++;};en(x,y);while(head<tail){const id=q[head++],nx=id%w,ny=Math.floor(id/w);en(nx+1,ny);en(nx-1,ny);en(nx,ny+1);en(nx,ny-1);}} else {for(let id=0;id<sel.length;id++)if(match(id)){sel[id]=255;count++;}}
+      if(!count)return false;
+      if(state.magicAntialias){const band=Math.max(8,Math.round(32-tol/16));for(let yy=0;yy<h;yy++)for(let xx=0;xx<w;xx++){const id=yy*w+xx;if(sel[id])continue;const touch=(xx>0&&sel[id-1]===255)||(xx<w-1&&sel[id+1]===255)||(yy>0&&sel[id-w]===255)||(yy<h-1&&sel[id+w]===255);if(!touch)continue;const diff=deltaAt(id*4);if(diff>tol&&diff<=tol+band)sel[id]=Math.round(255*(1-(diff-tol)/band));}}
+      const m=state.frameMasks[i],mc=m.getContext('2d'),md=mc.getImageData(0,0,w,h),mp=md.data; for(let id=0;id<sel.length;id++){const a=sel[id]; if(!a)continue; const p=id*4; mp[p]=0;mp[p+1]=0;mp[p+2]=0;mp[p+3]=Math.max(mp[p+3],a);} mc.putImageData(md,0,0); state.maskDirty[i]=maskHasPixels(m); return true;
+    }
+    function pointerPoint(e) { const r = els.mainCanvas.getBoundingClientRect(); return { x: clamp(Math.floor((e.clientX-r.left)*(state.cageWidth/r.width)),0,state.cageWidth-1), y: clamp(Math.floor((e.clientY-r.top)*(state.cageHeight/r.height)),0,state.cageHeight-1) }; }
+    function pointerDelta(e,px,py) { const r=els.mainCanvas.getBoundingClientRect(); return { dx:(e.clientX-px)*(state.cageWidth/r.width), dy:(e.clientY-py)*(state.cageHeight/r.height) }; }
+    function rulerHit(e) { const p = pointerPoint(e), r = els.mainCanvas.getBoundingClientRect(), tol = r.width ? 8*(state.cageWidth/r.width) : 8, hits=[]; state.rulersV.forEach((v,i)=>hits.push({kind:'v',index:i,d:Math.abs(p.y-v)})); state.rulersH.forEach((v,i)=>hits.push({kind:'h',index:i,d:Math.abs(p.x-v)})); hits.sort((a,b)=>a.d-b.d); return hits[0] && hits[0].d <= tol ? hits[0] : null; }
+    function moveRuler(hit, p) { if (!hit) return; if (hit.kind === 'v') state.rulersV[hit.index] = clamp(p.y, 0, state.cageHeight); else state.rulersH[hit.index] = clamp(p.x, 0, state.cageWidth); }
+    function removeRuler(hit) { if (!hit) return; if (hit.kind === 'v') state.rulersV.splice(hit.index, 1); else state.rulersH.splice(hit.index, 1); }
+
+    function dominantEdgeColor(imgData) { const {width,height,data}=imgData, map=new Map(); const add=(x,y)=>{ const p=(y*width+x)*4; if(data[p+3]<12)return; const key=`${data[p]>>4},${data[p+1]>>4},${data[p+2]>>4}`; const b=map.get(key)||{n:0,r:0,g:0,b:0}; b.n++; b.r+=data[p]; b.g+=data[p+1]; b.b+=data[p+2]; map.set(key,b);}; for(let x=0;x<width;x++){add(x,0);add(x,height-1)} for(let y=1;y<height-1;y++){add(0,y);add(width-1,y)} let best=null; map.forEach(b=>{if(!best||b.n>best.n)best=b}); return best ? {r:best.r/best.n,g:best.g/best.n,b:best.b/best.n} : null; }
+    function autoMaskAlpha(img,tol=state.autoBgTolerance) { const w=img.width,h=img.height,d=img.data,bg=dominantEdgeColor(img),vis=new Uint8Array(w*h); if(!bg)return vis; const stateTol=tol*tol*3,q=new Int32Array(w*h); let head=0,tail=0; const isBg=(x,y)=>{const p=(y*w+x)*4;if(d[p+3]<12)return false; const dr=d[p]-bg.r,dg=d[p+1]-bg.g,db=d[p+2]-bg.b; return dr*dr+dg*dg+db*db<=stateTol}; const en=(x,y)=>{if(x<0||y<0||x>=w||y>=h)return; const id=y*w+x; if(vis[id]||!isBg(x,y))return; vis[id]=255;q[tail++]=id}; for(let x=0;x<w;x++){en(x,0);en(x,h-1)} for(let y=1;y<h-1;y++){en(0,y);en(w-1,y)} while(head<tail){const id=q[head++],x=id%w,y=Math.floor(id/w);en(x+1,y);en(x-1,y);en(x,y+1);en(x,y-1)} return vis; }
+    function frameImageData(i){const w=state.cageWidth,h=state.cageHeight,tmp=makeMask(w,h),tc=tmp.getContext('2d'); drawSprite(tc,i,0,0,{applyMask:false}); return tc.getImageData(0,0,w,h);}
+    function baseMaskAlpha(i,img){const w=img.width,h=img.height,alpha=new Uint8Array(w*h); if(state.maskDirty[i]){const d=state.frameMasks[i].getContext('2d').getImageData(0,0,w,h).data; for(let id=0;id<alpha.length;id++)alpha[id]=d[id*4+3]?255:0;} else alpha.set(autoMaskAlpha(img)); return alpha;}
+    function haloRadius(){ return Math.max(0, Math.ceil(state.haloTolerance / 6)); }
+    function computeHaloSelection(i){
+      if(!hasFrames())return null; ensureArrays(); const img=frameImageData(i),w=img.width,h=img.height,baseAlpha=baseMaskAlpha(i,img),resultAlpha=baseAlpha.slice(),addAlpha=new Uint8Array(w*h),radius=haloRadius();
+      if(!baseAlpha.some(a=>a>0))return null;
+      if(radius<1)return {baseAlpha,resultAlpha,addAlpha};
+      const dist=new Int16Array(w*h); dist.fill(-1); const q=new Int32Array(w*h); let head=0,tail=0;
+      for(let id=0;id<baseAlpha.length;id++)if(baseAlpha[id]){dist[id]=0;q[tail++]=id}
+      while(head<tail){
+        const id=q[head++], step=dist[id]; if(step>=radius)continue; const x=id%w,y=Math.floor(id/w);
+        for(let yy=Math.max(0,y-1);yy<=Math.min(h-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(w-1,x+1);xx++){
+          const nid=yy*w+xx; if(dist[nid]!==-1)continue; dist[nid]=step+1; q[tail++]=nid; resultAlpha[nid]=255; addAlpha[nid]=255;
+        }
+      }
+      return {baseAlpha,resultAlpha,addAlpha,radius};
+    }
+    function autoMaskFrame(i) { const img=frameImageData(i),w=img.width,h=img.height,alpha=autoMaskAlpha(img); if(!alpha.some(a=>a>0))return; const m=state.frameMasks[i],mc=m.getContext('2d'),md=mc.getImageData(0,0,w,h),mp=md.data; for(let id=0;id<alpha.length;id++)if(alpha[id]){const p=id*4;mp[p]=0;mp[p+1]=0;mp[p+2]=0;mp[p+3]=255} mc.putImageData(md,0,0); state.maskDirty[i]=maskHasPixels(m); }
+    function autoMaskCurrent() { if(!hasFrames())return; pushHistory(); autoMaskFrame(state.currentFrame); state.maskMode=true; buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function autoMaskAll() { if(!hasFrames())return; pushHistory(); state.frames.forEach((_,i)=>autoMaskFrame(i)); state.maskMode=true; buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function haloRemoveFrame(i) { const halo=computeHaloSelection(i); if(!halo)return; const w=state.cageWidth,h=state.cageHeight,m=state.frameMasks[i],mc=m.getContext('2d'),md=mc.getImageData(0,0,w,h),mp=md.data; for(let id=0;id<halo.resultAlpha.length;id++)if(halo.resultAlpha[id]){const p=id*4;mp[p]=0;mp[p+1]=0;mp[p+2]=0;mp[p+3]=255} mc.putImageData(md,0,0); state.maskDirty[i]=maskHasPixels(m); }
+    function haloRemoveCurrent(){ if(!hasFrames())return; pushHistory(); haloRemoveFrame(state.currentFrame); state.showHalo=false; state.maskMode=true; buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+
+    function toggleMaskBrush() { state.maskMode=!(state.maskMode&&state.brushAction==='mask'); state.pencilMode=false; state.paintBucketMode=false; state.eyedropperMode=false; state.brushAction='mask'; if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function toggleRestoreBrush() { state.maskMode=!(state.maskMode&&state.brushAction==='restore'); state.pencilMode=false; state.paintBucketMode=false; state.eyedropperMode=false; state.brushAction='restore'; if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function toggleMagicWand() { state.maskMode=!(state.maskMode&&state.brushAction==='wand'); state.pencilMode=false; state.paintBucketMode=false; state.eyedropperMode=false; state.brushAction='wand'; state.brushCursorVisible=false; if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function toggleHideMask() { if(!hasFrames())return; state.hideMask=!state.hideMask; drawFrame(state.currentFrame); updateInfo(); }
+    function toggleShowHalo() { if(!hasFrames())return; state.showHalo=!state.showHalo; if(state.showHalo){state.maskMode=true; state.pencilMode=false; state.paintBucketMode=false; state.eyedropperMode=false;} drawFrame(state.currentFrame); updateInfo(); }
+    function togglePencilTool() { state.pencilMode = !state.pencilMode; if (state.pencilMode) { state.maskMode = false; state.paintBucketMode = false; state.eyedropperMode = false; } if (!state.pencilMode) state.brushCursorVisible = false; if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function togglePaintBucketTool() { state.paintBucketMode = !state.paintBucketMode; if (state.paintBucketMode) { state.maskMode = false; state.pencilMode = false; state.eyedropperMode = false; state.brushCursorVisible = false; } if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function toggleEyedropperTool() { state.eyedropperMode = !state.eyedropperMode; if (state.eyedropperMode) { state.maskMode = false; state.pencilMode = false; state.paintBucketMode = false; state.brushCursorVisible = false; } if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function rgbToHex(color) { return `#${[color.r, color.g, color.b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`; }
+    function hexToRgb(value) {
+      const hex = String(value || '').trim().replace(/^#/, '');
+      if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+      return { r: parseInt(hex.slice(0, 2), 16), g: parseInt(hex.slice(2, 4), 16), b: parseInt(hex.slice(4, 6), 16), a: 255 };
+    }
+    function rgbToHsv(color) {
+      const r = (color.r || 0) / 255, g = (color.g || 0) / 255, b = (color.b || 0) / 255, max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+      let h = 0;
+      if (d) {
+        if (max === r) h = ((g - b) / d) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+      }
+      return { h: (h * 60 + 360) % 360, s: max === 0 ? 0 : d / max, v: max };
+    }
+    function hsvToRgb(h, s, v) {
+      const c = v * s, hp = (((h % 360) + 360) % 360) / 60, x = c * (1 - Math.abs(hp % 2 - 1));
+      let r = 0, g = 0, b = 0;
+      if (hp < 1) [r, g, b] = [c, x, 0];
+      else if (hp < 2) [r, g, b] = [x, c, 0];
+      else if (hp < 3) [r, g, b] = [0, c, x];
+      else if (hp < 4) [r, g, b] = [0, x, c];
+      else if (hp < 5) [r, g, b] = [x, 0, c];
+      else [r, g, b] = [c, 0, x];
+      const m = v - c;
+      return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255), a: 255 };
+    }
+    const colorPicker = { open: false, target: null, h: 0, s: 0, v: 1 };
+    function currentPickerColor() { return hsvToRgb(colorPicker.h, colorPicker.s, colorPicker.v); }
+    function syncColorPickerInputs() {
+      const color = currentPickerColor();
+      setVal(els.colorRInput, color.r); setVal(els.colorGInput, color.g); setVal(els.colorBInput, color.b); if (document.activeElement !== els.colorHexInput) els.colorHexInput.value = rgbToHex(color);
+    }
+    function drawColorField() {
+      const c = els.colorFieldCanvas, ctx2d = c.getContext('2d');
+      ctx2d.clearRect(0, 0, c.width, c.height);
+      ctx2d.fillStyle = `hsl(${colorPicker.h}, 100%, 50%)`;
+      ctx2d.fillRect(0, 0, c.width, c.height);
+      const white = ctx2d.createLinearGradient(0, 0, c.width, 0);
+      white.addColorStop(0, '#fff'); white.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx2d.fillStyle = white; ctx2d.fillRect(0, 0, c.width, c.height);
+      const black = ctx2d.createLinearGradient(0, 0, 0, c.height);
+      black.addColorStop(0, 'rgba(0,0,0,0)'); black.addColorStop(1, '#000');
+      ctx2d.fillStyle = black; ctx2d.fillRect(0, 0, c.width, c.height);
+      const x = colorPicker.s * c.width, y = (1 - colorPicker.v) * c.height;
+      ctx2d.lineWidth = 3; ctx2d.strokeStyle = '#fff'; ctx2d.beginPath(); ctx2d.arc(x, y, 9, 0, Math.PI * 2); ctx2d.stroke();
+      ctx2d.lineWidth = 1.5; ctx2d.strokeStyle = 'rgba(0,0,0,.65)'; ctx2d.stroke();
+    }
+    function drawHueField() {
+      const c = els.colorHueCanvas, ctx2d = c.getContext('2d'), g = ctx2d.createLinearGradient(0, 0, c.width, 0);
+      g.addColorStop(0, '#ff3b30'); g.addColorStop(1 / 6, '#ffcc00'); g.addColorStop(2 / 6, '#34c759'); g.addColorStop(3 / 6, '#5ac8fa'); g.addColorStop(4 / 6, '#007aff'); g.addColorStop(5 / 6, '#af52de'); g.addColorStop(1, '#ff2d55');
+      ctx2d.clearRect(0, 0, c.width, c.height);
+      ctx2d.fillStyle = g; ctx2d.fillRect(0, 0, c.width, c.height);
+      const x = (colorPicker.h / 360) * c.width;
+      ctx2d.lineWidth = 3; ctx2d.strokeStyle = '#fff'; ctx2d.beginPath(); ctx2d.arc(x, c.height / 2, 7, 0, Math.PI * 2); ctx2d.stroke();
+      ctx2d.lineWidth = 1.5; ctx2d.strokeStyle = 'rgba(0,0,0,.65)'; ctx2d.stroke();
+    }
+    function renderColorPicker() { drawColorField(); drawHueField(); syncColorPickerInputs(); }
+    function openColorPicker(target, color, title = 'Color') {
+      const hsv = rgbToHsv(cloneColor(color));
+      colorPicker.open = true; colorPicker.target = target; colorPicker.h = hsv.h; colorPicker.s = hsv.s; colorPicker.v = hsv.v;
+      els.colorModalTitle.textContent = title;
+      els.colorModal.classList.add('show');
+      renderColorPicker();
+    }
+    function closeColorPicker() { colorPicker.open = false; colorPicker.target = null; els.colorModal.classList.remove('show'); }
+    function updatePickerFromFieldEvent(e) {
+      const rect = els.colorFieldCanvas.getBoundingClientRect();
+      colorPicker.s = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+      colorPicker.v = 1 - clamp((e.clientY - rect.top) / rect.height, 0, 1);
+      renderColorPicker();
+    }
+    function updatePickerFromHueEvent(e) {
+      const rect = els.colorHueCanvas.getBoundingClientRect();
+      colorPicker.h = clamp((e.clientX - rect.left) / rect.width, 0, 1) * 360;
+      renderColorPicker();
+    }
+    function applyColorPickerSelection() {
+      if (!colorPicker.target) return closeColorPicker();
+      const color = currentPickerColor(), target = colorPicker.target;
+      showError('');
+      if (target.type === 'pencil') {
+        state.pencilColor = cloneColor(color);
+        if (hasFrames()) drawFrame(state.currentFrame);
+        updateInfo();
+      } else if (target.type === 'background') {
+        state.backgroundCustomColor = cloneColor(color);
+        updateInfo();
+      } else if (target.type === 'palette-loaded') {
+        if (state.importedPaletteInfo?.palette?.[target.index]) {
+          state.importedPaletteInfo.palette[target.index] = { ...state.importedPaletteInfo.palette[target.index], ...cloneColor(color), a: state.importedPaletteInfo.palette[target.index].a === 0 ? 0 : 255 };
+          state.importedPaletteRevision += 1;
+          clearIndexPreviewCache();
+          if (hasFrames() && state.indexPreviewVisible) drawFrame(state.currentFrame);
+          updateInfo();
+        }
+      } else if (target.type === 'palette-preview') {
+        if (updatePreviewPaletteSlot(target.index, color)) { drawFrame(state.currentFrame); updateInfo(); }
+      } else if (target.type === 'palette-applied') {
+        pushHistory();
+        if (recolorFramePaletteSlot(state.currentFrame, target.index, color)) { buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+      }
+      closeColorPicker();
+    }
+    function paletteIndexFromEvent(e) {
+      const info = displayedPaletteInfo();
+      if (!info?.palette?.length) return null;
+      const rect = els.paletteCanvas.getBoundingClientRect(), px = Math.floor((e.clientX - rect.left) * (els.paletteCanvas.width / rect.width)), py = Math.floor((e.clientY - rect.top) * (els.paletteCanvas.height / rect.height));
+      const cell = els.paletteCanvas.width / 16, index = Math.floor(py / cell) * 16 + Math.floor(px / cell);
+      if (index < 0 || index >= info.palette.length) return null;
+      return { info, index, color: info.palette[index] };
+    }
+
+    function playLoop(ts){ if(!state.playing)return; if(!state.lastTick||ts-state.lastTick>=1000/state.fps){state.lastTick=ts;state.currentFrame++;if(state.currentFrame>state.endFrame)state.currentFrame=state.startFrame;drawFrame(state.currentFrame);updateInfo()} state.animationId=requestAnimationFrame(playLoop); }
+    function play(){ if(!hasFrames())return; state.playing=true; state.lastTick=0; updateInfo(); state.animationId=requestAnimationFrame(playLoop); }
+    function pause(){ state.playing=false; if(state.animationId)cancelAnimationFrame(state.animationId); state.animationId=null; updateInfo(); }
+    function stop(){ pause(); if(hasFrames()){state.currentFrame=state.startFrame;drawFrame(state.currentFrame);updateInfo()} }
+    function step(d){ if(!hasFrames())return; pause(); state.currentFrame+=d; if(state.currentFrame>state.endFrame)state.currentFrame=state.startFrame; if(state.currentFrame<state.startFrame)state.currentFrame=state.endFrame; drawFrame(state.currentFrame); updateInfo(); }
+    function setCurrentFrame(i) { if(!hasFrames())return; const next=clamp(Math.round(i),state.startFrame,state.endFrame); pause(); state.currentFrame=next; els.frameInput.value=next; drawFrame(next); updateInfo(); }
+    function frameFromTimelinePointer(e) { const r=els.frameInput.getBoundingClientRect(), min=state.startFrame, max=state.endFrame; if(!r.width||max<=min)return min; return Math.round(min+clamp((e.clientX-r.left)/r.width,0,1)*(max-min)); }
+    function scrubTimeline(e) { if(!hasFrames())return; setCurrentFrame(frameFromTimelinePointer(e)); }
+    function adjustBrushSize(delta) { state.brushSize = clamp(state.brushSize + delta, 1, 120); els.brushSizeInput.value = state.brushSize; if(hasFrames())drawFrame(state.currentFrame); updateInfo(); }
+    function repack(){ if(!hasFrames())return; ensureRows(); const rows=Math.max(state.rows,Math.ceil(state.frames.length/state.cols)), out=document.createElement('canvas'); out.width=state.cageWidth*state.cols; out.height=state.cageHeight*rows; const oc=out.getContext('2d',{alpha:true}); oc.imageSmoothingEnabled=false; state.frames.forEach((_,i)=>drawSprite(oc,i,(i%state.cols)*state.cageWidth,Math.floor(i/state.cols)*state.cageHeight,{applyMask:true})); out.toBlob(blob=>{const url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download=`${state.imageName.replace(/\.[^.]+$/,'').replace(/[^a-z0-9_-]+/gi,'_')}_repacked.png`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);},'image/png'); }
+
+    els.newButton.addEventListener('click', resetProject);
+    els.loadButton.addEventListener('click', () => els.projectFileInput.click());
+    els.saveButton.addEventListener('click', saveProject);
+    els.shortcutsButton.addEventListener('click', () => els.shortcutsModal.classList.add('show'));
+    els.closeShortcutsButton.addEventListener('click', () => els.shortcutsModal.classList.remove('show'));
+    els.shortcutsModal.addEventListener('click', e => { if(e.target === els.shortcutsModal) els.shortcutsModal.classList.remove('show'); });
+    els.closeColorButton.addEventListener('click', closeColorPicker);
+    els.cancelColorButton.addEventListener('click', closeColorPicker);
+    els.applyColorButton.addEventListener('click', applyColorPickerSelection);
+    els.colorModal.addEventListener('click', e => { if (e.target === els.colorModal) closeColorPicker(); });
+    els.pencilColorButton.addEventListener('click', () => openColorPicker({ type: 'pencil' }, state.pencilColor));
+    els.pencilButton.addEventListener('click', togglePencilTool);
+    els.paintBucketButton.addEventListener('click', togglePaintBucketTool);
+    els.eyedropperButton.addEventListener('click', toggleEyedropperTool);
+    els.loadPaletteButton.addEventListener('click', () => els.paletteFileInput.click());
+    els.saveActButton.addEventListener('click', savePaletteACT);
+    els.savePalButton.addEventListener('click', savePalettePAL);
+    els.addFrameNextMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); addFrameNext(i); });
+    els.deleteFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); deleteFrameAt(i); });
+    els.paletteCanvas.addEventListener('click', e => {
+      const hit = paletteIndexFromEvent(e);
+      if (!hit || !hit.color || hit.color.a === 0) return;
+      openColorPicker({ type: hit.info.mode === 'preview' ? 'palette-preview' : hit.info.mode === 'loaded' ? 'palette-loaded' : 'palette-applied', index: hit.index }, hit.color);
+    });
+    els.colorFieldCanvas.addEventListener('pointerdown', e => { e.preventDefault(); updatePickerFromFieldEvent(e); els.colorFieldCanvas.setPointerCapture(e.pointerId); });
+    els.colorFieldCanvas.addEventListener('pointermove', e => { if (els.colorFieldCanvas.hasPointerCapture(e.pointerId)) updatePickerFromFieldEvent(e); });
+    els.colorFieldCanvas.addEventListener('pointerup', e => { if (els.colorFieldCanvas.hasPointerCapture(e.pointerId)) els.colorFieldCanvas.releasePointerCapture(e.pointerId); });
+    els.colorFieldCanvas.addEventListener('pointercancel', e => { if (els.colorFieldCanvas.hasPointerCapture(e.pointerId)) els.colorFieldCanvas.releasePointerCapture(e.pointerId); });
+    els.colorHueCanvas.addEventListener('pointerdown', e => { e.preventDefault(); updatePickerFromHueEvent(e); els.colorHueCanvas.setPointerCapture(e.pointerId); });
+    els.colorHueCanvas.addEventListener('pointermove', e => { if (els.colorHueCanvas.hasPointerCapture(e.pointerId)) updatePickerFromHueEvent(e); });
+    els.colorHueCanvas.addEventListener('pointerup', e => { if (els.colorHueCanvas.hasPointerCapture(e.pointerId)) els.colorHueCanvas.releasePointerCapture(e.pointerId); });
+    els.colorHueCanvas.addEventListener('pointercancel', e => { if (els.colorHueCanvas.hasPointerCapture(e.pointerId)) els.colorHueCanvas.releasePointerCapture(e.pointerId); });
+    [els.colorRInput, els.colorGInput, els.colorBInput].forEach(input => input.addEventListener('input', () => {
+      const color = {
+        r: clamp(parseInt(els.colorRInput.value, 10) || 0, 0, 255),
+        g: clamp(parseInt(els.colorGInput.value, 10) || 0, 0, 255),
+        b: clamp(parseInt(els.colorBInput.value, 10) || 0, 0, 255),
+        a: 255
+      };
+      const hsv = rgbToHsv(color);
+      colorPicker.h = hsv.h; colorPicker.s = hsv.s; colorPicker.v = hsv.v;
+      renderColorPicker();
+    }));
+    els.colorHexInput.addEventListener('input', () => {
+      const rgb = hexToRgb(els.colorHexInput.value);
+      if (!rgb) return;
+      const hsv = rgbToHsv(rgb);
+      colorPicker.h = hsv.h; colorPicker.s = hsv.s; colorPicker.v = hsv.v;
+      renderColorPicker();
+    });
+    els.projectFileInput.addEventListener('change', e => { loadProjectFile(e.target.files[0]); e.target.value=''; });
+    els.paletteFileInput.addEventListener('change', e => { importPaletteFile(e.target.files[0]); e.target.value=''; });
+    els.fileInput.addEventListener('change', e => loadSpritesheet(e.target.files[0]));
+    els.frameFileInput.addEventListener('change', e => { importFrames(e.target.files); e.target.value=''; });
+    ['dragenter','dragover'].forEach(n=>els.dropZone.addEventListener(n,e=>{e.preventDefault();els.dropZone.classList.add('dragover')}));
+    ['dragleave','drop'].forEach(n=>els.dropZone.addEventListener(n,e=>{e.preventDefault();els.dropZone.classList.remove('dragover')}));
+    els.dropZone.addEventListener('drop', e => loadSpritesheet(e.dataTransfer.files[0]));
+    els.rowsInput.addEventListener('input',()=>{
+      const nextRows = clamp(parseInt(els.rowsInput.value,10)||1,1,100);
+      const nextCols = clamp(parseInt(els.colsInput.value,10)||1,1,100);
+      if(state.sheetImage){
+        pushHistory();
+        const imported=state.frames.filter(f=>f.kind==='image');
+        state.rows=nextRows; state.cols=nextCols;
+        state.frames=[...createSheetFrames(state.sheetImage,state.rows,state.cols),...imported];
+        state.frameOffsets=[];state.frameMasks=[];state.maskDirty=[];state.indexedFrames=[];state.frameScales=[]; state.cageCustom=false; state.truePixelPreviewVisible=false; clearIndexPreviewCache(); clearTruePixelPreviewCache(); syncAfterDataChange(true);
+        return;
+      }
+      if(!hasFrames()){
+        state.rows = nextRows;
+        state.cols = nextCols;
+        updateInfo();
+        return;
+      }
+      if (nextRows === state.rows && nextCols === state.cols) return;
+      pushHistory();
+      state.rows = nextRows;
+      state.cols = nextCols;
+      syncAfterDataChange(false);
+    });
+    els.colsInput.addEventListener('input',()=>els.rowsInput.dispatchEvent(new Event('input')));
+    [els.startFrameInput,els.endFrameInput].forEach(el=>el.addEventListener('input',()=>{readRange(); if(hasFrames())drawFrame(state.currentFrame); updateInfo()}));
+    els.speedInput.addEventListener('input',()=>{state.fps=clamp(parseInt(els.speedInput.value,10)||12,1,60);updateInfo()});
+    els.frameInput.addEventListener('input',()=>setCurrentFrame(parseInt(els.frameInput.value,10)||0));
+    els.frameInput.addEventListener('pointerdown',e=>{if(!hasFrames()||e.button!==0)return;e.preventDefault();state.timelineDragging=true;scrubTimeline(e);els.frameInput.setPointerCapture(e.pointerId)});
+    els.frameInput.addEventListener('pointermove',e=>{if(!state.timelineDragging)return;e.preventDefault();scrubTimeline(e)});
+    function endTimelineDrag(e){if(!state.timelineDragging)return;state.timelineDragging=false;if(e.pointerId!==undefined&&els.frameInput.hasPointerCapture(e.pointerId))els.frameInput.releasePointerCapture(e.pointerId);updateInfo()}
+    els.frameInput.addEventListener('pointerup',endTimelineDrag); els.frameInput.addEventListener('pointercancel',endTimelineDrag);
+    els.backgroundInput.addEventListener('change',()=>{
+      state.background = els.backgroundInput.value;
+      if (state.background === 'custom') openColorPicker({ type: 'background' }, state.backgroundCustomColor, 'Preview Background');
+      updateInfo();
+    });
+    [els.cageWidthInput,els.cageHeightInput].forEach(el=>el.addEventListener('input',()=>setCage(parseFloat(els.cageWidthInput.value)||state.frameWidth,parseFloat(els.cageHeightInput.value)||state.frameHeight)));
+    els.scaleXInput.addEventListener('input',()=>applyScale('x')); els.scaleYInput.addEventListener('input',()=>applyScale('y')); els.scaleModeButton.addEventListener('click',toggleScaleMode); els.scaleLockButton.addEventListener('click',toggleScaleLock);
+    els.rulerVButton.addEventListener('click',()=>addRuler('v')); els.rulerHButton.addEventListener('click',()=>addRuler('h'));
+    els.pivotOnlyYInput.addEventListener('input',applyPivotOnly); els.pivotYInput.addEventListener('input',applyPivotAll); [els.offsetXInput,els.offsetYInput].forEach(el=>el.addEventListener('input',applyOffset));
+    els.brushSizeInput.addEventListener('input',()=>{state.brushSize=clamp(parseInt(els.brushSizeInput.value,10)||1,1,120); if(hasFrames())drawFrame(state.currentFrame); updateInfo()});
+    els.magicToleranceInput.addEventListener('input',()=>{state.magicTolerance=clamp(parseInt(els.magicToleranceInput.value,10)||0,0,255);updateInfo()});
+    els.magicAntialiasInput.addEventListener('change',()=>{state.magicAntialias=els.magicAntialiasInput.checked;updateInfo()});
+    els.magicContiguousInput.addEventListener('change',()=>{state.magicContiguous=els.magicContiguousInput.checked;updateInfo()});
+    els.autoBgToleranceInput.addEventListener('input',()=>{state.autoBgTolerance=clamp(parseInt(els.autoBgToleranceInput.value,10)||0,0,30);updateInfo()});
+    els.haloToleranceInput.addEventListener('input',()=>{state.haloTolerance=clamp(parseInt(els.haloToleranceInput.value,10)||0,0,30); if(state.showHalo&&hasFrames())drawFrame(state.currentFrame); updateInfo()});
+    els.indexColorsInput.addEventListener('input',()=>{state.indexColors=clamp(parseInt(els.indexColorsInput.value,10)||256,3,256); clearIndexPreviewCache(); if(hasFrames()&&state.indexPreviewVisible)drawFrame(state.currentFrame); updateInfo()});
+    els.indexKeepTransparencyInput.addEventListener('change',()=>{state.indexKeepTransparency=els.indexKeepTransparencyInput.checked; clearIndexPreviewCache(); if(hasFrames()&&state.indexPreviewVisible)drawFrame(state.currentFrame); updateInfo()});
+    els.truePixelResolutionInput.addEventListener('change',()=>{state.truePixelResolution=normalizeTruePixelResolution(els.truePixelResolutionInput.value); clearTruePixelPreviewCache(); if(hasFrames()&&state.truePixelPreviewVisible)drawFrame(state.currentFrame); updateInfo()});
+    els.maskBrushButton.addEventListener('click',toggleMaskBrush);
+    els.restoreBrushButton.addEventListener('click',toggleRestoreBrush);
+    els.magicWandButton.addEventListener('click',toggleMagicWand);
+    els.hideMaskButton.addEventListener('click',toggleHideMask);
+    els.autoMaskFrameButton.addEventListener('click',autoMaskCurrent); els.autoMaskAllButton.addEventListener('click',autoMaskAll); els.showHaloButton.addEventListener('click',toggleShowHalo); els.haloRemoverButton.addEventListener('click',haloRemoveCurrent); els.clearMaskButton.addEventListener('click',clearCurrentMask); els.clearAllMasksButton.addEventListener('click',clearAllMasks);
+    els.indexButton.addEventListener('click',indexCurrentFrame); els.resetIndexButton.addEventListener('click',resetIndexedCurrentFrame); els.indexFrameButton.addEventListener('click',toggleIndexPreview); els.indexAllButton.addEventListener('click',indexAllFrames);
+    els.truePixelButton.addEventListener('click',truePixelCurrentFrame); els.truePixelAllButton.addEventListener('click',truePixelAllFrames); els.truePixelResetButton.addEventListener('click',resetTruePixelCurrentFrame); els.truePixelPreviewButton.addEventListener('click',toggleTruePixelPreview);
+    els.prevButton.addEventListener('click',()=>step(-1)); els.playButton.addEventListener('click',()=>state.playing?pause():play()); els.stopButton.addEventListener('click',stop); els.nextButton.addEventListener('click',()=>step(1));
+    els.nudgeLeftButton.addEventListener('click',()=>nudge(-1,0)); els.nudgeRightButton.addEventListener('click',()=>nudge(1,0)); els.nudgeUpButton.addEventListener('click',()=>nudge(0,-1)); els.nudgeDownButton.addEventListener('click',()=>nudge(0,1));
+    els.resetButton.addEventListener('click',resetView); els.repackButton.addEventListener('click',repack);
+
+    els.framesEl.addEventListener('dragover',e=>{if(state.draggedFrameIndex===null)return;e.preventDefault();state.dropIndex=dropIndex(e.clientX);showDropGap(state.dropIndex)});
+    els.framesEl.addEventListener('drop',e=>{if(state.draggedFrameIndex===null)return;e.preventDefault();const t=state.dropIndex??dropIndex(e.clientX),f=state.draggedFrameIndex;state.draggedFrameIndex=null;state.dropIndex=null;removeDropGap();moveFrame(f,t)});
+    document.addEventListener('pointerdown', e => { if (els.frameContextMenu.classList.contains('show') && !els.frameContextMenu.contains(e.target)) closeFrameContextMenu(); });
+    els.canvasShell.addEventListener('wheel', e => { if(!hasFrames())return; e.preventDefault(); if(e.shiftKey&&((state.maskMode&&state.brushAction!=='wand')||state.pencilMode)){const step=Math.max(1,Math.round(Math.abs(e.deltaY)/100));adjustBrushSize(e.deltaY<0?step:-step);return} const before=els.mainCanvas.getBoundingClientRect(), ax=(e.clientX-before.left)/before.width, ay=(e.clientY-before.top)/before.height; state.zoom=clamp(state.zoom*(e.deltaY<0?1.12:1/1.12),.25,8); updateCanvasZoom(); const after=els.mainCanvas.getBoundingClientRect(); state.panX+=e.clientX-(after.left+ax*after.width); state.panY+=e.clientY-(after.top+ay*after.height); updateCanvasZoom(); }, {passive:false});
+    window.addEventListener('resize', updateCanvasZoom);
+    els.canvasShell.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
+    els.canvasShell.addEventListener('dblclick',e=>{const hit=rulerHit(e); if(!hit)return; pushHistory(); removeRuler(hit); drawFrame(state.currentFrame); updateInfo()});
+    els.canvasShell.addEventListener('pointerdown', e => {
+      if(!hasFrames()||(e.button!==0&&e.button!==1))return; e.preventDefault(); pause(); state.dragLastX=e.clientX; state.dragLastY=e.clientY;
+      if(e.button===1){state.dragging=true; state.dragMode='pan'; els.canvasShell.classList.add('dragging'); els.canvasShell.setPointerCapture(e.pointerId); return}
+      if(state.eyedropperMode){
+        const p=pointerPoint(e), color=sampleVisibleFrameColor(state.currentFrame,p.x,p.y);
+        state.brushX=p.x; state.brushY=p.y; state.brushCursorVisible=false;
+        if(color){state.pencilColor=cloneColor(color); state.eyedropperMode=false; state.pencilMode=true; state.paintBucketMode=false;}
+        drawFrame(state.currentFrame); updateInfo(); return;
+      }
+      if(state.paintBucketMode){
+        const p=pointerPoint(e);
+        pushHistory();
+        paintBucketFill(state.currentFrame,p.x,p.y);
+        buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); return;
+      }
+      state.dragging=true; pushHistory(); const hit=rulerHit(e);
+      if(hit)state.dragMode=hit;
+      else if(state.maskMode&&state.brushAction==='wand'){state.dragMode='wand';const p=pointerPoint(e);state.brushCursorVisible=false;applyMagicWand(state.currentFrame,p.x,p.y);drawFrame(state.currentFrame)}
+      else if(state.maskMode){state.dragMode='mask';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;paintMaskLine(state.currentFrame,p.x,p.y,p.x,p.y);drawFrame(state.currentFrame)}
+      else if(state.pencilMode){state.dragMode='pencil';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=!!framePixelPoint(state.currentFrame,p.x,p.y);paintPencilLine(state.currentFrame,p.x,p.y,p.x,p.y);drawFrame(state.currentFrame)}
+      else state.dragMode='offset';
+      els.canvasShell.classList.add('dragging'); els.canvasShell.setPointerCapture(e.pointerId);
+    });
+    els.canvasShell.addEventListener('pointermove', e => { if(!hasFrames())return; if(!state.dragging){ if(state.maskMode&&state.brushAction!=='wand'){const p=pointerPoint(e);state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;drawFrame(state.currentFrame)} else if(state.pencilMode){const p=pointerPoint(e);state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=!!framePixelPoint(state.currentFrame,p.x,p.y);drawFrame(state.currentFrame)} else if((state.paintBucketMode||state.eyedropperMode)&&state.brushCursorVisible){state.brushCursorVisible=false;drawFrame(state.currentFrame)} return; } if(state.dragMode==='wand')return; if(state.dragMode==='pan'){state.panX+=e.clientX-state.dragLastX;state.panY+=e.clientY-state.dragLastY;state.dragLastX=e.clientX;state.dragLastY=e.clientY;updateCanvasZoom();return} if(typeof state.dragMode==='object'){moveRuler(state.dragMode,pointerPoint(e));drawFrame(state.currentFrame);updateInfo();return} if(state.dragMode==='mask'){const p=pointerPoint(e);state.brushX=p.x;state.brushY=p.y;paintMaskLine(state.currentFrame,state.maskLastX,state.maskLastY,p.x,p.y);state.maskLastX=p.x;state.maskLastY=p.y;drawFrame(state.currentFrame);return} if(state.dragMode==='pencil'){const p=pointerPoint(e);state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=!!framePixelPoint(state.currentFrame,p.x,p.y);paintPencilLine(state.currentFrame,state.maskLastX,state.maskLastY,p.x,p.y);state.maskLastX=p.x;state.maskLastY=p.y;drawFrame(state.currentFrame);return} const d=pointerDelta(e,state.dragLastX,state.dragLastY),o=state.frameOffsets[state.currentFrame]||{x:0,y:0};state.dragLastX=e.clientX;state.dragLastY=e.clientY;setOffset(state.currentFrame,o.x+d.dx,o.y+d.dy);drawFrame(state.currentFrame);updateInfo(); });
+    function endDrag(e){ if(!state.dragging)return; const rebuild=state.dragMode==='offset'||state.dragMode==='mask'||state.dragMode==='wand'||state.dragMode==='pencil'; state.dragging=false; state.dragMode='offset'; els.canvasShell.classList.remove('dragging'); if(e.pointerId!==undefined&&els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId); if(rebuild)buildFilmstrip(); updateInfo(); }
+    els.canvasShell.addEventListener('pointerup',endDrag); els.canvasShell.addEventListener('pointercancel',endDrag); els.canvasShell.addEventListener('pointerleave',e=>{if(state.dragging)endDrag(e); else if(state.brushCursorVisible){state.brushCursorVisible=false;if(hasFrames())drawFrame(state.currentFrame)}});
+    document.addEventListener('keydown',e=>{const k=e.key.toLowerCase(); if(e.key==='Escape'&&els.colorModal.classList.contains('show')){e.preventDefault();closeColorPicker();return} if(els.colorModal.classList.contains('show'))return; if(e.key==='Escape'&&els.shortcutsModal.classList.contains('show')){e.preventDefault();els.shortcutsModal.classList.remove('show');return} if(els.shortcutsModal.classList.contains('show'))return; if(e.key==='Escape'&&els.frameContextMenu.classList.contains('show')){e.preventDefault();closeFrameContextMenu();return} if(els.frameContextMenu.classList.contains('show'))return; if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return} if((e.ctrlKey||e.metaKey)&&k==='y'){e.preventDefault();redo();return} if(!hasFrames())return; const active=document.activeElement,typing=active&&['INPUT','SELECT','TEXTAREA'].includes(active.tagName); if(typing)return; if(e.key==='Escape'&&state.eyedropperMode){e.preventDefault();state.eyedropperMode=false;state.brushCursorVisible=false;drawFrame(state.currentFrame);updateInfo();return} if(!e.ctrlKey&&!e.metaKey&&!e.altKey){if(k==='m'){e.preventDefault();toggleMaskBrush();return} if(k==='e'){e.preventDefault();toggleRestoreBrush();return} if(k==='w'){e.preventDefault();toggleMagicWand();return} if(k==='p'){e.preventDefault();togglePencilTool();return} if(k==='d'){e.preventDefault();toggleEyedropperTool();return} if(k==='h'){e.preventDefault();toggleHideMask();return} if(k==='f'){e.preventDefault();resetView();return} if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteFrameAt(state.currentFrame);return}} if(e.shiftKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();nudge(e.key==='ArrowLeft'?-1:e.key==='ArrowRight'?1:0,e.key==='ArrowUp'?-1:e.key==='ArrowDown'?1:0);return} if(e.code==='Space'){e.preventDefault();state.playing?pause():play();return} if(e.key==='ArrowLeft'){e.preventDefault();step(-1)} if(e.key==='ArrowRight'){e.preventDefault();step(1)}});
+
+    function initScrub(){ let scrub=null; document.querySelectorAll('input[type="number"]').forEach(input=>{input.addEventListener('pointerdown',e=>{if(e.button!==0)return;scrub={input,id:e.pointerId,x:e.clientX,v:parseFloat(input.value)||0};input.setPointerCapture(e.pointerId)});input.addEventListener('pointermove',e=>{if(!scrub||scrub.input!==input)return;const dx=e.clientX-scrub.x;if(Math.abs(dx)<3)return;document.body.classList.add('scrub-active');input.classList.add('scrubbing');e.preventDefault();const step=parseFloat(input.step)||1,min=input.min===''?-Infinity:parseFloat(input.min),max=input.max===''?Infinity:parseFloat(input.max),val=clamp(scrub.v+Math.round(dx/(e.shiftKey?12:4))*step,min,max);if(String(input.value)!==String(val)){input.value=String(val);input.dispatchEvent(new Event('input',{bubbles:true}))}});function end(){if(!scrub||scrub.input!==input)return;document.body.classList.remove('scrub-active');input.classList.remove('scrubbing');if(input.hasPointerCapture(scrub.id))input.releasePointerCapture(scrub.id);scrub=null}input.addEventListener('pointerup',end);input.addEventListener('pointercancel',end)})}
+
+    initScrub(); buildFilmstrip(); updateInfo(); setButtons(false);
+  </script>
+</body>
+</html>
