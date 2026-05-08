@@ -17,7 +17,7 @@
   ·
   <a href="#quick-start">Quick Start</a>
   ·
-  <a href="#feedback">Feedback</a>
+  <a href="https://renderpopstudio.com/SpritesheetEditor/#suggestions"><strong>Feedback</strong></a>
 </p>
 
 <p align="center">
