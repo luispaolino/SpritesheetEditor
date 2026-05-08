@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://renderpopstudio.com/SpritesheetEditor/"><strong>Official Page</strong></a>
   ·
-  <a href="SpritesheetEditor.html"><strong>Open Locally</strong></a>
+  <a href="https://renderpopstudio.com/SpritesheetEditor/SpritesheetEditor.html"><strong>Demo</strong></a>
   ·
   <a href="#features">Features</a>
   ·
