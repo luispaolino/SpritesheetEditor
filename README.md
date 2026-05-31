@@ -10,15 +10,15 @@
 
 <p align="center">
   <a href="https://renderpopstudio.com/SpritesheetEditor/"><strong>Official Page</strong></a>
-  ·
+  &middot;
   <a href="https://renderpopstudio.com/SpritesheetEditor/SpritesheetEditor.html"><strong>Demo</strong></a>
-  ·
+  &middot;
   <a href="#features">Features</a>
-  ·
+  &middot;
   <a href="#quick-start">Quick Start</a>
   &middot;
-  <a href="#release-log">Release Log</a>
-  ·
+  <a href="#release-notes">Release Notes</a>
+  &middot;
   <a href="https://renderpopstudio.com/SpritesheetEditor/#suggestions"><strong>Feedback</strong></a>
 </p>
 
@@ -111,9 +111,9 @@ https://github.com/luispaolino/SpritesheetEditor/
 
 ---
 
-## Release Log
+## Release Notes
 
-For the full release history, see [RELEASE_LOG.md](RELEASE_LOG.md).
+For the full release history, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ### v1.1 - 2026-05-31
 

@@ -1,4 +1,4 @@
-# Release Log
+# Release Notes
 
 ## v1.1 - 2026-05-31
 
