@@ -193,13 +193,21 @@ Current release notes are split into:
 - `v1.3.0 - 2026-06-05`
 - `v1.4.0 - 2026-06-09`
 - `v1.5.0 - 2026-06-12`
+- `v1.6.0 - 2026-10-29`
 
 Major features:
 
 - Font Maker is documented under `v1.4.0`.
 - Compositor is documented under `v1.5.0`.
+- Animation layers are documented under `v1.6.0`; their logic and styling live in `animation.js` and `animation.css`.
 
-Latest `v1.5.0` notes include:
+Current `v1.6.0` notes include sprite layers with per-frame transforms, drag ordering, selection/splitting and pixel editing, project persistence, and the compact Animation panel layout.
+
+Animation visibility is stored in each frame's `animationVisibility` map, with the layer's old visibility used as the default for compatibility. Keep this map when cloning, saving, restoring, or reordering frames. Selection masks are binary pixel rasters; the translucent fill and animated black-and-white border render on a separate noninteractive overlay canvas so they never appear in exports. The section bar uses the full stage width, and a ResizeObserver updates the floating panel's top offset when the section buttons wrap.
+
+`numeric-inputs.js` enhances static and dynamically added numeric fields with arithmetic. It parses expressions without evaluating JavaScript and commits on Enter or blur before existing numeric handlers run. Enhanced fields are text inputs marked with `data-numeric-input`; preserve that selector in numeric styling and drag scrubbing. `drawPivotCross` shares physically aligned geometry between the sprite and sprite-sheet builder pivot overlays.
+
+The `v1.5.0` notes include:
 
 - Compositor workspace
 - compositor clip settings

@@ -83,6 +83,16 @@ Preview and apply indexed color reduction, preserve transparency, highlight pale
 
 Load multiple reference layers with offset, scale, transparency, flip, visibility, shadow, reload, and compositor-linking controls. References are preserved when loading a new spritesheet and reset only on New Project.
 
+### Animation layers
+
+Use the Animation panel to load sprites as layers while keeping the existing canvas and frame timeline. Drag layer names to reorder them; the top layer renders in front. Position, visibility, and horizontal/vertical flips are stored per frame. Select pixels with the lasso or rectangle tool and use Split to cut them into a new cropped layer without moving the artwork. Pencil, eraser, and the shared pencil colors edit the active layer. Layer artwork and order are included in project saving, undo/redo, frame duplication, and standard sprite exports.
+
+Selections use a translucent fill and animated black-and-white borders. Selection masks use hard pixel edges without anti-aliasing. Section buttons use the full width above the floating panel and wrap when needed on smaller windows.
+
+Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or Eraser size, just like Edit Tools. Rectangle selection uses a crosshair; Lasso uses a contrasting lasso cursor with a precise selection point.
+
+Numeric fields accept basic math such as `150+20`, `64*2`, and `(150-20)/2`. Press Enter or leave the field to calculate. Results follow the field's range and step size. Invalid expressions keep the last valid value; Escape cancels a pending expression. Drag scrubbing and arrow-key stepping remain available.
+
 ### Compositor
 
 Build layered sprite scenes with tracks, clips, text, fades, audio, playback controls, timeline zoom, timeline end control, multi-select clip editing, GIF export, and MP4/WebM export with quality and bitrate settings.
@@ -129,6 +139,12 @@ https://github.com/luispaolino/SpritesheetEditor/
 ## Release Notes
 
 For the full release history, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+### v1.6.0 - 2026-10-29
+
+- Added the Animation panel with sprite layers, per-frame offsets and flips, drag ordering, lasso/rectangle selection, Split, and pencil, dropper, and eraser tools.
+- Included animation layers in project saving, undo/redo, frame duplication, and sprite exports.
+- Refined Animation controls with an icon-only toolbar, centered pencil colors, stacked visibility/remove and flip buttons, and aligned layer names and offsets.
 
 ### v1.5.0 - 2026-06-12
 

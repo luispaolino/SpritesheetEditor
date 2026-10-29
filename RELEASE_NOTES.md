@@ -1,5 +1,36 @@
 # Release Notes
 
+## v1.6.0 - 2026-10-29
+
+### New Features
+
+- Added the Animation floating panel with Load Sprite support for images, GIFs, and WebP files.
+- Added sprite layers with names, visibility, removal, per-frame X/Y offsets, and horizontal/vertical flips.
+- Added drag ordering for sprite layers; the top layer renders in front.
+- Added lasso and rectangle selection, plus Split to cut selected pixels into a cropped layer while preserving their canvas position.
+- Added pencil, dropper, eraser, and shared pencil colors to the Animation panel.
+- Included animation layers in project saving/loading, undo/redo, frame duplication, and sprite exports using the existing canvas and timeline.
+
+### Improvements
+
+- Simplified the Animation panel by removing helper text and the extra color-add button.
+- Added an icon for Move and centered the color swatch to match the other editing tools.
+- Stacked visibility/removal on the left and horizontal/vertical flips on the right of each layer.
+- Matched layer name height to the offset inputs and aligned the name with the X input.
+- Centered the Animation toolbar, including the pencil color beside Eraser.
+- Added animated black-and-white selection borders with a translucent fill and hard pixel selection edges.
+- Allowed section buttons to use the full canvas width above the floating menu, with the menu following wrapped rows on smaller windows.
+- Added basic arithmetic in numeric fields, including parentheses, with Enter/blur calculation and existing range and step constraints.
+
+### Bug Fixes
+
+- Fixed Animation Hide/Show affecting every frame. Visibility now belongs to the current frame, including spritesheet imports, and survives saving, undo/redo, frame duplication, and export.
+- Centered the pivot cross around one shared square so all four arms have equal lengths at different zoom levels and display scales.
+- Reused the Edit Tools pencil cursor for Animation Pencil and Eraser, showing their actual pixel footprint while hovering and drawing.
+- Added Shift + Wheel sizing to Animation Pencil and Eraser, matching Edit Tools without changing canvas zoom.
+- Added a lasso cursor and rectangle crosshair, including while dragging selections.
+- Fixed panning to temporarily show a grabbing hand over active tools and restore the selected cursor on release. Animation Move now uses a four-direction move cursor.
+
 ## v1.5.0 - 2026-06-12
 
 ### New Features
