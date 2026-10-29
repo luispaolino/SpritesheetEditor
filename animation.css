@@ -41,12 +41,15 @@
 .side-panels #animationColorStrip .swatch-button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; display: grid; place-items: center; }
 .side-panels #animationColorStrip .swatch-chip { width: 22px; height: 22px; }
 .animation-group [hidden] { display: none !important; }
+.animation-clipboard-button .tool-icon-image { width: 16px; height: 16px; }
 .canvas-shell.animation-move-cursor,
 .canvas-shell.animation-move-cursor.dragging { cursor: move; }
 .canvas-shell.animation-lasso-cursor,
 .canvas-shell.animation-lasso-cursor.dragging { cursor: url('icons/cursor-lasso.svg') 7 23, crosshair; }
 .canvas-shell.animation-rectangle-cursor,
 .canvas-shell.animation-rectangle-cursor.dragging { cursor: crosshair; }
+.canvas-shell.animation-dropper-cursor { cursor: url('icons/cursor-dropper.svg') 3 28, crosshair; }
+.canvas-shell.animation-selection-moving.dragging { cursor: move; }
 .canvas-shell.panning.dragging { cursor: grabbing; }
 .canvas-shell > canvas.animation-selection-overlay {
   position: absolute; inset: 0; z-index: 320; display: none;

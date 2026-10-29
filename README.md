@@ -89,9 +89,15 @@ Use the Animation panel to load sprites as layers while keeping the existing can
 
 Selections use a translucent fill and animated black-and-white borders. Selection masks use hard pixel edges without anti-aliasing. Section buttons use the full width above the floating panel and wrap when needed on smaller windows.
 
+With Lasso or Rectangle selected, hold Shift while selecting to add an area, or Alt to subtract an area. Drag inside an existing selection to move its outline, or use the arrow keys for one-pixel movement and Shift+Arrows for ten pixels. These actions move the selection without changing the artwork. Delete or Backspace erases the selected pixels on the active layer and keeps the outline; Undo restores the artwork. Split layers appear in the layer list only on frames that contain their artwork.
+
 Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or Eraser size, just like Edit Tools. Rectangle selection uses a crosshair; Lasso uses a contrasting lasso cursor with a precise selection point.
 
+Hold Ctrl/Cmd while using Animation Pencil or Eraser to sample a color temporarily; releasing it restores the selected tool. Dropper has a pipette cursor and sits immediately before Pencil. Brush previews stay within the canvas and off floating menus.
+
 New Layer creates an empty layer above the selected layer, with independent artwork in each frame. Ctrl/Cmd-click layer names to select several, or Shift-click a range, then click Group. Groups have green borders; double-click a group to expand or collapse its children. Children remain individually selectable and editable. Move, offsets, flips, and per-frame visibility work on the whole group, while drawing and selection tools operate only on individual layers. Drag a layer onto the middle of a group to put it inside, or above/below the group to move it outside. Press F2 to rename a layer or group. Groups and their contents are preserved by project saving and undo/redo.
+
+Copy selected layers or groups with Ctrl/Cmd+C or the Copy icon in the Animation title. Choose the destination frame and use Ctrl/Cmd+V or the adjacent Paste icon. Paste creates independent copies above the selected layer, preserving the copied frame's artwork, hierarchy, offsets, flips, and visibility. The pasted layers belong to the destination frame. Text fields retain their usual copy and paste behavior.
 
 Numeric fields accept basic math such as `150+20`, `64*2`, and `(150-20)/2`. Press Enter or leave the field to calculate. Results follow the field's range and step size. Invalid expressions keep the last valid value; Escape cancels a pending expression. Drag scrubbing and arrow-key stepping remain available.
 

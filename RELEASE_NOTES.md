@@ -12,6 +12,9 @@
 - Added equal-size New Layer and Group buttons below Animation layers. New layers start empty above the selected layer.
 - Added multi-layer selection with Ctrl/Cmd-click and Shift-click, green collapsible groups, nested layer ordering, and group movement, flipping, and per-frame visibility.
 - Kept grouped child layers individually editable and blocked drawing on groups. Group structure is preserved in saving/loading and undo/redo.
+- Added compact Copy/Paste title icons and Ctrl/Cmd+C/V shortcuts for independent layer and group copies within or between frames.
+- Added Shift-drag to add selection areas, Alt-drag to subtract areas, and selection outline movement by dragging inside or using Arrows (Shift+Arrows for ten pixels).
+- Added Delete/Backspace to erase selected pixels on the active Animation layer with undo support.
 - Included animation layers in project saving/loading, undo/redo, frame duplication, and sprite exports using the existing canvas and timeline.
 
 ### Improvements
@@ -21,6 +24,7 @@
 - Stacked visibility/removal on the left and horizontal/vertical flips on the right of each layer.
 - Matched layer name height to the offset inputs and aligned the name with the X input.
 - Centered the Animation toolbar, including the pencil color beside Eraser.
+- Placed Dropper before Pencil and added Ctrl/Cmd temporary color picking for Animation Pencil/Eraser with a contrasting pipette cursor.
 - Added animated black-and-white selection borders with a translucent fill and hard pixel selection edges.
 - Allowed section buttons to use the full canvas width above the floating menu, with the menu following wrapped rows on smaller windows.
 - Added basic arithmetic in numeric fields, including parentheses, with Enter/blur calculation and existing range and step constraints.
@@ -28,6 +32,8 @@
 ### Bug Fixes
 
 - Fixed Animation Hide/Show affecting every frame. Visibility now belongs to the current frame, including spritesheet imports, and survives saving, undo/redo, frame duplication, and export.
+- Fixed split and pasted layers appearing in other frames' layer lists when those frames have no cel for the layer.
+- Hid brush cursor previews over menus and clipped large footprints around floating controls.
 - Centered the pivot cross around one shared square so all four arms have equal lengths at different zoom levels and display scales.
 - Reused the Edit Tools pencil cursor for Animation Pencil and Eraser, showing their actual pixel footprint while hovering and drawing.
 - Added Shift + Wheel sizing to Animation Pencil and Eraser, matching Edit Tools without changing canvas zoom.

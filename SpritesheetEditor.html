@@ -1909,7 +1909,7 @@
             </details>
           </div>
           <div class="group animation-group" id="animationGroup">
-            <p class="group-title">Animation</p>
+            <p class="group-title"><span>Animation</span><span class="group-title-actions"><button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy Animation layers (Ctrl/Cmd+C)" title="Copy selected layers or groups from this frame (Ctrl/Cmd+C)"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button><button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste Animation layers (Ctrl/Cmd+V)" title="Paste layers or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button></span></p>
             <label class="upload compact" id="animationDropZone">
               <input id="animationFileInput" type="file" accept="image/*,.gif,.webp" multiple />
               <div><strong>Load Sprite</strong><span>Click here or drag image / GIF / WebP file(s)</span></div>
@@ -1919,8 +1919,8 @@
               <button id="animationLassoButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="lasso" title="Lasso selection (L)" aria-label="Lasso selection (L)"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" /></button>
               <button id="animationRectangleButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="rectangle" title="Rectangle selection (R)" aria-label="Rectangle selection (R)"><img class="tool-icon-image" src="icons/selection-rectangle.svg" alt="" /></button>
               <button id="animationSplitButton" class="secondary icon-button tool-icon-button" type="button" title="Split selection into a new layer" aria-label="Split selection into a new layer" disabled><img class="tool-icon-image" src="icons/split.svg" alt="" /></button>
-              <button id="animationPencilButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="pencil" title="Pencil (P)" aria-label="Animation pencil (P)"><img class="tool-icon-image" src="icons/pencil.svg" alt="" /></button>
               <button id="animationDropperButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="dropper" title="Dropper (D)" aria-label="Animation dropper (D)"><img class="tool-icon-image" src="icons/pipette.svg" alt="" /></button>
+              <button id="animationPencilButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="pencil" title="Pencil (P); hold Ctrl/Cmd for Dropper" aria-label="Animation pencil (P)"><img class="tool-icon-image" src="icons/pencil.svg" alt="" /></button>
               <button id="animationEraserButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="eraser" title="Eraser (E)" aria-label="Animation eraser (E)"><img class="tool-icon-image" src="icons/eraser.svg" alt="" /></button>
               <div id="animationColorStrip" class="pencil-color-strip" aria-label="Animation pencil colors"></div>
             </div>
@@ -2142,7 +2142,7 @@
         <div><kbd>G</kbd><span>Paint Bucket tool</span></div>
         <div><kbd>W</kbd><span>Magic Wand tool</span></div>
         <div><kbd>D</kbd><span>Dropper tool</span></div>
-        <div><kbd>Ctrl/Cmd</kbd><span>Temporary color picker while using Pencil tools</span></div>
+        <div><kbd>Ctrl/Cmd</kbd><span>Temporary color picker while using Pencil tools or Animation Pencil/Eraser</span></div>
         <div><kbd>H</kbd><span>Hide Mask on/off</span></div>
         <div><kbd>F</kbd><span>Reset view, or fit the Compositor timeline when hovering it</span></div>
         <div><kbd>Mouse Wheel</kbd><span>Zoom preview canvas</span></div>
@@ -2150,6 +2150,11 @@
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
         <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Animation</span></div>
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Select multiple Animation layers</span></div>
+        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy / paste Animation layers or groups in the current frame</span></div>
+        <div><kbd>Alt + Drag</kbd><span>Subtract from an Animation lasso or rectangle selection</span></div>
+        <div><kbd>Shift + Drag</kbd><span>Add to an Animation lasso or rectangle selection</span></div>
+        <div><kbd>Arrows / Shift + Arrows</kbd><span>Move an Animation selection 1 / 10 pixels; drag inside it to move with the mouse</span></div>
+        <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active Animation layer while using Lasso or Rectangle</span></div>
         <div><kbd>F2</kbd><span>Rename the selected Animation layer or group</span></div>
         <div><kbd>Shift + Arrows</kbd><span>Move the current frame, active Animation layer, or selected Compositor clips</span></div>
         <div><kbd>Space</kbd><span>Play/Pause</span></div>
@@ -5468,10 +5473,10 @@
       return clamp(Math.round(parseFloat(state.pencilHardness) || 0), 0, 100) / 100;
     }
     function temporaryPencilColorPickerActive(e = null) {
-      return !!(state.pencilMode && (state.pencilCtrlPickMode || e?.ctrlKey || e?.metaKey));
+      return !!((state.pencilMode || animationPixelBrushActive()) && (state.pencilCtrlPickMode || e?.ctrlKey || e?.metaKey));
     }
     function setPencilCtrlPickMode(active, redraw = true) {
-      const next = !!active && state.pencilMode;
+      const next = !!active && (state.pencilMode || animationPixelBrushActive());
       if (state.pencilCtrlPickMode === next) return;
       state.pencilCtrlPickMode = next;
       state.brushCursorVisible = false;
@@ -5669,11 +5674,20 @@
       }
       const t = resizeBrushCursorOverlay(shellRect);
       if (!t) return;
+      // Keep large footprints off floating controls even before the pointer reaches them.
+      t.save();
+      t.beginPath();t.rect(shellRect.left,shellRect.top,shellRect.width,shellRect.height);t.clip();
+      document.querySelectorAll('.side-panels .group.inspector-active, .floating-tool-tabs, .canvas-info-row, .sprite-sheet-builder-cell-actions').forEach(menu=>{
+        const r=menu.getBoundingClientRect();
+        if (!r.width || !r.height || r.right<shellRect.left || r.left>shellRect.right || r.bottom<shellRect.top || r.top>shellRect.bottom) return;
+        t.beginPath();t.rect(0,0,window.innerWidth,window.innerHeight);t.rect(r.left,r.top,r.width,r.height);t.clip('evenodd');
+      });
       const g = brushCursorGeometry();
       const zoomX = mainRect.width / Math.max(1, frame.width);
       const zoomY = mainRect.height / Math.max(1, frame.height);
       if (mode === 'pencil' && !builderSurface) {
         if (!renderPencilCursorFootprint(t, shellRect, mainRect, zoomX, zoomY)) clearBrushCursorOverlay();
+        t.restore();
         return;
       }
       const x = mainRect.left + g.cx * zoomX;
@@ -5698,6 +5712,7 @@
       t.moveTo(x, y - arm); t.lineTo(x, y - gap);
       t.moveTo(x, y + gap); t.lineTo(x, y + arm);
       t.stroke();
+      t.restore();
       t.restore();
     }
     function drawBrush(t) {
@@ -6956,6 +6971,7 @@
       els.canvasShell.classList.toggle('animation-move-cursor', animationPanelActive() && (state.animationTool || 'move') === 'move' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-lasso-cursor', animationPanelActive() && state.animationTool === 'lasso' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-rectangle-cursor', animationPanelActive() && state.animationTool === 'rectangle' && !colorPicker.pickMode);
+      els.canvasShell.classList.toggle('animation-dropper-cursor', animationPanelActive() && (state.animationTool === 'dropper' || tempPencilPicker) && !colorPicker.pickMode);
       updateIndexPreview();
       setButtons(hasFrames());
       setDisplayVisibilityButtons();
@@ -16264,6 +16280,8 @@
       else clearBrushCursorOverlay();
     }
     function updateBrushCursorFromEvent(e) {
+      const surface=document.elementFromPoint(e.clientX,e.clientY);
+      if (!surface || !els.canvasShell.contains(surface) || surface.closest('button, input, select, textarea, a, .canvas-info-row, .sprite-sheet-builder-cell-actions')) { hideBrushCursor(false); return null; }
       const p = pointerCagePoint(e);
       if (!p) { hideBrushCursor(false); return null; }
       state.brushX = p.x;
@@ -20237,7 +20255,7 @@
         }
         return;
       }
-      if ((e.key === 'Control' || e.key === 'Meta') && !typing && state.pencilMode) { setPencilCtrlPickMode(true); return; }
+      if ((e.key === 'Control' || e.key === 'Meta') && !typing && (state.pencilMode || animationPixelBrushActive())) { setPencilCtrlPickMode(true); return; }
       if (typing) return;
       if (handleAnimationKeyDown(e)) return;
       if (e.key === 'Escape' && (state.eyedropperMode || state.paletteDropperMode)) { e.preventDefault(); state.eyedropperMode = false; state.paletteDropperMode = false; state.paletteMergeTargetIndices = []; state.brushCursorVisible = false; drawFrame(state.currentFrame); updateInfo(); return; }
