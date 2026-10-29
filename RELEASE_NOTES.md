@@ -9,6 +9,9 @@
 - Added drag ordering for sprite layers; the top layer renders in front.
 - Added lasso and rectangle selection, plus Split to cut selected pixels into a cropped layer while preserving their canvas position.
 - Added pencil, dropper, eraser, and shared pencil colors to the Animation panel.
+- Added equal-size New Layer and Group buttons below Animation layers. New layers start empty above the selected layer.
+- Added multi-layer selection with Ctrl/Cmd-click and Shift-click, green collapsible groups, nested layer ordering, and group movement, flipping, and per-frame visibility.
+- Kept grouped child layers individually editable and blocked drawing on groups. Group structure is preserved in saving/loading and undo/redo.
 - Included animation layers in project saving/loading, undo/redo, frame duplication, and sprite exports using the existing canvas and timeline.
 
 ### Improvements

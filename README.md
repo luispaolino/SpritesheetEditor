@@ -91,6 +91,8 @@ Selections use a translucent fill and animated black-and-white borders. Selectio
 
 Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or Eraser size, just like Edit Tools. Rectangle selection uses a crosshair; Lasso uses a contrasting lasso cursor with a precise selection point.
 
+New Layer creates an empty layer above the selected layer, with independent artwork in each frame. Ctrl/Cmd-click layer names to select several, or Shift-click a range, then click Group. Groups have green borders; double-click a group to expand or collapse its children. Children remain individually selectable and editable. Move, offsets, flips, and per-frame visibility work on the whole group, while drawing and selection tools operate only on individual layers. Drag a layer onto the middle of a group to put it inside, or above/below the group to move it outside. Press F2 to rename a layer or group. Groups and their contents are preserved by project saving and undo/redo.
+
 Numeric fields accept basic math such as `150+20`, `64*2`, and `(150-20)/2`. Press Enter or leave the field to calculate. Results follow the field's range and step size. Invalid expressions keep the last valid value; Escape cancels a pending expression. Drag scrubbing and arrow-key stepping remain available.
 
 ### Compositor

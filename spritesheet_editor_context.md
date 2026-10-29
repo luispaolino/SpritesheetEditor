@@ -207,6 +207,8 @@ Animation visibility is stored in each frame's `animationVisibility` map, with t
 
 `numeric-inputs.js` enhances static and dynamically added numeric fields with arithmetic. It parses expressions without evaluating JavaScript and commits on Enter or blur before existing numeric handlers run. Enhanced fields are text inputs marked with `data-numeric-input`; preserve that selector in numeric styling and drag scrubbing. `drawPivotCross` shares physically aligned geometry between the sprite and sprite-sheet builder pivot overlays.
 
+Animation layers are stored in preorder with `parentId` links; group records have `group: true` and `collapsed`. Groups have no cel canvas and must never be paint targets. Group movement and flips update descendant leaf cels directly, so child editing stays in cage coordinates. Group visibility is inherited per frame; collapsing only changes the list. `cloneAnimationLayers` validates and preserves the hierarchy. New Layer creates independent empty cels in every frame above the selected layer. Ctrl/Cmd-click and Shift-click select multiple rows; Group wraps selected subtrees, and dropping onto the middle of a group adopts a subtree. Double-click toggles groups; F2 renames either kind of row.
+
 The `v1.5.0` notes include:
 
 - Compositor workspace

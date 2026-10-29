@@ -5,7 +5,7 @@ const animationEls = {
   group: $('animationGroup'), input: $('animationFileInput'), drop: $('animationDropZone'),
   list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'),
   size: $('animationBrushSizeInput'), sizeValue: $('animationBrushSizeValue'), sizeField: $('animationBrushSizeField'),
-  selectionActions: $('animationSelectionActions')
+  selectionActions: $('animationSelectionActions'), newLayer: $('animationNewLayerButton'), newGroup: $('animationGroupLayersButton')
 };
 let animationSelection = null;
 let animationStroke = null;
@@ -20,7 +20,7 @@ function animationPanelActive() {
   return animationEls.group.classList.contains('inspector-active') && !state.referenceCompositorVisible;
 }
 function animationPixelBrushActive() {
-  return animationPanelActive() && ['pencil','eraser'].includes(state.animationTool);
+  return animationPanelActive() && !activeAnimationLayer()?.group && ['pencil','eraser'].includes(state.animationTool);
 }
 function setAnimationBrushSize(value) {
   state.animationBrushSize = clamp(Math.round(Number(value) || 1),1,120);
@@ -41,21 +41,65 @@ function activeAnimationLayer() {
   return layers.find(layer => layer.id === state.activeAnimationLayerId) || layers[0] || null;
 }
 function cloneAnimationLayers(layers) {
-  return Array.isArray(layers) ? layers.map(layer => ({ id: String(layer.id), name: String(layer.name || 'Sprite'), visible: layer.visible !== false, base: layer.id === ANIMATION_BASE_ID })) : null;
+  if (!Array.isArray(layers)) return null;
+  const copy = layers.map(layer => ({ id: String(layer.id), name: String(layer.name || (layer.group ? 'Group' : 'Sprite')), visible: layer.visible !== false,
+    base: layer.id === ANIMATION_BASE_ID, group: !!layer.group && layer.id !== ANIMATION_BASE_ID, parentId: String(layer.parentId || ''), collapsed: !!layer.collapsed }));
+  const byId = new Map(copy.map(layer => [layer.id,layer]));
+  copy.forEach(layer => {
+    const seen = new Set([layer.id]); let parent = byId.get(layer.parentId);
+    if (layer.parentId && !parent?.group) layer.parentId = '';
+    while (parent) {
+      if (seen.has(parent.id)) { layer.parentId = ''; break; }
+      seen.add(parent.id); parent = byId.get(parent.parentId);
+    }
+  });
+  const ordered = [], visited = new Set();
+  function append(parentId) {
+    copy.filter(layer => layer.parentId === parentId).forEach(layer => {
+      if (visited.has(layer.id)) return;
+      visited.add(layer.id); ordered.push(layer); if (layer.group) append(layer.id);
+    });
+  }
+  append('');
+  return ordered;
+}
+function animationAncestors(layer, layers = animationLayerList()) {
+  const ancestors = [], seen = new Set([layer?.id]);
+  let parentId = layer?.parentId;
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId); const parent = layers.find(item => item.id === parentId && item.group);
+    if (!parent) break;
+    ancestors.push(parent); parentId = parent.parentId;
+  }
+  return ancestors;
+}
+function animationSubtreeIds(id, layers = animationLayerList()) {
+  return new Set(layers.filter(layer => layer.id === id || animationAncestors(layer,layers).some(parent => parent.id === id)).map(layer => layer.id));
+}
+function animationVisibleLayers() {
+  const layers = animationLayerList();
+  return layers.filter(layer => !animationAncestors(layer,layers).some(parent => parent.collapsed));
+}
+function selectedAnimationLayerIds() {
+  const layers = animationLayerList(), selected = (state.selectedAnimationLayerIds || []).filter(id => layers.some(layer => layer.id === id));
+  return selected.length ? selected : (activeAnimationLayer() ? [activeAnimationLayer().id] : []);
+}
+function animationLayerOwnVisible(layer, i = state.currentFrame) {
+  const visible = state.frames[i]?.animationVisibility?.[layer.id];
+  return typeof visible === 'boolean' ? visible : layer.visible !== false;
 }
 function cloneAnimationVisibility(visibility = {}) {
   return Object.fromEntries(Object.entries(visibility || {}).filter(([,visible]) => typeof visible === 'boolean'));
 }
 function animationLayerVisible(layer, i = state.currentFrame) {
   if (!layer) return false;
-  const visible = state.frames[i]?.animationVisibility?.[layer.id];
-  return typeof visible === 'boolean' ? visible : layer.visible !== false;
+  return animationLayerOwnVisible(layer,i) && animationAncestors(layer).every(parent => animationLayerOwnVisible(parent,i));
 }
 function toggleAnimationVisibility(id) {
   const layer = animationLayerList().find(layer => layer.id === id), frame = state.frames[state.currentFrame];
   if (!layer || !frame) return;
   pause();
-  const visible = animationLayerVisible(layer);
+  const visible = animationLayerOwnVisible(layer);
   pushHistory();
   ensureAnimationLayers();
   frame.animationVisibility = { ...cloneAnimationVisibility(frame.animationVisibility), [id]: !visible };
@@ -90,11 +134,13 @@ function resetAnimationTools() {
 function resetAnimationState() {
   state.animationLayers = null;
   state.activeAnimationLayerId = '';
+  state.selectedAnimationLayerIds = [];
+  state.animationSelectionAnchorId = '';
   state.animationBrushSize = 1;
   resetAnimationTools();
 }
 function animationCel(layer, i = state.currentFrame) {
-  if (!layer) return null;
+  if (!layer || layer.group) return null;
   if (layer.base) {
     const frame = state.frames[i];
     if (!frame) return null;
@@ -105,6 +151,68 @@ function animationCel(layer, i = state.currentFrame) {
 }
 function animationCelPosition(cel) {
   return { x: Math.round((state.cageWidth - cel.canvas.width) / 2) + Math.round(cel.offsetX || 0), y: Math.round((state.cageHeight - cel.canvas.height) / 2) + Math.round(cel.offsetY || 0) };
+}
+function animationMovementTargets(layer, i = state.currentFrame) {
+  const layers = animationLayerList(), ids = animationSubtreeIds(layer?.id,layers);
+  return layers.filter(item => ids.has(item.id) && !item.group && animationCel(item,i));
+}
+function animationLayerBounds(layer, i = state.currentFrame) {
+  const cel = animationCel(layer,i);
+  if (!cel) return null;
+  const position = layer.base ? framePos(i) : animationCelPosition(cel), scale = layer.base ? frameScale(i) : {x:1,y:1};
+  return { left:position.x, top:position.y, right:position.x+cel.canvas.width*scale.x, bottom:position.y+cel.canvas.height*scale.y };
+}
+function animationGroupBounds(layer, i = state.currentFrame) {
+  const bounds = animationMovementTargets(layer,i).map(item => animationLayerBounds(item,i));
+  return bounds.length ? { left:Math.min(...bounds.map(b=>b.left)), top:Math.min(...bounds.map(b=>b.top)), right:Math.max(...bounds.map(b=>b.right)), bottom:Math.max(...bounds.map(b=>b.bottom)) } : null;
+}
+function animationLayerOffset(layer, i = state.currentFrame) {
+  if (!layer?.group) { const cel = animationCel(layer,i); return cel ? {x:cel.offsetX,y:cel.offsetY} : null; }
+  const bounds = animationGroupBounds(layer,i);
+  return bounds ? {x:Math.round((bounds.left+bounds.right-state.cageWidth)/2),y:Math.round((bounds.top+bounds.bottom-state.cageHeight)/2)} : null;
+}
+function writeAnimationOffset(layer, i, x, y) {
+  if (layer.base) state.frameOffsets[i] = {x:Math.round(x),y:Math.round(y)};
+  else { const cel=animationCel(layer,i); if(cel) {cel.offsetX=Math.round(x);cel.offsetY=Math.round(y);} }
+}
+function newAnimationId(kind = 'layer') { return `animation-${kind}-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+function uniqueAnimationName(prefix) {
+  const names = new Set(animationLayerList().map(layer=>layer.name)); let n=1;
+  while (names.has(`${prefix} ${n}`)) n++;
+  return `${prefix} ${n}`;
+}
+function createEmptyAnimationLayer() {
+  if (!hasFrames()) return;
+  pause(); pushHistory();
+  const layers=ensureAnimationLayers(), active=activeAnimationLayer(), id=newAnimationId(), name=uniqueAnimationName('Layer');
+  const index=active ? layers.findIndex(layer=>layer.id===active.id) : 0;
+  layers.splice(Math.max(0,index),0,{id,name,visible:true,base:false,parentId:active?.parentId || ''});
+  state.frames.forEach(frame=>{frame.animationCels ||= {};frame.animationCels[id]={canvas:makeMask(),offsetX:0,offsetY:0,flipX:false,flipY:false};});
+  state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
+  animationSelection=null;state.animationTool='move';animationChanged();
+}
+function createAnimationGroup() {
+  const layers=animationLayerList(), selected=new Set(selectedAnimationLayerIds());
+  const roots=layers.filter(layer=>selected.has(layer.id) && !animationAncestors(layer,layers).some(parent=>selected.has(parent.id)));
+  if (!roots.length || !hasFrames()) return;
+  pause();pushHistory();ensureAnimationLayers();
+  const parentPaths=roots.map(layer=>[...animationAncestors(layer,layers).map(parent=>parent.id),'']);
+  const parentId=parentPaths[0].find(id=>parentPaths.every(path=>path.includes(id))) || '';
+  let anchor=roots[0];
+  while ((anchor.parentId || '')!==parentId) anchor=layers.find(layer=>layer.id===anchor.parentId);
+  const memberIds=new Set(roots.flatMap(layer=>[...animationSubtreeIds(layer.id,layers)]));
+  const members=layers.filter(layer=>memberIds.has(layer.id)), remaining=layers.filter(layer=>!memberIds.has(layer.id));
+  const at=memberIds.has(anchor.id) ? layers.slice(0,layers.indexOf(anchor)).filter(layer=>!memberIds.has(layer.id)).length : remaining.indexOf(anchor);
+  const id=newAnimationId('group'), group={id,name:uniqueAnimationName('Group'),visible:true,group:true,base:false,parentId,collapsed:true};
+  roots.forEach(layer=>{layer.parentId=id;});
+  remaining.splice(Math.max(0,at),0,group,...members);
+  state.animationLayers=cloneAnimationLayers(remaining);state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
+  animationSelection=null;state.animationTool='move';animationChanged();
+}
+function toggleAnimationGroup(id) {
+  const layer=ensureAnimationLayers().find(layer=>layer.id===id && layer.group);
+  if (!layer) return;
+  layer.collapsed=!layer.collapsed;updateAnimationUi(true);
 }
 function drawAnimationCel(t, cel, x = 0, y = 0) {
   if (!cel?.canvas) return;
@@ -120,7 +228,7 @@ function drawAnimationSprite(t, i, x, y, opt) {
   if (!Array.isArray(state.animationLayers)) return false;
   t.save(); t.beginPath(); t.rect(x, y, state.cageWidth, state.cageHeight); t.clip();
   for (const layer of [...state.animationLayers].reverse()) {
-    if (!animationLayerVisible(layer, i)) continue;
+    if (layer.group || !animationLayerVisible(layer, i)) continue;
     if (layer.base) {
       // Base masks and blend modes must not erase or recolor lower sprite layers.
       const base = makeMask();
@@ -251,44 +359,66 @@ function animationChanged(rebuild = true) {
   drawFrame(state.currentFrame);
   updateInfo();
 }
-function selectAnimationLayer(id) {
-  if (!animationLayerList().some(layer => layer.id === id)) return;
-  state.activeAnimationLayerId = id;
+function selectAnimationLayer(id, {toggle=false,range=false} = {}) {
+  const layer=animationLayerList().find(layer=>layer.id===id);
+  if (!layer) return;
+  const selected=selectedAnimationLayerIds();
+  if (range) {
+    const visible=animationVisibleLayers().map(layer=>layer.id), anchor=visible.indexOf(state.animationSelectionAnchorId || state.activeAnimationLayerId), at=visible.indexOf(id);
+    const ids=visible.slice(Math.min(anchor<0?at:anchor,at),Math.max(anchor<0?at:anchor,at)+1);
+    state.selectedAnimationLayerIds=toggle ? [...new Set([...selected,...ids])] : ids;
+  } else if (toggle) state.selectedAnimationLayerIds=selected.includes(id) ? selected.filter(item=>item!==id) : [...selected,id];
+  else state.selectedAnimationLayerIds=[id];
+  if (!state.selectedAnimationLayerIds.length) state.selectedAnimationLayerIds=[id];
+  state.activeAnimationLayerId=state.selectedAnimationLayerIds.includes(id) ? id : state.selectedAnimationLayerIds.at(-1);
+  if (!range) state.animationSelectionAnchorId=id;
+  if (activeAnimationLayer()?.group && !['move','dropper'].includes(state.animationTool)) state.animationTool='move';
   animationSelection = null;
-  drawFrame(state.currentFrame); updateAnimationUi();
+  drawFrame(state.currentFrame); updateInfo();
 }
 function setAnimationOffset(id, axis, value, history = true) {
-  const layer = animationLayerList().find(layer => layer.id === id), cel = animationCel(layer);
-  if (!cel) return;
-  const next = Math.round(Number(value) || 0), key = axis === 'x' ? 'offsetX' : 'offsetY';
-  if (cel[key] === next) return;
+  const layer = animationLayerList().find(layer => layer.id === id), offset=animationLayerOffset(layer);
+  if (!offset) return;
+  const next = Math.round(Number(value) || 0), delta=next-offset[axis];
+  if (!delta) return;
   if (history) pushHistory();
-  if (layer.base) state.frameOffsets[state.currentFrame][axis] = next;
-  else cel[key] = next;
+  animationMovementTargets(layer).forEach(item=>{
+    const cel=animationCel(item);writeAnimationOffset(item,state.currentFrame,cel.offsetX+(axis==='x'?delta:0),cel.offsetY+(axis==='y'?delta:0));
+  });
   state.activeAnimationLayerId = id;
   animationSelection = null;
   animationChanged(false);
 }
 function toggleAnimationFlip(id, axis) {
-  const layer = animationLayerList().find(layer => layer.id === id), cel = animationCel(layer);
-  if (!cel) return;
+  const layer = animationLayerList().find(layer => layer.id === id), targets=animationMovementTargets(layer);
+  if (!targets.length) return;
   pushHistory();
-  if (layer.base) {
-    const flips = axis === 'x' ? state.frameFlips : state.frameFlipYs;
-    flips[state.currentFrame] = !flips[state.currentFrame];
-  } else cel[axis === 'x' ? 'flipX' : 'flipY'] = !cel[axis === 'x' ? 'flipX' : 'flipY'];
+  const groupBounds=layer.group ? animationGroupBounds(layer) : null;
+  const records=targets.map(item=>({layer:item,cel:animationCel(item),bounds:groupBounds?animationLayerBounds(item):null}));
+  records.forEach(record=>{
+    const item=record.layer,cel=record.cel;
+    if (groupBounds) {
+      const delta=axis==='x' ? groupBounds.left+groupBounds.right-record.bounds.left-record.bounds.right : groupBounds.top+groupBounds.bottom-record.bounds.top-record.bounds.bottom;
+      writeAnimationOffset(item,state.currentFrame,cel.offsetX+(axis==='x'?delta:0),cel.offsetY+(axis==='y'?delta:0));
+    }
+    if (item.base) {const flips=axis==='x'?state.frameFlips:state.frameFlipYs;flips[state.currentFrame]=!flips[state.currentFrame];}
+    else cel[axis==='x'?'flipX':'flipY']=!cel[axis==='x'?'flipX':'flipY'];
+  });
   state.activeAnimationLayerId = id; animationSelection = null; animationChanged();
 }
 function removeAnimationLayer(id) {
   if (!animationLayerList().some(layer => layer.id === id)) return;
   pushHistory();
-  const layers = ensureAnimationLayers(), at = layers.findIndex(layer => layer.id === id);
-  layers.splice(at,1);
+  const layers = ensureAnimationLayers(), at = layers.findIndex(layer => layer.id === id), removed=animationSubtreeIds(id,layers);
+  state.animationLayers=layers.filter(layer=>!removed.has(layer.id));
   state.frames.forEach(frame => {
-    if (frame.animationCels) delete frame.animationCels[id];
-    if (frame.animationVisibility) delete frame.animationVisibility[id];
+    removed.forEach(removedId=>{
+      if (frame.animationCels) delete frame.animationCels[removedId];
+      if (frame.animationVisibility) delete frame.animationVisibility[removedId];
+    });
   });
-  state.activeAnimationLayerId = layers[Math.min(at,layers.length-1)]?.id || '';
+  state.activeAnimationLayerId = state.animationLayers[Math.min(at,state.animationLayers.length-1)]?.id || '';
+  state.selectedAnimationLayerIds=state.activeAnimationLayerId?[state.activeAnimationLayerId]:[];
   animationSelection = null; animationChanged();
 }
 function renameAnimationLayer(id, name) {
@@ -298,16 +428,25 @@ function renameAnimationLayer(id, name) {
   ensureAnimationLayers().find(item => item.id === id).name = next;
   updateAnimationUi(true);
 }
-function moveAnimationLayer(id, targetId, after) {
+function moveAnimationLayer(id, targetId, after, intoGroup = false) {
   const layers = animationLayerList(), from = layers.findIndex(layer => layer.id === id);
-  if (from < 0 || id === targetId || !layers.some(layer => layer.id === targetId)) return;
-  const next = layers.filter(layer => layer.id !== id), index = next.findIndex(layer => layer.id === targetId) + (after ? 1 : 0);
-  next.splice(index,0,layers[from]);
-  if (next.every((layer,i) => layer.id === layers[i].id)) return;
-  pushHistory(); state.animationLayers = next; state.activeAnimationLayerId = id; animationChanged();
+  const target=layers.find(layer=>layer.id===targetId), moving=animationSubtreeIds(id,layers);
+  if (from < 0 || !target || moving.has(targetId) || (intoGroup&&!target.group)) return;
+  const members=layers.filter(layer=>moving.has(layer.id)),next=layers.filter(layer=>!moving.has(layer.id));
+  const targetSubtree=animationSubtreeIds(targetId,next);
+  let index=next.findIndex(layer=>layer.id===targetId)+(intoGroup?1:after?targetSubtree.size:0);
+  const parentId=intoGroup?targetId:(target.parentId||'');
+  if ((members[0].parentId||'')===parentId && index===from && !intoGroup) return;
+  pushHistory();members[0].parentId=parentId;
+  if(intoGroup)target.collapsed=false;
+  next.splice(index,0,...members);
+  state.animationLayers=next;state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];animationChanged();
 }
 function updateAnimationUi(force = false) {
-  const layers = animationLayerList(), active = activeAnimationLayer();
+  const layers = animationLayerList(), active = activeAnimationLayer(), visibleLayers=animationVisibleLayers(), selectedIds=new Set(selectedAnimationLayerIds());
+  animationEls.newLayer.disabled=!hasFrames();
+  animationEls.newGroup.disabled=!hasFrames() || !selectedIds.size;
+  animationEls.newGroup.title='Group selected layers (Ctrl/Cmd-click or Shift-click layer names to select several)';
   if (!validAnimationSelection()) animationSelection = null;
   const selected = !!animationSelection;
   animationEls.split.disabled = !selected || !animationLayerVisible(active);
@@ -316,24 +455,30 @@ function updateAnimationUi(force = false) {
   animationEls.group.querySelectorAll('[data-animation-tool]').forEach(button => {
     const on = button.dataset.animationTool === tool;
     button.classList.toggle('active',on); button.setAttribute('aria-pressed',String(on));
-    button.disabled = !hasFrames() || (!active && button.dataset.animationTool !== 'dropper');
+    const paintTool=['pencil','eraser','lasso','rectangle'].includes(button.dataset.animationTool);
+    button.disabled = !hasFrames() || (!active && button.dataset.animationTool !== 'dropper') || (active?.group && paintTool);
   });
   animationEls.sizeField.hidden = !['pencil','eraser'].includes(tool);
   animationEls.size.value = state.animationBrushSize || 1;
   animationEls.sizeValue.textContent = state.animationBrushSize || 1;
   // Update controls in place while typing or scrubbing their numeric values.
-  const signature = JSON.stringify(layers.map(layer => [layer.id,layer.name,layer.visible]));
+  const signature = JSON.stringify(layers.map(layer => [layer.id,layer.name,layer.visible,layer.group,layer.parentId,layer.collapsed]));
   const list = animationEls.list;
   if (force || list.dataset.layerKey !== signature) {
     list.dataset.layerKey = signature; list.replaceChildren();
-    layers.forEach(layer => {
-      const item = document.createElement('div'); item.className = 'reference-layer-item animation-layer-item'; item.dataset.animationId = layer.id;
+    visibleLayers.forEach(layer => {
+      const item = document.createElement('div'); item.className = `reference-layer-item animation-layer-item${layer.group?' animation-group-item':''}`; item.dataset.animationId = layer.id;
+      item.style.setProperty('--animation-layer-depth',animationAncestors(layer,layers).length);
       const actions = document.createElement('div'); actions.className = 'animation-layer-actions';
-      const name = document.createElement('button'); name.type = 'button'; name.className = 'reference-layer-name animation-layer-name secondary'; name.textContent = layer.name; name.title = 'Drag to reorder; double-click to rename';
+      const name = document.createElement('button'); name.type = 'button'; name.className = 'reference-layer-name animation-layer-name secondary';
+      if(layer.group) {const arrow=document.createElement('span');arrow.className='animation-group-arrow';arrow.textContent=layer.collapsed?'▸':'▾';arrow.setAttribute('aria-hidden','true');name.append(arrow);name.setAttribute('aria-expanded',String(!layer.collapsed));}
+      name.append(layer.name);
+      name.title = layer.group ? 'Double-click to expand/collapse; Ctrl/Cmd-click to select multiple; F2 to rename' : 'Drag to reorder; double-click to rename; Ctrl/Cmd-click or Shift-click to select multiple';
       name.setAttribute('aria-label', `Select ${layer.name}`);
       const eye = document.createElement('button'); eye.type = 'button'; eye.className = 'lock-button reference-visibility-button'; eye.dataset.animationAction = 'visible';
       eye.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'lock-button reference-remove-button'; remove.dataset.animationAction = 'remove'; remove.setAttribute('aria-label',`Remove ${layer.name}`); remove.title = 'Remove Layer';
+      if(layer.group)remove.title='Remove group and its layers';
       remove.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>';
       actions.append(eye,remove);
       const controls = document.createElement('div'); controls.className = 'reference-layer-controls animation-layer-controls';
@@ -351,13 +496,14 @@ function updateAnimationUi(force = false) {
       item.append(actions,name,controls,flips); list.append(item);
     });
   }
-  layers.forEach(layer => {
+  visibleLayers.forEach(layer => {
     const item = [...list.children].find(el => el.dataset.animationId === layer.id); if (!item) return;
-    const cel = animationCel(layer); item.classList.toggle('active',layer.id === active?.id);
-    const visible = animationLayerVisible(layer);
-    const eye = item.querySelector('[data-animation-action="visible"]'); eye.classList.toggle('active',visible); eye.setAttribute('aria-pressed',String(visible)); eye.setAttribute('aria-label',`${visible ? 'Hide' : 'Show'} ${layer.name}`); eye.title = `${visible ? 'Hide' : 'Show'} sprite in current frame`;
-    item.querySelectorAll('[data-animation-offset]').forEach(input => { if (document.activeElement !== input) input.value = Math.round(cel?.[input.dataset.animationOffset === 'x' ? 'offsetX' : 'offsetY'] || 0); input.disabled = !cel; });
-    item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); button.setAttribute('aria-pressed',String(flip)); button.disabled = !cel; });
+    const cel = animationCel(layer), offset=animationLayerOffset(layer); item.classList.toggle('active',selectedIds.has(layer.id));
+    const visible = animationLayerOwnVisible(layer);
+    item.classList.toggle('animation-inherited-hidden',visible&&!animationLayerVisible(layer));
+    const eye = item.querySelector('[data-animation-action="visible"]'); eye.classList.toggle('active',visible); eye.setAttribute('aria-pressed',String(visible)); eye.setAttribute('aria-label',`${visible ? 'Hide' : 'Show'} ${layer.name}`); eye.title = `${visible ? 'Hide' : 'Show'} ${layer.group?'group':'sprite'} in current frame`;
+    item.querySelectorAll('[data-animation-offset]').forEach(input => { if (document.activeElement !== input || input.hasAttribute('data-numeric-committing')) input.value = Math.round(offset?.[input.dataset.animationOffset] || 0); input.disabled = !offset; });
+    item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); if(layer.group)button.removeAttribute('aria-pressed');else button.setAttribute('aria-pressed',String(flip)); button.disabled = !offset; });
   });
   const colorKey = JSON.stringify([state.pencilColors,state.activePencilColorIndex]);
   if (animationEls.colors.dataset.colorKey !== colorKey) {
@@ -449,12 +595,13 @@ function splitAnimationSelection() {
   if(layer.base) state.frames[state.currentFrame].sourceCanvas = canvasClone(target.canvas);
   const cropped = makeMask(right-left+1,bottom-top+1); cropped.getContext('2d').drawImage(source,left,top,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
   const id=`animation-${Date.now()}-${Math.random().toString(36).slice(2)}`, layers=ensureAnimationLayers(), index=layers.findIndex(item=>item.id===layer.id);
-  layers.splice(index,0,{id,name:`${layer.name} split`,visible:true,base:false});
+  layers.splice(index,0,{id,name:`${layer.name} split`,visible:true,base:false,parentId:layer.parentId || ''});
   const frame=state.frames[state.currentFrame]; frame.animationCels ||= {};
   frame.animationCels[id]={canvas:cropped,offsetX:left-Math.round((state.cageWidth-cropped.width)/2),offsetY:top-Math.round((state.cageHeight-cropped.height)/2),flipX:false,flipY:false};
-  state.activeAnimationLayerId=id; animationSelection=null; state.animationTool='move'; showError(''); animationChanged();
+  state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id]; animationSelection=null; state.animationTool='move'; showError(''); animationChanged();
 }
 function setAnimationTool(tool) {
+  if(activeAnimationLayer()?.group && ['pencil','eraser','lasso','rectangle'].includes(tool))return;
   const previous = state.animationTool;
   const selection = animationSelection;
   clearActiveCanvasTools(false);
@@ -472,9 +619,9 @@ function startAnimationCanvasDrag(e) {
   if(tool==='move' && (rulerHit(e) || pivotHit(e))) return false;
   if(tool==='dropper' || ((e.ctrlKey||e.metaKey) && tool==='pencil')) {
     const p=pointerCagePoint(e); if(p) {const color=sampleVisibleFrameColor(state.currentFrame,p.x,p.y,{allowTransparent:true});if(color)setPencilColorAt(state.activePencilColorIndex,color,{refresh:false});}
-    if(tool==='dropper')state.animationTool='pencil'; updateInfo(); return true;
+    if(tool==='dropper'&&!layer?.group)state.animationTool='pencil'; updateInfo(); return true;
   }
-  if(!animationLayerVisible(layer) || !animationCel(layer)) return true;
+  if(!animationLayerVisible(layer) || !animationLayerOffset(layer) || (layer.group && tool!=='move')) return true;
   pause();
   if(tool==='rectangle'||tool==='lasso') {
     const p=animationPoint(e);animationSelection={kind:tool,points:[p,p],frameId:state.frames[state.currentFrame].id,layerId:layer.id};
@@ -485,8 +632,8 @@ function startAnimationCanvasDrag(e) {
       else animationBakeCel(layer,state.currentFrame);
     }
   }
-  const cel=animationCel(layer);
-  animationStroke={layerId:layer.id,frame:state.currentFrame,tool,last:pointerGuidePoint(e),startX:e.clientX,startY:e.clientY,offsetX:cel.offsetX,offsetY:cel.offsetY};
+  const offset=animationLayerOffset(layer),targets=animationMovementTargets(layer).map(item=>({id:item.id,x:animationCel(item).offsetX,y:animationCel(item).offsetY}));
+  animationStroke={layerId:layer.id,frame:state.currentFrame,tool,last:pointerGuidePoint(e),startX:e.clientX,startY:e.clientY,offsetX:offset.x,offsetY:offset.y,targets};
   state.activeAnimationLayerId=layer.id;state.dragging=true;state.dragMode=`animation-${tool}`;state.dragPointerId=e.pointerId;
   els.canvasShell.classList.add('dragging');els.canvasShell.setPointerCapture(e.pointerId);
   if(tool==='pencil'||tool==='eraser') { updateBrushCursorFromEvent(e); paintAnimationLine(animationStroke.last,animationStroke.last); }
@@ -522,10 +669,8 @@ function moveAnimationCanvasDrag(e) {
     if(stroke.tool==='rectangle')animationSelection.points[1]=p;
     else {const last=animationSelection.points[animationSelection.points.length-1];if(Math.hypot(p.x-last.x,p.y-last.y)>=.5)animationSelection.points.push(p);}
   } else if(stroke.tool==='move') {
-    const layer=animationLayerList().find(item=>item.id===stroke.layerId),cel=animationCel(layer,stroke.frame),d=pointerDelta(e,stroke.startX,stroke.startY);
-    if(!cel)return;
-    if(layer.base)state.frameOffsets[stroke.frame]={x:Math.round(stroke.offsetX+d.dx),y:Math.round(stroke.offsetY+d.dy)};
-    else {cel.offsetX=Math.round(stroke.offsetX+d.dx);cel.offsetY=Math.round(stroke.offsetY+d.dy);}
+    const layers=animationLayerList(),d=pointerDelta(e,stroke.startX,stroke.startY);
+    stroke.targets.forEach(record=>{const layer=layers.find(item=>item.id===record.id);if(layer)writeAnimationOffset(layer,stroke.frame,record.x+d.dx,record.y+d.dy);});
     animationSelection=null;
   } else if(stroke.tool==='pencil'||stroke.tool==='eraser') {
     const p=pointerGuidePoint(e);updateBrushCursorFromEvent(e);paintAnimationLine(stroke.last,p);stroke.last=p;
@@ -543,19 +688,22 @@ function finishAnimationCanvasDrag(e) {
 function handleAnimationKeyDown(e) {
   if(!animationPanelActive()||e.ctrlKey||e.metaKey||e.altKey)return false;
   const key=e.key.toLowerCase();
+  if(e.key==='F2'){e.preventDefault();beginAnimationLayerRename(activeAnimationLayer()?.id);return true;}
   if(e.key==='Escape') {animationSelection=null;state.animationTool='move';drawFrame(state.currentFrame);updateInfo();e.preventDefault();return true;}
   const tools={m:'move',l:'lasso',r:'rectangle',p:'pencil',d:'dropper',e:'eraser'};
   if(!e.shiftKey&&tools[key]){e.preventDefault();setAnimationTool(tools[key]);return true;}
   if(!e.shiftKey&&['b','g','w','h'].includes(key)){e.preventDefault();return true;}
   if(e.shiftKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
-    const layer=activeAnimationLayer(),cel=animationCel(layer);if(!cel)return true;
+    const layer=activeAnimationLayer(),offset=animationLayerOffset(layer);if(!offset)return true;
     e.preventDefault();const axis=['ArrowLeft','ArrowRight'].includes(e.key)?'x':'y',delta=['ArrowLeft','ArrowUp'].includes(e.key)?-1:1;
-    setAnimationOffset(layer.id,axis,cel[axis==='x'?'offsetX':'offsetY']+delta);return true;
+    setAnimationOffset(layer.id,axis,offset[axis]+delta);return true;
   }
   return false;
 }
 
 animationEls.input.addEventListener('change',e=>loadAnimationSprites(e.target.files));
+animationEls.newLayer.addEventListener('click',createEmptyAnimationLayer);
+animationEls.newGroup.addEventListener('click',createAnimationGroup);
 ['dragenter','dragover'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.add('dragover');}));
 ['dragleave','drop'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.remove('dragover');}));
 animationEls.drop.addEventListener('drop',e=>loadAnimationSprites(e.dataTransfer.files));
@@ -575,13 +723,20 @@ animationEls.list.addEventListener('click',e=>{
   if(action==='remove'){removeAnimationLayer(id);return;}
   if(action==='visible'){toggleAnimationVisibility(id);return;}
   const flip=e.target.closest('[data-animation-flip]');if(flip){toggleAnimationFlip(id,flip.dataset.animationFlip);return;}
-  selectAnimationLayer(id);
+  selectAnimationLayer(id,{toggle:e.ctrlKey||e.metaKey,range:e.shiftKey});
 });
-animationEls.list.addEventListener('dblclick',e=>{
-  const name=e.target.closest('.animation-layer-name'),item=name?.closest('[data-animation-id]');if(!item)return;
-  const layer=animationLayerList().find(layer=>layer.id===item.dataset.animationId),input=document.createElement('input');input.type='text';input.className='reference-layer-rename-input animation-layer-rename-input';input.value=layer.name;input.setAttribute('aria-label','Sprite layer name');name.replaceWith(input);input.focus();input.select();
+function beginAnimationLayerRename(id) {
+  const item=[...animationEls.list.querySelectorAll('[data-animation-id]')].find(item=>item.dataset.animationId===id),name=item?.querySelector('.animation-layer-name');
+  const layer=animationLayerList().find(layer=>layer.id===id);if(!name||!layer)return;
+  const input=document.createElement('input');input.type='text';input.className='reference-layer-rename-input animation-layer-rename-input';input.value=layer.name;input.setAttribute('aria-label',layer.group?'Group name':'Sprite layer name');name.replaceWith(input);input.focus();input.select();
   let done=false;const finish=commit=>{if(done)return;done=true;if(commit)renameAnimationLayer(layer.id,input.value);else updateAnimationUi(true);};
   input.addEventListener('blur',()=>finish(true));input.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(e.key==='Enter');}});
+}
+animationEls.list.addEventListener('dblclick',e=>{
+  const item=e.target.closest('[data-animation-id]');if(!item||e.target.closest('input,[data-animation-action],[data-animation-flip]'))return;
+  const id=item.dataset.animationId,layer=animationLayerList().find(layer=>layer.id===id);
+  if(layer?.group){toggleAnimationGroup(id);return;}
+  if(e.target.closest('.animation-layer-name'))beginAnimationLayerRename(id);
 });
 animationEls.list.addEventListener('focusin',e=>{if(e.target.matches('[data-animation-offset]')){pause();animationInputHistory=null;}});
 animationEls.list.addEventListener('input',e=>{
@@ -594,28 +749,29 @@ animationEls.list.addEventListener('change',e=>{if(e.target.matches('[data-anima
 animationEls.list.addEventListener('keydown',e=>{
   if(e.target.closest('input'))return;
   const item=e.target.closest('[data-animation-id]');if(!item||!e.altKey||!['ArrowUp','ArrowDown'].includes(e.key))return;
-  const layers=animationLayerList(),i=layers.findIndex(layer=>layer.id===item.dataset.animationId),target=layers[i+(e.key==='ArrowUp'?-1:1)];
+  const all=animationLayerList(),active=all.find(layer=>layer.id===item.dataset.animationId),layers=all.filter(layer=>(layer.parentId||'')===(active?.parentId||'')),i=layers.findIndex(layer=>layer.id===item.dataset.animationId),target=layers[i+(e.key==='ArrowUp'?-1:1)];
   if(target){e.preventDefault();e.stopPropagation();moveAnimationLayer(item.dataset.animationId,target.id,e.key==='ArrowDown');}
 });
 animationEls.list.addEventListener('pointerdown',e=>{
-  const name=e.target.closest('.animation-layer-name');if(!name||e.button!==0)return;
+  const name=e.target.closest('.animation-layer-name');if(!name||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey)return;
   animationLayerDrag={id:name.closest('[data-animation-id]').dataset.animationId,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,target:name,active:false};
 });
 document.addEventListener('pointermove',e=>{
   const drag=animationLayerDrag;if(!drag||drag.pointerId!==e.pointerId)return;
   if(!drag.active&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<5)return;
   e.preventDefault();drag.active=true;drag.target.setPointerCapture(e.pointerId);
-  const items=[...animationEls.list.querySelectorAll('[data-animation-id]')];items.forEach(item=>item.classList.remove('animation-drop-before','animation-drop-after','dragging-animation'));
+  const items=[...animationEls.list.querySelectorAll('[data-animation-id]')];items.forEach(item=>item.classList.remove('animation-drop-before','animation-drop-after','animation-drop-inside','dragging-animation'));
   items.find(item=>item.dataset.animationId===drag.id)?.classList.add('dragging-animation');
-  const other=items.filter(item=>item.dataset.animationId!==drag.id);let target=other.find(item=>e.clientY<item.getBoundingClientRect().bottom)||other[other.length-1];
-  if(target){const r=target.getBoundingClientRect();drag.targetId=target.dataset.animationId;drag.after=e.clientY>=r.top+r.height/2;target.classList.add(drag.after?'animation-drop-after':'animation-drop-before');}
+  const moving=animationSubtreeIds(drag.id),other=items.filter(item=>!moving.has(item.dataset.animationId));let target=other.find(item=>e.clientY<item.getBoundingClientRect().bottom)||other[other.length-1];
+  drag.targetId='';drag.intoGroup=false;
+  if(target){const r=target.getBoundingClientRect(),layer=animationLayerList().find(layer=>layer.id===target.dataset.animationId),fraction=(e.clientY-r.top)/r.height;drag.targetId=layer.id;drag.intoGroup=!!layer.group&&fraction>.25&&fraction<.75;drag.after=fraction>=.5;target.classList.add(drag.intoGroup?'animation-drop-inside':drag.after?'animation-drop-after':'animation-drop-before');}
   const listRect=animationEls.list.getBoundingClientRect();if(e.clientY<listRect.top+24)animationEls.list.scrollTop-=12;else if(e.clientY>listRect.bottom-24)animationEls.list.scrollTop+=12;
 },{passive:false});
 function finishAnimationLayerDrag(e) {
   const drag=animationLayerDrag;if(!drag||drag.pointerId!==e.pointerId)return;
   animationLayerDrag=null;if(drag.target.hasPointerCapture?.(e.pointerId))drag.target.releasePointerCapture(e.pointerId);
-  animationEls.list.querySelectorAll('[data-animation-id]').forEach(item=>item.classList.remove('animation-drop-before','animation-drop-after','dragging-animation'));
-  if(drag.active){e.preventDefault();if(e.type!=='pointercancel'&&drag.targetId)moveAnimationLayer(drag.id,drag.targetId,drag.after);}
+  animationEls.list.querySelectorAll('[data-animation-id]').forEach(item=>item.classList.remove('animation-drop-before','animation-drop-after','animation-drop-inside','dragging-animation'));
+  if(drag.active){e.preventDefault();if(e.type!=='pointercancel'&&drag.targetId)moveAnimationLayer(drag.id,drag.targetId,drag.after,drag.intoGroup);}
 }
 document.addEventListener('pointerup',finishAnimationLayerDrag);document.addEventListener('pointercancel',finishAnimationLayerDrag);
 resetAnimationState();

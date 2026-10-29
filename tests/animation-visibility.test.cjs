@@ -7,14 +7,16 @@ const { test } = require('node:test');
 function editor() {
   const element = { addEventListener() {}, querySelectorAll() { return []; }, classList: { contains() { return false; } } };
   const context = {
-    state: { frames: [{ id: 'frame-a' }, { id: 'frame-b' }], currentFrame: 0, imageName: 'Imported sheet' },
+    state: { frames: [{ id: 'frame-a', canvas: {width:64,height:64} }, { id: 'frame-b', canvas: {width:64,height:64} }], currentFrame: 0, imageName: 'Imported sheet', cageWidth:64,cageHeight:64,frameOffsets:[{x:0,y:0},{x:0,y:0}],frameFlips:[false,false],frameFlipYs:[false,false] },
     $() { return element; }, document: { addEventListener() {} },
     sheetBaseName(name) { return name; },
     pause() {}, pushHistory() {}, markFrameBitmapsDirty() {}, buildFilmstrip() {}, drawFrame() {}, updateInfo() {},
-    makeMask() { return { getContext() { return {}; } }; }, drawBaseSprite() {},
+    makeMask(width=64,height=64) { return { width,height,getContext() { return {}; } }; }, drawBaseSprite() {},
     clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }, renderBrushCursorOverlay() {}
   };
   context.hasFrames = () => context.state.frames.length > 0;
+  context.frameFlipX = i => context.state.frameFlips[i];context.frameFlipY = i => context.state.frameFlipYs[i];
+  context.framePos = i => context.state.frameOffsets[i];context.frameScale = () => ({x:1,y:1});
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'animation.js'), 'utf8'), context);
   return context;
@@ -172,4 +174,141 @@ test('Edit Tools sizing and normal canvas zoom keep their existing behavior', ()
     assert.equal(app.state.animationBrushSize, 14);
     assert.equal(app.state.zoom, 3 * 1.12);
   }
+});
+
+function layeredEditor() {
+  const app=editor();
+  app.state.animationLayers=[{id:'a',name:'Arm',visible:true},{id:'b',name:'Body',visible:true},{id:'c',name:'Head',visible:true}];
+  app.state.frames.forEach(frame=>{frame.animationCels=Object.fromEntries(['a','b','c'].map((id,i)=>[id,{canvas:{width:16,height:16},offsetX:i*5,offsetY:0,flipX:false,flipY:false,tag:id}]));});
+  app.state.activeAnimationLayerId='a';
+  return app;
+}
+
+test('New Layer inserts above the selected layer with independent empty cels in every frame', () => {
+  const app=editor();app.createEmptyAnimationLayer();
+  const id=app.state.activeAnimationLayerId;
+  assert.equal(app.state.animationLayers[0].id,id);
+  assert.equal(app.state.animationLayers[1].id,'animation-base');
+  assert.equal(app.state.frames[0].animationCels[id].canvas.width,64);
+  assert.notEqual(app.state.frames[0].animationCels[id].canvas,app.state.frames[1].animationCels[id].canvas);
+  app.state.frames[0].animationCels[id].offsetX=9;
+  assert.equal(app.state.frames[1].animationCels[id].offsetX,0);
+});
+
+test('grouping selected layers preserves child order and rendering while collapsed', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','c'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();
+  assert.equal(group.group,true);assert.equal(group.collapsed,true);
+  assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),[group.id,'a','c','b']);
+  assert.deepEqual(Array.from(app.animationVisibleLayers(),layer=>layer.id),[group.id,'b']);
+  assert.equal(app.state.animationLayers.find(layer=>layer.id==='a').parentId,group.id);
+  const drawn=[];app.drawAnimationCel=(_t,cel)=>drawn.push(cel.tag);
+  app.drawAnimationSprite({save(){},beginPath(){},rect(){},clip(){},restore(){}},0,0,0,{});
+  assert.deepEqual(drawn,['b','c','a']);
+  group.collapsed=false;
+  assert.deepEqual(Array.from(app.animationVisibleLayers(),layer=>layer.id),[group.id,'a','c','b']);
+});
+
+test('group visibility affects descendants only in the current frame', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer(), child=app.state.animationLayers.find(layer=>layer.id==='a');
+  app.toggleAnimationVisibility(group.id);
+  assert.equal(app.animationLayerVisible(child,0),false);
+  assert.equal(app.animationLayerVisible(child,1),true);
+  assert.equal(app.animationLayerOwnVisible(child,0),true);
+  assert.equal(app.animationLayerVisible(app.state.animationLayers.find(layer=>layer.id==='c'),0),true);
+});
+
+test('groups move and flip their children together without changing other frames', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer(), position=app.animationLayerOffset(group);
+  app.setAnimationOffset(group.id,'x',position.x+10);
+  assert.equal(app.state.frames[0].animationCels.a.offsetX,10);
+  assert.equal(app.state.frames[0].animationCels.b.offsetX,15);
+  assert.equal(app.state.frames[1].animationCels.a.offsetX,0);
+  app.toggleAnimationFlip(group.id,'x');
+  assert.equal(app.state.frames[0].animationCels.a.offsetX,15);
+  assert.equal(app.state.frames[0].animationCels.b.offsetX,10);
+  assert.equal(app.state.frames[0].animationCels.a.flipX,true);
+  assert.equal(app.state.frames[1].animationCels.a.flipX,false);
+  app.toggleAnimationFlip(group.id,'x');
+  assert.equal(app.state.frames[0].animationCels.a.offsetX,10);
+  assert.equal(app.state.frames[0].animationCels.b.offsetX,15);
+});
+
+test('groups cannot receive pencil or eraser strokes, even through keyboard or direct handlers', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();app.animationPanelActive=()=>true;
+  assert.equal(app.animationCel(group),null);
+  for(const tool of ['pencil','eraser']) {
+    app.state.animationTool='move';app.setAnimationTool(tool);
+    assert.equal(app.state.animationTool,'move');
+    app.state.animationTool=tool;let histories=0;app.pushHistory=()=>histories++;
+    assert.equal(app.startAnimationCanvasDrag({}),true);
+    assert.equal(histories,0);
+    assert.equal(app.animationPixelBrushActive(),false);
+    vm.runInContext(`animationStroke={layerId:${JSON.stringify(group.id)},frame:0,tool:${JSON.stringify(tool)}}`,app);
+    app.paintAnimationLine({x:0,y:0},{x:5,y:5});
+    assert.equal(app.state.frames[0].animationCels[group.id],undefined);
+  }
+});
+
+test('dragging layers into and out of groups preserves subtrees and prevents cycles', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();
+  app.moveAnimationLayer('c',group.id,false,true);
+  assert.equal(app.state.animationLayers.find(layer=>layer.id==='c').parentId,group.id);
+  assert.equal(group.collapsed,false);
+  const before=JSON.stringify(app.state.animationLayers);
+  app.moveAnimationLayer(group.id,'a',false,true);
+  assert.equal(JSON.stringify(app.state.animationLayers),before);
+  app.moveAnimationLayer('c',group.id,false);
+  assert.equal(app.state.animationLayers[0].id,'c');
+  assert.equal(app.state.animationLayers[0].parentId,'');
+  app.moveAnimationLayer(group.id,'c',false);
+  assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),[group.id,'a','b','c']);
+});
+
+test('group metadata survives project/history cloning without sharing mutable objects', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer(), saved=app.cloneAnimationLayers(app.state.animationLayers);
+  group.name='Changed';group.collapsed=false;
+  assert.equal(saved[0].name,'Group 1');assert.equal(saved[0].collapsed,true);
+  assert.equal(saved[1].parentId,saved[0].id);
+  const restored=app.cloneAnimationLayers(JSON.parse(JSON.stringify(saved)));
+  assert.equal(restored[0].group,true);assert.equal(restored[1].parentId,restored[0].id);
+});
+
+test('removing a group removes its contents and leaves other layers intact', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();app.removeAnimationLayer(group.id);
+  assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),['c']);
+  for(const frame of app.state.frames) {assert.equal(frame.animationCels.a,undefined);assert.equal(frame.animationCels.b,undefined);assert.ok(frame.animationCels.c);}
+});
+
+test('New Layer above a grouped child stays inside the same group', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();group.collapsed=false;app.selectAnimationLayer('b');app.createEmptyAnimationLayer();
+  const added=app.activeAnimationLayer(),ids=Array.from(app.state.animationLayers,layer=>layer.id);
+  assert.equal(added.parentId,group.id);
+  assert.equal(ids.indexOf(added.id)+1,ids.indexOf('b'));
+});
+
+test('Ctrl/Cmd selection and Shift ranges select layers for grouping', () => {
+  const app=layeredEditor();app.selectAnimationLayer('a');app.selectAnimationLayer('c',{toggle:true});
+  assert.deepEqual(Array.from(app.selectedAnimationLayerIds()),['a','c']);
+  app.selectAnimationLayer('a');app.selectAnimationLayer('c',{range:true});
+  assert.deepEqual(Array.from(app.selectedAnimationLayerIds()),['a','b','c']);
+  app.createAnimationGroup();assert.equal(app.animationMovementTargets(app.activeAnimationLayer()).length,3);
+});
+
+test('nested groups move as subtrees and invalid parent cycles are repaired on load', () => {
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const inner=app.activeAnimationLayer();app.state.selectedAnimationLayerIds=[inner.id,'c'];app.createAnimationGroup();
+  const outer=app.activeAnimationLayer();assert.equal(app.state.animationLayers.find(layer=>layer.id===inner.id).parentId,outer.id);
+  assert.equal(app.animationMovementTargets(outer).length,3);
+  const repaired=app.cloneAnimationLayers([{id:'x',group:true,parentId:'y'},{id:'y',group:true,parentId:'x'},{id:'orphan',parentId:'missing'}]);
+  assert.equal(repaired.length,3);
+  assert.equal(repaired.find(layer=>layer.id==='orphan').parentId,'');
+  assert.ok(repaired.some(layer=>layer.group&&!layer.parentId));
 });
