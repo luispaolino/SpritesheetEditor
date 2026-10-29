@@ -71,6 +71,8 @@ Upload spritesheets, individual image frames, GIF, PSD, and MP4 sources. Configu
 
 Preview animation directly in the browser. Scrub frames, play or stop playback, reorder frames, duplicate or delete frames, adjust cage size, nudge frames, scale frames, flip sprites, position pivots, and place rulers.
 
+Skipped frames take no playback time. The remaining frames play at the configured FPS, including loop boundaries and ping-pong reversals.
+
 ### Mask cleanup and pixel editing
 
 Clean sprite backgrounds with mask brush, mask eraser, magic wand, halo cleanup, mask baking, and mask reset tools. Edit sprites with pencil, brush, eraser, paint bucket, eyedropper, color swatches, and editable pixel layers.
@@ -96,6 +98,8 @@ Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or
 Hold Ctrl/Cmd while using Animation Pencil or Eraser to sample a color temporarily; releasing it restores the selected tool. Dropper has a pipette cursor and sits immediately before Pencil. Brush previews stay within the canvas and off floating menus.
 
 New Layer creates an empty layer above the selected layer, with independent artwork in each frame. Ctrl/Cmd-click layer names to select several, or Shift-click a range, then click Group. Groups have green borders; double-click a group to expand or collapse its children. Children remain individually selectable and editable. Move, offsets, flips, and per-frame visibility work on the whole group, while drawing and selection tools operate only on individual layers. Drag a layer onto the middle of a group to put it inside, or above/below the group to move it outside. Press F2 to rename a layer or group. Groups and their contents are preserved by project saving and undo/redo.
+
+Merge combines selected layers and groups into one editable layer across their frames. Select several layer names with Ctrl/Cmd-click or Shift-click, then click Merge beside New Layer and Group. Selecting one group and clicking Merge flattens that group. The result preserves each frame's selected artwork in layer order, including offsets, flips, and visibility. Undo restores the original layers and groups.
 
 Copy selected layers or groups with Ctrl/Cmd+C or the Copy icon in the Animation title. Choose the destination frame and use Ctrl/Cmd+V or the adjacent Paste icon. Paste creates independent copies above the selected layer, preserving the copied frame's artwork, hierarchy, offsets, flips, and visibility. The pasted layers belong to the destination frame. Text fields retain their usual copy and paste behavior.
 

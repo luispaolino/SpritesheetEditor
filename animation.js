@@ -5,7 +5,7 @@ const animationEls = {
   group: $('animationGroup'), input: $('animationFileInput'), drop: $('animationDropZone'),
   list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'),
   size: $('animationBrushSizeInput'), sizeValue: $('animationBrushSizeValue'), sizeField: $('animationBrushSizeField'),
-  selectionActions: $('animationSelectionActions'), newLayer: $('animationNewLayerButton'), newGroup: $('animationGroupLayersButton'),
+  selectionActions: $('animationSelectionActions'), newLayer: $('animationNewLayerButton'), newGroup: $('animationGroupLayersButton'), merge: $('animationMergeButton'),
   copy: $('animationCopyButton'), paste: $('animationPasteButton')
 };
 let animationSelection = null;
@@ -269,6 +269,47 @@ function createAnimationGroup() {
   remaining.splice(Math.max(0,at),0,group,...members);
   state.animationLayers=cloneAnimationLayers(remaining);state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
   animationSelection=null;state.animationTool='move';animationChanged();
+}
+function mergeAnimationLayers() {
+  const layers=animationLayerList(), selected=new Set(selectedAnimationLayerIds());
+  const roots=layers.filter(layer=>selected.has(layer.id) && !animationAncestors(layer,layers).some(parent=>selected.has(parent.id)));
+  if(!hasFrames() || !roots.length || (roots.length===1 && !roots[0].group))return false;
+  const parentPaths=roots.map(layer=>[...animationAncestors(layer,layers).map(parent=>parent.id),'']);
+  const parentId=parentPaths[0].find(id=>parentPaths.every(path=>path.includes(id))) || '';
+  const memberIds=new Set(roots.flatMap(layer=>[...animationSubtreeIds(layer.id,layers)]));
+  const leaves=layers.filter(layer=>memberIds.has(layer.id) && !layer.group), id=newAnimationId();
+  const name=roots.length===1?roots[0].name:uniqueAnimationName('Merged Layer');
+  // Bake only visibility below the surviving parent; that parent still controls the result.
+  const visible=(layer,i)=>{
+    if(!animationLayerOwnVisible(layer,i))return false;
+    for(const parent of animationAncestors(layer,layers)) {
+      if(parent.id===parentId)break;
+      if(!animationLayerOwnVisible(parent,i))return false;
+    }
+    return true;
+  };
+  const cels=state.frames.map((_frame,i)=>{
+    if(!leaves.some(layer=>animationCel(layer,i)))return null;
+    const canvas=makeMask(),t=canvas.getContext('2d');t.imageSmoothingEnabled=false;
+    for(const layer of [...leaves].reverse()) {
+      if(!visible(layer,i))continue;
+      if(layer.base) { const base=makeMask();drawBaseSprite(base.getContext('2d'),i,0,0,{applyMask:true});t.drawImage(base,0,0); }
+      else drawAnimationCel(t,animationCel(layer,i));
+    }
+    return {canvas,offsetX:0,offsetY:0,flipX:false,flipY:false};
+  });
+  pause();pushHistory();
+  let anchor=roots[0];while((anchor.parentId || '')!==parentId)anchor=layers.find(layer=>layer.id===anchor.parentId);
+  const remaining=layers.filter(layer=>!memberIds.has(layer.id));
+  const at=memberIds.has(anchor.id)?layers.slice(0,layers.indexOf(anchor)).filter(layer=>!memberIds.has(layer.id)).length:remaining.indexOf(anchor);
+  remaining.splice(Math.max(0,at),0,{id,name,visible:true,base:false,group:false,parentId});
+  state.animationLayers=cloneAnimationLayers(remaining);
+  state.frames.forEach((frame,i)=>{
+    memberIds.forEach(member=>{if(frame.animationCels)delete frame.animationCels[member];if(frame.animationVisibility)delete frame.animationVisibility[member];});
+    if(cels[i]) {frame.animationCels ||= {};frame.animationCels[id]=cels[i];}
+  });
+  state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
+  animationSelection=null;state.animationTool='move';animationChanged();return true;
 }
 function toggleAnimationGroup(id) {
   const layer=ensureAnimationLayers().find(layer=>layer.id===id && layer.group);
@@ -536,6 +577,8 @@ function updateAnimationUi(force = false) {
   animationEls.paste.disabled=!hasFrames() || !animationClipboard?.records.length;
   animationEls.newLayer.disabled=!hasFrames();
   animationEls.newGroup.disabled=!hasFrames() || !selectedIds.size;
+  animationEls.merge.disabled=!hasFrames() || (selectedIds.size<2 && !layers.some(layer=>selectedIds.has(layer.id) && layer.group));
+  animationEls.merge.title='Merge selected layers or flatten a selected group across its frames';
   animationEls.newGroup.title='Group selected layers (Ctrl/Cmd-click or Shift-click layer names to select several)';
   if (!validAnimationSelection()) animationSelection = null;
   const selected = !!animationSelection;
@@ -832,6 +875,7 @@ function handleAnimationKeyDown(e) {
 animationEls.input.addEventListener('change',e=>loadAnimationSprites(e.target.files));
 animationEls.newLayer.addEventListener('click',createEmptyAnimationLayer);
 animationEls.newGroup.addEventListener('click',createAnimationGroup);
+animationEls.merge.addEventListener('click',mergeAnimationLayers);
 animationEls.copy.addEventListener('click',copyAnimationLayers);
 animationEls.paste.addEventListener('click',pasteAnimationLayers);
 ['dragenter','dragover'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.add('dragover');}));

@@ -10,7 +10,7 @@
 .animation-group-item .animation-layer-name { position: relative; padding-left: 22px; }
 .animation-group-arrow { position: absolute; left: 7px; color: #9be7b9; }
 .animation-inherited-hidden { opacity: .6; }
-.animation-layer-add-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.animation-layer-add-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .animation-layer-add-actions button { width: 100%; min-height: 38px; }
 .side-panels .reference-layer-item.animation-layer-item {
   width: calc(100% - var(--animation-layer-depth, 0) * 14px);

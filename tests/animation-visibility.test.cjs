@@ -382,6 +382,53 @@ function layeredEditor() {
   return app;
 }
 
+function mergeEditor() {
+  const app=layeredEditor();
+  app.makeMask=()=>{const canvas={width:64,height:64,drawn:[]};canvas.getContext=()=>({drawImage(source){canvas.drawn.push(...(source.drawn || [source.tag]));}});return canvas;};
+  app.state.frames.forEach((frame,i)=>Object.entries(frame.animationCels).forEach(([id,cel])=>{cel.canvas.tag=`${id}-${i}`;}));
+  app.drawAnimationCel=(target,cel)=>{if(cel)target.drawImage(cel.canvas);};
+  return app;
+}
+
+test('Merge flattens selected layers in render order with independent artwork in each frame',()=>{
+  const app=mergeEditor();app.state.selectedAnimationLayerIds=['a','b'];let history=0;app.pushHistory=()=>history++;
+  assert.equal(app.mergeAnimationLayers(),true);const merged=app.activeAnimationLayer();
+  assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),[merged.id,'c']);
+  assert.deepEqual(app.animationCel(merged,0).canvas.drawn,['b-0','a-0']);
+  assert.deepEqual(app.animationCel(merged,1).canvas.drawn,['b-1','a-1']);
+  assert.notEqual(app.animationCel(merged,0).canvas,app.animationCel(merged,1).canvas);
+  assert.equal(app.state.frames[0].animationCels.a,undefined);assert.equal(history,1);
+});
+
+test('Merge accepts a single group and removes its subtree without touching other layers',()=>{
+  const app=mergeEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();const group=app.activeAnimationLayer();
+  const other=app.state.frames[0].animationCels.c;app.mergeAnimationLayers();const merged=app.activeAnimationLayer();
+  assert.equal(merged.name,group.name);assert.equal(merged.group,false);assert.equal(merged.parentId,'');
+  assert.deepEqual(app.animationCel(merged).canvas.drawn,['b-0','a-0']);assert.equal(app.state.animationLayers.length,2);
+  assert.equal(app.state.frames[0].animationCels.c,other);
+});
+
+test('Merge retains frame-local membership and bakes descendant visibility per frame',()=>{
+  const app=mergeEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  delete app.state.frames[1].animationCels.a;delete app.state.frames[1].animationCels.b;
+  app.state.frames[0].animationVisibility={b:false};app.mergeAnimationLayers();const merged=app.activeAnimationLayer();
+  assert.deepEqual(app.animationCel(merged).canvas.drawn,['a-0']);assert.equal(app.animationCel(merged,1),null);
+  app.state.currentFrame=1;assert.deepEqual(Array.from(app.animationFrameLayers(),layer=>layer.id),['c']);
+});
+
+test('Merge inside a hidden surviving parent keeps the artwork and inherits that parent visibility',()=>{
+  const app=mergeEditor();app.state.selectedAnimationLayerIds=['a','b','c'];app.createAnimationGroup();const group=app.activeAnimationLayer();
+  app.state.frames[0].animationVisibility={[group.id]:false};app.state.activeAnimationLayerId='a';app.state.selectedAnimationLayerIds=['a','b'];
+  app.mergeAnimationLayers();const merged=app.activeAnimationLayer();assert.equal(merged.parentId,group.id);
+  assert.deepEqual(app.animationCel(merged).canvas.drawn,['b-0','a-0']);assert.equal(app.animationLayerVisible(merged),false);
+  app.state.frames[0].animationVisibility[group.id]=true;assert.equal(app.animationLayerVisible(merged),true);
+});
+
+test('Merge does nothing for a single ordinary layer',()=>{
+  const app=mergeEditor();let history=0;app.pushHistory=()=>history++;
+  assert.equal(app.mergeAnimationLayers(),false);assert.equal(history,0);assert.equal(app.state.animationLayers.length,3);
+});
+
 test('New Layer inserts above the selected layer with independent empty cels in every frame', () => {
   const app=editor();app.createEmptyAnimationLayer();
   const id=app.state.activeAnimationLayerId;

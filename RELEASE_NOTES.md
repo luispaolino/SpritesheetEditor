@@ -10,6 +10,7 @@
 - Added lasso and rectangle selection, plus Split to cut selected pixels into a cropped layer while preserving their canvas position.
 - Added pencil, dropper, eraser, and shared pencil colors to the Animation panel.
 - Added equal-size New Layer and Group buttons below Animation layers. New layers start empty above the selected layer.
+- Added an equal-size Merge button beside New Layer and Group to combine selected layers/groups or flatten one group across its frames, with undo support.
 - Added multi-layer selection with Ctrl/Cmd-click and Shift-click, green collapsible groups, nested layer ordering, and group movement, flipping, and per-frame visibility.
 - Kept grouped child layers individually editable and blocked drawing on groups. Group structure is preserved in saving/loading and undo/redo.
 - Added compact Copy/Paste title icons and Ctrl/Cmd+C/V shortcuts for independent layer and group copies within or between frames.
@@ -33,6 +34,7 @@
 
 - Fixed Animation Hide/Show affecting every frame. Visibility now belongs to the current frame, including spritesheet imports, and survives saving, undo/redo, frame duplication, and export.
 - Fixed split and pasted layers appearing in other frames' layer lists when those frames have no cel for the layer.
+- Removed skipped-frame timing from preview playback so remaining frames keep the configured FPS, including loop boundaries, ping-pong reversals, and one-shot endings.
 - Hid brush cursor previews over menus and clipped large footprints around floating controls.
 - Centered the pivot cross around one shared square so all four arms have equal lengths at different zoom levels and display scales.
 - Reused the Edit Tools pencil cursor for Animation Pencil and Eraser, showing their actual pixel footprint while hovering and drawing.
