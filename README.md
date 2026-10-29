@@ -73,6 +73,8 @@ Preview animation directly in the browser. Scrub frames, play or stop playback, 
 
 Skipped frames take no playback time. The remaining frames play at the configured FPS, including loop boundaries and ping-pong reversals.
 
+Rulers align with sprite pixel cells at every zoom level. Drag from anywhere on a guide to move it in whole pixels without a grab-point jump. Extended ruler dashes stay anchored to the sprite grid while panning.
+
 ### Mask cleanup and pixel editing
 
 Clean sprite backgrounds with mask brush, mask eraser, magic wand, halo cleanup, mask baking, and mask reset tools. Edit sprites with pencil, brush, eraser, paint bucket, eyedropper, color swatches, and editable pixel layers.
@@ -80,6 +82,8 @@ Clean sprite backgrounds with mask brush, mask eraser, magic wand, halo cleanup,
 ### Indexed color and palette tools
 
 Preview and apply indexed color reduction, preserve transparency, highlight palette colors, create color layers, edit selected palette colors, import auxiliary palettes, transfer colors, and export ACT or PAL palette files.
+
+Re-Order opens a menu with Original index order, Color similarity, Light → dark, Dark → light, Hue, and Reverse. Original index order restores the table's order before sorting, including after saving and loading. Reordering preserves the palette's colors and count. Reducing the Colors value updates the default color layer, so Re-Order and Bake All retain the reduced palette.
 
 ### References
 

@@ -763,7 +763,7 @@
     .display-reference-layer.compositor-fade-layer { image-rendering: auto; }
     .canvas-shell > canvas.scanline-overlay {
       position: absolute; inset: 0; z-index: 310; display: none; width: 100%; height: 100%;
-      max-width: none; max-height: none; pointer-events: none; background: transparent; image-rendering: auto; transform: none;
+      max-width: none; max-height: none; pointer-events: none; background: transparent; image-rendering: pixelated; transform: none;
     }
     .canvas-shell > canvas.brush-cursor-overlay,
     canvas.brush-cursor-overlay {
@@ -1242,6 +1242,9 @@
     .context-menu button:disabled { opacity: .45; cursor: not-allowed; }
     #referenceCompositorContextMenu,
     #referenceCompositorTrackContextMenu { z-index: 11000; }
+    #paletteOrderMenu { z-index: 11010; gap: 2px; padding: 6px; }
+    #paletteOrderMenu button { padding: 8px 10px; background: transparent; border-color: transparent; }
+    #paletteOrderMenu button:hover, #paletteOrderMenu button:focus-visible { background: rgba(112,205,248,.16); }
 
     @media (max-width: 1180px) {
       .app { grid-template-columns: 1fr; grid-template-areas: "left" "center" "timeline"; }
@@ -1806,7 +1809,7 @@
                   <button id="indexHighlightColorButton" class="swatch-button" type="button" disabled aria-label="Choose highlight color" title="Choose highlight color">
                     <span id="indexHighlightColorSwatch" class="swatch-chip"></span>
                   </button>
-                  <button id="indexButton" class="secondary small-button" type="button" disabled>Re-Order</button>
+                  <button id="indexButton" class="secondary small-button" type="button" disabled aria-haspopup="menu" aria-controls="paletteOrderMenu" aria-expanded="false">Re-Order</button>
                   <button id="spriteEditColorButton" class="secondary small-button" type="button" disabled>Edit Color</button>
                 </div>
                 <div class="index-action-row index-leading-row">
@@ -2203,6 +2206,14 @@
     </div>
   </div>
 
+  <div class="context-menu" id="paletteOrderMenu" role="menu" aria-label="Color table order">
+    <button type="button" role="menuitem" data-palette-order="original">Original index order</button>
+    <button type="button" role="menuitem" data-palette-order="similarity">Color similarity</button>
+    <button type="button" role="menuitem" data-palette-order="light-dark">Light → dark</button>
+    <button type="button" role="menuitem" data-palette-order="dark-light">Dark → light</button>
+    <button type="button" role="menuitem" data-palette-order="hue">Hue</button>
+    <button type="button" role="menuitem" data-palette-order="reverse">Reverse</button>
+  </div>
   <div class="context-menu" id="frameContextMenu" role="menu" aria-label="Frame actions">
     <button id="duplicateFrameMenuButton" type="button" role="menuitem">Duplicate</button>
     <button id="addFrameNextMenuButton" type="button" role="menuitem">Add Frame Next</button>
@@ -4517,8 +4528,8 @@
         state.rulersH = (state.rulersH || []).map(v => Math.round(v));
         return;
       }
-      state.rulersV = (state.rulersV || []).map(v => clamp(Math.round(v), 0, state.cageWidth));
-      state.rulersH = (state.rulersH || []).map(v => clamp(Math.round(v), 0, state.cageHeight));
+      state.rulersV = (state.rulersV || []).map(v => clamp(Math.round(v), 0, Math.max(0,state.cageWidth-guideThickness())));
+      state.rulersH = (state.rulersH || []).map(v => clamp(Math.round(v), 0, Math.max(0,state.cageHeight-guideThickness())));
     }
     function defaultPivotX(width = state.cageWidth) { return Math.round(Math.max(1, Math.round(width || 1)) / 2); }
     function pivotXValue(width = state.cageWidth) {
@@ -4579,8 +4590,8 @@
       x = Math.round(x); y = Math.round(y); length = Math.max(0, Math.round(length)); thickness = Math.max(1, Math.round(thickness)); dash = Math.max(1, Math.round(dash));
       centeredDashRuns(length, dash).forEach(run => t.fillRect(x, y + run.start, thickness, run.length));
     }
-    function drawCageGuide(t, x = 0, y = 0) {
-      const w = guideThickness(), dash = guideDashLength(), x0 = Math.round(x), y0 = Math.round(y), cw = Math.max(w, Math.round(state.cageWidth)), ch = Math.max(w, Math.round(state.cageHeight));
+    function drawCageGuide(t, x = 0, y = 0, frameSize = {width:state.cageWidth,height:state.cageHeight}) {
+      const w = guideThickness(), dash = guideDashLength(), x0 = Math.round(x), y0 = Math.round(y), cw = Math.max(w, Math.round(frameSize.width)), ch = Math.max(w, Math.round(frameSize.height));
       t.save(); t.imageSmoothingEnabled = false; t.fillStyle = 'rgb(255,79,115)';
       drawDashedPixelH(t, x0 + w, y0, Math.max(0, cw - 2 * w), w, dash);
       drawDashedPixelH(t, x0 + w, y0 + ch - w, Math.max(0, cw - 2 * w), w, dash);
@@ -4588,25 +4599,25 @@
       drawDashedPixelV(t, x0 + cw - w, y0 + w, Math.max(0, ch - 2 * w), w, dash);
       t.restore();
     }
-    function drawRulers(t, x = 0, y = 0) {
-      const w = guideThickness(), dash = guideDashLength(), x0 = Math.round(x), y0 = Math.round(y), cw = Math.max(w, Math.round(state.cageWidth)), ch = Math.max(w, Math.round(state.cageHeight));
+    function drawRulers(t, x = 0, y = 0, frameSize = {width:state.cageWidth,height:state.cageHeight}) {
+      const w = guideThickness(), dash = guideDashLength(), x0 = Math.round(x), y0 = Math.round(y), cw = Math.max(w, Math.round(frameSize.width)), ch = Math.max(w, Math.round(frameSize.height));
       t.save(); t.imageSmoothingEnabled = false; t.fillStyle = colorToCss(activeRulerColor());
-      state.rulersV.forEach(v => drawDashedPixelV(t, centeredGuideStart(x + v, w, x, x + state.cageWidth), y0, ch, w, dash));
-      state.rulersH.forEach(v => drawDashedPixelH(t, x0, centeredGuideStart(y + v, w, y, y + state.cageHeight), cw, w, dash));
+      state.rulersV.forEach(v => drawDashedPixelV(t, centeredGuideStart(x + v, w, x, x + cw), y0, ch, w, dash));
+      state.rulersH.forEach(v => drawDashedPixelH(t, x0, centeredGuideStart(y + v, w, y, y + ch), cw, w, dash));
       t.restore();
     }
     function overlayGuideMetrics(shellRect, mainRect, frameSize = previewFrameSize()) {
       const frameWidth = Math.max(1, Math.round(frameSize.width || 1));
       const frameHeight = Math.max(1, Math.round(frameSize.height || 1));
-      const width = Math.max(1, Math.round(mainRect.width || frameWidth * state.zoom));
-      const height = Math.max(1, Math.round(mainRect.height || frameHeight * state.zoom));
+      const width = Math.max(.01, mainRect.width || frameWidth * state.zoom);
+      const height = Math.max(.01, mainRect.height || frameHeight * state.zoom);
       const zoomX = width / frameWidth;
       const zoomY = height / frameHeight;
       return {
         zoomX,
         zoomY,
-        x0: Math.round(mainRect.left - shellRect.left),
-        y0: Math.round(mainRect.top - shellRect.top),
+        x0: mainRect.left - shellRect.left,
+        y0: mainRect.top - shellRect.top,
         width,
         height,
         thickX: Math.max(1, Math.round(guideThickness() * zoomX)),
@@ -4615,9 +4626,30 @@
         dashY: Math.max(1, Math.round(guideDashLength() * zoomY))
       };
     }
-    function overlayGuideStart(pos, thickness, min, max) {
-      const low = Math.round(min), high = Math.max(low, Math.round(max - thickness));
-      return clamp(Math.round(pos - thickness / 2), low, high);
+    function pixelGuideContext(t, overlayRect, mainRect, frameSize = previewFrameSize()) {
+      const m=overlayGuideMetrics(overlayRect,mainRect,frameSize), transform=t.getTransform();
+      const sx=Math.abs(transform.a) || 1, sy=Math.abs(transform.d) || 1;
+      return {
+        save:()=>t.save(),restore:()=>t.restore(),
+        set imageSmoothingEnabled(value){t.imageSmoothingEnabled=value;},
+        set fillStyle(value){t.fillStyle=value;},
+        fillRect(x,y,width,height) {
+          const left=Math.round((m.x0+x*m.zoomX)*sx),top=Math.round((m.y0+y*m.zoomY)*sy);
+          const right=Math.max(left+1,Math.round((m.x0+(x+width)*m.zoomX)*sx));
+          const bottom=Math.max(top+1,Math.round((m.y0+(y+height)*m.zoomY)*sy));
+          t.fillRect(left/sx,top/sy,(right-left)/sx,(bottom-top)/sy);
+        }
+      };
+    }
+    function drawExtendedPixelRuler(t,kind,value,min,max,length) {
+      const w=guideThickness(),dash=guideDashLength(),period=dash*2;
+      const phase=centeredDashRuns(length,dash)[0]?.start || 0;
+      for(let start=phase+Math.floor((min-phase)/period)*period;start<max;start+=period) {
+        const from=Math.max(min,start),to=Math.min(max,start+dash);
+        if(to<=from)continue;
+        if(kind==='v')t.fillRect(Math.round(value),from,w,to-from);
+        else t.fillRect(from,Math.round(value),to-from,w);
+      }
     }
     function drawOverlayDashedH(t, x, y, length, thickness, dash) {
       x = Math.round(x); y = Math.round(y); length = Math.max(0, Math.round(length)); thickness = Math.max(1, Math.round(thickness)); dash = Math.max(1, Math.round(dash));
@@ -4630,38 +4662,23 @@
     function drawTopCageGuide(octx, shellRect, mainRect) {
       if (spriteSheetBuilderPanelActive()) return;
       if (state.showCageOverlay === false || (!hasFrames() && !state.referenceCompositorVisible)) return;
-      const m = overlayGuideMetrics(shellRect, mainRect), x0 = Math.round(m.x0), y0 = Math.round(m.y0);
-      octx.save();
-      octx.imageSmoothingEnabled = false;
-      octx.fillStyle = 'rgb(255,79,115)';
-      drawOverlayDashedH(octx, x0 + m.thickX, y0, Math.max(0, m.width - 2 * m.thickX), m.thickY, m.dashX);
-      drawOverlayDashedH(octx, x0 + m.thickX, y0 + m.height - m.thickY, Math.max(0, m.width - 2 * m.thickX), m.thickY, m.dashX);
-      drawOverlayDashedV(octx, x0, y0 + m.thickY, Math.max(0, m.height - 2 * m.thickY), m.thickX, m.dashY);
-      drawOverlayDashedV(octx, x0 + m.width - m.thickX, y0 + m.thickY, Math.max(0, m.height - 2 * m.thickY), m.thickX, m.dashY);
-      octx.restore();
+      const frame=previewFrameSize();
+      drawCageGuide(pixelGuideContext(octx,shellRect,mainRect,frame),0,0,frame);
     }
     function drawTopRulers(octx, shellRect, mainRect) {
       if (spriteSheetBuilderPanelActive()) return;
       if (state.showRulerOverlay === false || !hasFrames()) return;
       const hasRulers = !!((state.rulersV || []).length || (state.rulersH || []).length);
       if (!hasRulers) return;
-      const m = overlayGuideMetrics(shellRect, mainRect);
-      octx.save();
-      octx.imageSmoothingEnabled = false;
-      octx.fillStyle = colorToCss(activeRulerColor());
-      const xMin = state.rulersBeyondCage ? 0 : m.x0;
-      const xMax = state.rulersBeyondCage ? shellRect.width : m.x0 + m.width;
-      const yMin = state.rulersBeyondCage ? 0 : m.y0;
-      const yMax = state.rulersBeyondCage ? shellRect.height : m.y0 + m.height;
-      state.rulersV.forEach(v => {
-        const x = overlayGuideStart(m.x0 + v * m.zoomX, m.thickX, xMin, xMax);
-        drawOverlayDashedV(octx, x, yMin, Math.max(0, yMax - yMin), m.thickX, m.dashY);
-      });
-      state.rulersH.forEach(v => {
-        const y = overlayGuideStart(m.y0 + v * m.zoomY, m.thickY, yMin, yMax);
-        drawOverlayDashedH(octx, xMin, y, Math.max(0, xMax - xMin), m.thickY, m.dashX);
-      });
-      octx.restore();
+      const frame=previewFrameSize(),t=pixelGuideContext(octx,shellRect,mainRect,frame);
+      if(!state.rulersBeyondCage) {drawRulers(t,0,0,frame);return;}
+      const m=overlayGuideMetrics(shellRect,mainRect);
+      const left=Math.floor(-m.x0/m.zoomX),right=Math.ceil((shellRect.width-m.x0)/m.zoomX);
+      const top=Math.floor(-m.y0/m.zoomY),bottom=Math.ceil((shellRect.height-m.y0)/m.zoomY);
+      t.save();t.imageSmoothingEnabled=false;t.fillStyle=colorToCss(activeRulerColor());
+      state.rulersV.forEach(v=>drawExtendedPixelRuler(t,'v',v,top,bottom,frame.height));
+      state.rulersH.forEach(v=>drawExtendedPixelRuler(t,'h',v,left,right,frame.width));
+      t.restore();
     }
     function addSpriteSheetBuilderGuideSegment(segments, key, start, end) {
       const a = Math.round(Math.min(start, end)), b = Math.round(Math.max(start, end));
@@ -5311,19 +5328,20 @@
         overlay.style.clipPath = '';
         return;
       }
-      const rect = els.canvasShell.getBoundingClientRect();
+      overlay.style.display = 'block';
+      const rect = overlay.getBoundingClientRect();
       const mainRect = els.mainCanvas.getBoundingClientRect();
-      const width = Math.max(1, Math.ceil(rect.width || 1));
-      const height = Math.max(1, Math.ceil(rect.height || 1));
-      const dpr = Math.max(1, Math.ceil(window.devicePixelRatio || 1));
-      const targetWidth = width * dpr;
-      const targetHeight = height * dpr;
+      const width = Math.max(1, rect.width || 1);
+      const height = Math.max(1, rect.height || 1);
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const targetWidth = Math.ceil(width * dpr);
+      const targetHeight = Math.ceil(height * dpr);
       if (overlay.width !== targetWidth || overlay.height !== targetHeight) {
         overlay.width = targetWidth;
         overlay.height = targetHeight;
       }
       const octx = overlay.getContext('2d', { alpha: true });
-      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      octx.setTransform(targetWidth/width, 0, 0, targetHeight/height, 0, 0);
       octx.clearRect(0, 0, width, height);
       if (drawScanlines) {
         const frame = previewFrameSize();
@@ -7510,7 +7528,8 @@
     }
     function basePaletteInfoForEditing() {
       const visible = displayedPaletteInfo();
-      if (visible?.mode === 'uploaded') {
+      // After a color-count change the old applied palette must not seed a new default layer.
+      if (visible?.mode === 'uploaded' || (visible?.mode === 'preview' && !defaultPaletteLayer()?.palette?.length)) {
         return { mode: visible.mode, palette: visible.palette, colorLimit: visible.colorLimit, keepTransparency: visible.keepTransparency, sourceKey: visible.sourceKey || '' };
       }
       if (state.importedPaletteInfo?.palette?.length) {
@@ -7703,7 +7722,7 @@
       const outputColorLimit = outputPalette ? clamp(Math.max(3, Math.round(layer.outputColorLimit || visible.colorLimit || outputPalette.length)), 3, 256) : null;
       selected.forEach(index => {
         if (!nextPalette[index]) return;
-        nextPalette[index] = mergeColor ? cloneColor(mergeColor) : adjustPaletteLayerColor(basePalette[index], adjust);
+        nextPalette[index] = {...basePalette[index],...(mergeColor ? cloneColor(mergeColor) : adjustPaletteLayerColor(basePalette[index], adjust))};
       });
       return { basePalette, nextPalette, outputPalette, selected, adjust, mergeColor, colorLimit: visible.colorLimit || nextPalette.length, outputColorLimit, keepTransparency: visible.keepTransparency, sourceKey: visible.sourceKey || defaultPaletteLayer()?.sourceKey || '' };
     }
@@ -8345,7 +8364,7 @@
         if (!from || !to || from.a === 0) return;
         touched = true;
         if (from.r !== to.r || from.g !== to.g || from.b !== to.b || from.a !== to.a) replacements.set(colorKey(from), cloneColor(to));
-        info.palette[index] = cloneColor(to);
+        info.palette[index] = {...info.palette[index],...to,...cloneColor(to)};
       });
       if (!touched) return false;
       info.colorLimit = Math.max(info.colorLimit || 0, nextPalette.length);
@@ -8396,24 +8415,60 @@
       reanchorGeneratedPaletteState('');
       buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
     }
-    function orderedPaletteColors(palette = []) {
-      return clonePalette(palette).map((color, index) => ({ ...color, index })).sort((a, b) => {
-        const at = a.a === 0, bt = b.a === 0;
-        if (at || bt) return at === bt ? a.index - b.index : at ? -1 : 1;
-        const ah = rgbToHsv(a), bh = rgbToHsv(b), an = ah.s < 0.08, bn = bh.s < 0.08;
-        if (an !== bn) return an ? -1 : 1;
-        if (an) return ah.v - bh.v || a.index - b.index;
-        return ah.h - bh.h || ah.s - bh.s || ah.v - bh.v || a.index - b.index;
-      }).map(({ index, ...color }) => color);
+    function orderedPaletteColors(palette = [], mode = 'similarity') {
+      const colors=clonePalette(palette).map((color,index)=>({...color,originalIndex:Number.isInteger(color.originalIndex)?color.originalIndex:index}));
+      const original=(a,b)=>a.originalIndex-b.originalIndex;
+      if(mode==='original')return colors.sort(original);
+      if(mode==='reverse')return colors.reverse();
+      const transparent=colors.filter(color=>color.a===0),opaque=colors.filter(color=>color.a!==0);
+      const lightness=color=>.2126*color.r+.7152*color.g+.0722*color.b;
+      if(mode==='similarity') {
+        const remaining=opaque.sort((a,b)=>lightness(a)-lightness(b)||original(a,b)),ordered=[];
+        if(remaining.length)ordered.push(remaining.shift());
+        while(remaining.length) {
+          const last=ordered[ordered.length-1];let best=0;
+          for(let i=1;i<remaining.length;i++)if(colorDistanceSq(last,remaining[i])<colorDistanceSq(last,remaining[best]))best=i;
+          ordered.push(remaining.splice(best,1)[0]);
+        }
+        return [...transparent,...ordered];
+      }
+      opaque.sort((a,b)=>{
+        if(mode==='light-dark')return lightness(a)-lightness(b)||original(a,b);
+        if(mode==='dark-light')return lightness(b)-lightness(a)||original(a,b);
+        const ah=rgbToHsv(a),bh=rgbToHsv(b),an=ah.s<.08,bn=bh.s<.08;
+        if(an!==bn)return an?-1:1;
+        if(an)return ah.v-bh.v||original(a,b);
+        return ah.h-bh.h||ah.s-bh.s||ah.v-bh.v||original(a,b);
+      });
+      return [...transparent,...opaque];
     }
-    function reorderColorTable() {
+    function closePaletteOrderMenu(restoreFocus = false) {
+      $('paletteOrderMenu').classList.remove('show');els.indexButton.setAttribute('aria-expanded','false');
+      if(restoreFocus)els.indexButton.focus();
+    }
+    function positionPaletteOrderMenu() {
+      const menu=$('paletteOrderMenu');
+      if(!menu.classList.contains('show'))return;
+      const anchor=els.indexButton.getBoundingClientRect(),r=menu.getBoundingClientRect();
+      menu.style.left=`${Math.max(8,Math.min(anchor.left,window.innerWidth-r.width-8))}px`;
+      menu.style.top=`${anchor.bottom+6+r.height<=window.innerHeight-8?anchor.bottom+6:Math.max(8,anchor.top-r.height-6)}px`;
+    }
+    function togglePaletteOrderMenu() {
+      const menu=$('paletteOrderMenu');
+      if(menu.classList.contains('show')) {closePaletteOrderMenu();return;}
+      if(!hasFrames() || !displayedPaletteInfo()?.palette?.length)return;
+      menu.classList.add('show');els.indexButton.setAttribute('aria-expanded','true');positionPaletteOrderMenu();
+      menu.querySelector('[role="menuitem"]').focus();
+    }
+    function reorderColorTable(mode = 'similarity') {
       if (!hasFrames()) return;
+      if(!['original','similarity','light-dark','dark-light','hue','reverse'].includes(mode))return;
       const visible = displayedPaletteInfo();
       if (!visible?.palette?.length) return showError('There is no color table to reorder yet.');
       showError('');
       pushHistory();
       const keepIndexPreview = !!state.indexPreviewVisible;
-      const nextPalette = orderedPaletteColors(visible.palette);
+      const nextPalette = orderedPaletteColors(visible.palette,mode);
       clearPaletteLayerState();
       const sharedPaletteInfo = setSharedPaletteInfo(nextPalette, visible.colorLimit || nextPalette.length, visible.keepTransparency, 'Re-Ordered Color Table', '');
       const result = buildFrameIndexResult(state.currentFrame, sharedPaletteInfo);
@@ -15898,7 +15953,7 @@
     function toggleRulerVisibility() { state.showRulerOverlay = state.showRulerOverlay === false; if (hasFrames()) drawFrame(state.currentFrame); updateInfo(); }
     function togglePivotVisibility() { state.showPivotOverlay = !state.showPivotOverlay; if (spriteSheetBuilderPanelActive()) syncSpriteSheetBuilderCanvasPreview(); else if (hasFrames()) drawFrame(state.currentFrame); updateInfo(); }
     function nextRulerValue(values, max) { const center=Math.round(max/2), step=Math.max(4,Math.round(max/20)); for(let i=0;i<=values.length;i++){const offset=i===0?0:Math.ceil(i/2)*step*(i%2?-1:1), v=clamp(center+offset,0,max); if(!values.some(n=>Math.abs(n-v)<2))return v} return center; }
-    function addRuler(kind) { if (!hasFrames()) return; pushHistory(); if (kind === 'v') state.rulersV.push(nextRulerValue(state.rulersV,state.cageWidth)); else state.rulersH.push(nextRulerValue(state.rulersH,state.cageHeight)); drawFrame(state.currentFrame); updateInfo(); }
+    function addRuler(kind) { if (!hasFrames()) return; pushHistory(); if (kind === 'v') state.rulersV.push(nextRulerValue(state.rulersV,Math.max(0,state.cageWidth-guideThickness()))); else state.rulersH.push(nextRulerValue(state.rulersH,Math.max(0,state.cageHeight-guideThickness()))); drawFrame(state.currentFrame); updateInfo(); }
 
     function resetMask(i) { const m = state.frameMasks[i]; if (m) { m.getContext('2d').clearRect(0,0,m.width,m.height); touchMask(m); } state.maskDirty[i] = false; state.indexedFrames[i] = null; clearIndexPreviewCache(); }
     function resetCurrentMask() {
@@ -16354,11 +16409,12 @@
       if (state.showRulerOverlay === false) return null;
       const p = pointerGuidePoint(e), b = extendedRulerBounds();
       if (p.x < b.minX || p.x > b.maxX || p.y < b.minY || p.y > b.maxY) return null;
-      const r = els.mainCanvas.getBoundingClientRect(), tol = r.width ? 8 * (state.cageWidth / r.width) : 8, hits = [];
-      state.rulersV.forEach((v,i)=>hits.push({kind:'v',index:i,d:Math.abs(p.x-v)}));
-      state.rulersH.forEach((v,i)=>hits.push({kind:'h',index:i,d:Math.abs(p.y-v)}));
+      const r = els.mainCanvas.getBoundingClientRect(), w=guideThickness(), hits = [];
+      const distance=(value,start)=>Math.max(start-value,value-start-w,0);
+      state.rulersV.forEach((v,i)=>{const start=state.rulersBeyondCage?Math.round(v):centeredGuideStart(v,w,0,state.cageWidth);hits.push({kind:'v',index:i,d:distance(p.x,start)*(r.width/state.cageWidth),offset:p.x-start});});
+      state.rulersH.forEach((v,i)=>{const start=state.rulersBeyondCage?Math.round(v):centeredGuideStart(v,w,0,state.cageHeight);hits.push({kind:'h',index:i,d:distance(p.y,start)*(r.height/state.cageHeight),offset:p.y-start});});
       hits.sort((a,b)=>a.d-b.d);
-      return hits[0] && hits[0].d <= tol ? hits[0] : null;
+      return hits[0] && hits[0].d <= 8 ? hits[0] : null;
     }
     function pivotHit(e) {
       if (state.referenceCompositorVisible || !state.showPivotOverlay) return false;
@@ -16367,7 +16423,12 @@
       const tol = Math.max(g.half + 2, r.width ? 8 * (frame.width / r.width) : 8);
       return Math.abs(p.x - g.cx) <= tol && Math.abs(p.y - g.cy) <= tol;
     }
-    function moveRuler(hit, p) { if (!hit) return; const b = extendedRulerBounds(); if (hit.kind === 'v') state.rulersV[hit.index] = clamp(Math.round(p.x), b.minX, b.maxX); else state.rulersH[hit.index] = clamp(Math.round(p.y), b.minY, b.maxY); }
+    function moveRuler(hit, p) {
+      if (!hit) return;
+      const b=extendedRulerBounds(),offset=Number.isFinite(hit.offset)?hit.offset:0,w=state.rulersBeyondCage?0:guideThickness();
+      if(hit.kind==='v')state.rulersV[hit.index]=clamp(Math.round(p.x-offset),b.minX,Math.max(b.minX,b.maxX-w));
+      else state.rulersH[hit.index]=clamp(Math.round(p.y-offset),b.minY,Math.max(b.minY,b.maxY-w));
+    }
     function removeRuler(hit) { if (!hit) return; if (hit.kind === 'v') state.rulersV.splice(hit.index, 1); else state.rulersH.splice(hit.index, 1); }
 
     function frameImageData(i){const w=state.cageWidth,h=state.cageHeight,tmp=makeMask(w,h),tc=tmp.getContext('2d'); drawSprite(tc,i,0,0,{applyMask:false}); return tc.getImageData(0,0,w,h);}
@@ -16876,7 +16937,7 @@
       const nextPalette = clonePalette(palette || []);
       const previous = nextPalette[index];
       if (nextPalette.length <= index) nextPalette.length = index + 1;
-      const nextColor = cloneColor(color);
+      const nextColor = {...previous,...cloneColor(color)};
       if (!previous || previous.auxiliary) nextColor.auxiliary = true;
       nextPalette[index] = nextColor;
       return nextPalette.slice(0, 256);
@@ -19729,7 +19790,20 @@
     els.magicWandButton.addEventListener('click',toggleMagicWand);
     els.hideMaskButton.addEventListener('click',toggleHideMask);
     els.showHaloButton.addEventListener('click',toggleShowHalo); els.haloRemoverButton.addEventListener('click',haloRemoveAll); els.resetMaskButton.addEventListener('click',resetCurrentMask); els.resetAllMasksButton.addEventListener('click',resetAllMasks); els.bakeAllMasksButton.addEventListener('click',bakeAllMasks);
-    els.indexButton.addEventListener('click',reorderColorTable); els.matchPaletteButton.addEventListener('click',matchCurrentFrameToPaletteOrder); els.matchPaletteAllButton.addEventListener('click',matchAllFramesToPaletteOrder); els.resetIndexButton.addEventListener('click',resetIndexedCurrentFrame); els.indexFrameButton.addEventListener('click',toggleIndexPreview); els.indexAllButton.addEventListener('click',bakeViewedColorTableAll);
+    els.indexButton.addEventListener('click',togglePaletteOrderMenu); els.matchPaletteButton.addEventListener('click',matchCurrentFrameToPaletteOrder); els.matchPaletteAllButton.addEventListener('click',matchAllFramesToPaletteOrder); els.resetIndexButton.addEventListener('click',resetIndexedCurrentFrame); els.indexFrameButton.addEventListener('click',toggleIndexPreview); els.indexAllButton.addEventListener('click',bakeViewedColorTableAll);
+    $('paletteOrderMenu').addEventListener('click',e=>{
+      const option=e.target.closest('[data-palette-order]');if(!option)return;
+      closePaletteOrderMenu(true);reorderColorTable(option.dataset.paletteOrder);
+    });
+    $('paletteOrderMenu').addEventListener('keydown',e=>{
+      const buttons=[...$('paletteOrderMenu').querySelectorAll('[role="menuitem"]')],index=buttons.indexOf(document.activeElement);
+      if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)) {
+        e.preventDefault();e.stopPropagation();
+        const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:(index+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+        buttons[next].focus();
+      } else if(e.key==='Tab')closePaletteOrderMenu();
+    });
+    window.addEventListener('resize',positionPaletteOrderMenu);
     els.spriteEditColorButton.addEventListener('click', toggleSpriteColorEdit);
     els.spriteEditResetButton.addEventListener('click', resetSpriteColorEdit);
     els.editToolSpriteEditResetButton?.addEventListener('click', resetSpriteColorEdit);
@@ -19747,6 +19821,8 @@
     els.framesEl.addEventListener('dragover',e=>{if(!dragHasFrame(e))return;e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='move';state.dropIndex=dropIndex(e.clientX);showDropGap(state.dropIndex)});
     els.framesEl.addEventListener('drop',e=>{const frames=draggedFrameIndicesFromEvent(e);if(!frames.length)return;e.preventDefault();const t=state.dropIndex??dropIndex(e.clientX);clearTimelineDrag();moveFrames(frames,t)});
     document.addEventListener('pointerdown', e => {
+      const paletteOrderMenu=$('paletteOrderMenu');
+      if(paletteOrderMenu.classList.contains('show') && !paletteOrderMenu.contains(e.target) && !els.indexButton.contains(e.target))closePaletteOrderMenu();
       if (els.frameContextMenu.classList.contains('show') && !els.frameContextMenu.contains(e.target)) closeFrameContextMenu();
       const compositorMenuOpen = els.referenceCompositorContextMenu.classList.contains('show') || els.referenceCompositorTrackContextMenu?.classList.contains('show');
       const insideCompositorMenu = els.referenceCompositorContextMenu.contains(e.target) || !!els.referenceCompositorTrackContextMenu?.contains(e.target);
@@ -20155,6 +20231,10 @@
     document.addEventListener('pointercancel', e => endReferenceCompositorTrackDrag(e, false));
     document.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
+      if($('paletteOrderMenu').classList.contains('show')) {
+        if(e.key==='Escape') {e.preventDefault();closePaletteOrderMenu(true);}
+        return;
+      }
       if (e.key === 'Escape' && els.paletteLayerModal.classList.contains('show')) { e.preventDefault(); closePaletteLayerModal(); return; }
       if (els.paletteLayerModal.classList.contains('show')) return;
       if (e.key === 'Escape' && els.newProjectModal.classList.contains('show')) { e.preventDefault(); closeNewProjectModal(); return; }

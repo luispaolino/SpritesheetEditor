@@ -17,6 +17,7 @@
 - Added Shift-drag to add selection areas, Alt-drag to subtract areas, and selection outline movement by dragging inside or using Arrows (Shift+Arrows for ten pixels).
 - Added Delete/Backspace to erase selected pixels on the active Animation layer with undo support.
 - Included animation layers in project saving/loading, undo/redo, frame duplication, and sprite exports using the existing canvas and timeline.
+- Added a Re-Order menu with original index order, color similarity, light/dark, hue, and reverse palette sorting.
 
 ### Improvements
 
@@ -36,6 +37,8 @@
 - Fixed split and pasted layers appearing in other frames' layer lists when those frames have no cel for the layer.
 - Removed skipped-frame timing from preview playback so remaining frames keep the configured FPS, including loop boundaries, ping-pong reversals, and one-shot endings.
 - Hid brush cursor previews over menus and clipped large footprints around floating controls.
+- Aligned rulers and cage guides with the sprite pixel grid at high and fractional zoom, removed border-related overlay drift, and preserved the grab point while dragging rulers in whole pixels.
+- Fixed reduced palettes being replaced by an older applied color table when using Re-Order or Bake All.
 - Centered the pivot cross around one shared square so all four arms have equal lengths at different zoom levels and display scales.
 - Reused the Edit Tools pencil cursor for Animation Pencil and Eraser, showing their actual pixel footprint while hovering and drawing.
 - Added Shift + Wheel sizing to Animation Pencil and Eraser, matching Edit Tools without changing canvas zoom.
