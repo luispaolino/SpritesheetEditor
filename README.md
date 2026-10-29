@@ -95,7 +95,7 @@ Use the Animation panel to load sprites as layers while keeping the existing can
 
 Selections use a translucent fill and animated black-and-white borders. Selection masks use hard pixel edges without anti-aliasing. Section buttons use the full width above the floating panel and wrap when needed on smaller windows.
 
-With Lasso or Rectangle selected, hold Shift while selecting to add an area, or Alt to subtract an area. Drag inside an existing selection to move its outline, or use the arrow keys for one-pixel movement and Shift+Arrows for ten pixels. These actions move the selection without changing the artwork. Delete or Backspace erases the selected pixels on the active layer and keeps the outline; Undo restores the artwork. Split layers appear in the layer list only on frames that contain their artwork.
+With Lasso or Rectangle selected, hold Shift while selecting to add an area, or Alt to subtract an area. Drag inside an existing selection to move its outline, or use the arrow keys for one-pixel movement and Shift+Arrows for ten pixels. These actions move the selection without changing the artwork. Undo and Redo restore previous selections, including added/subtracted areas, outline movement, and clearing. The selection stays in place when switching layers or tools within the same frame. Delete or Backspace erases the selected pixels on the active layer and keeps the outline; Undo restores the artwork. Split layers appear in the layer list only on frames that contain their artwork.
 
 Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or Eraser size, just like Edit Tools. Rectangle selection uses a crosshair; Lasso uses a contrasting lasso cursor with a precise selection point.
 

@@ -177,7 +177,101 @@ test('selection arrows move only the outline, use Shift for 10 pixels, and retai
   assert.equal(app.animationSelectionRaster().alpha[12*64+3],255);
   app.moveAnimationSelection(-100,0);assert.equal(app.animationSelectionRaster().alpha.some(value=>value),false);
   app.moveAnimationSelection(100,0);assert.equal(app.animationSelectionRaster().alpha.filter(value=>value).length,9);
-  assert.equal(app.state.frames[0].canvas,canvas);assert.equal(app.state.frameOffsets[0],offset);assert.equal(history,0);
+  assert.equal(app.state.frames[0].canvas,canvas);assert.equal(app.state.frameOffsets[0],offset);assert.equal(history,4);
+});
+
+function selectionHistoryEditor(tool='rectangle') {
+  const app=selectionEditor(tool);
+  Object.assign(app.state,{undoStack:[],redoStack:[],selectedAnimationLayerIds:[]});
+  app.historySuppressDepth=0;app.finishKeyboardNudge=()=>{};
+  app.snapshot=()=>({currentFrame:app.state.currentFrame,activeAnimationLayerId:app.state.activeAnimationLayerId,
+    animationSelectionHistory:app.animationSelectionHistoryState()});
+  app.restore=saved=>{
+    app.resetAnimationTools();app.state.currentFrame=saved.currentFrame;app.state.activeAnimationLayerId=saved.activeAnimationLayerId;
+    app.restoreAnimationSelectionHistory(saved.animationSelectionHistory);
+  };
+  for(const name of ['pushHistory','cancelActiveDrag','undo','redo'])vm.runInContext(sourceFunction(name),app);
+  return app;
+}
+
+test('Undo and Redo restore successive rectangle and lasso selections and the active tool',()=>{
+  for(const tool of ['rectangle','lasso']) {
+    const app=selectionHistoryEditor(tool),shape=(x,y)=>tool==='rectangle'?[[x,y],[x+4,y+4]]:[[x,y],[x+4,y],[x+4,y+4],[x,y+4]];
+    const first=Array.from(selectionDrag(app,shape(2,2))),second=Array.from(selectionDrag(app,shape(20,20)));
+    assert.equal(app.state.undoStack.length,2);
+    app.undo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),first);assert.equal(app.state.animationTool,tool);
+    app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),second);
+    app.undo();app.undo();assert.equal(app.validAnimationSelection(),null);
+    app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),first);
+    app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),second);
+  }
+});
+
+test('Undo restores exact masks before Shift additions, Alt subtractions, movement, and clearing',()=>{
+  const app=selectionHistoryEditor(),masks=[];
+  masks.push(Array.from(selectionDrag(app,[[2,2],[10,10]])));
+  masks.push(Array.from(selectionDrag(app,[[12,2],[15,5]],{shiftKey:true})));
+  masks.push(Array.from(selectionDrag(app,[[4,4],[6,6]],{altKey:true})));
+  masks.push(Array.from(selectionDrag(app,[[3,3],[4,5]])));
+  app.handleAnimationKeyDown({key:'ArrowRight',preventDefault(){}});masks.push(Array.from(app.animationSelectionRaster().alpha));
+  app.handleAnimationKeyDown({key:'Escape',preventDefault(){}});assert.equal(app.validAnimationSelection(),null);
+  for(const mask of masks.reverse()) {app.undo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);}
+  app.undo();assert.equal(app.validAnimationSelection(),null);
+  for(const mask of masks.reverse()) {app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);}
+  app.redo();assert.equal(app.validAnimationSelection(),null);assert.equal(app.state.animationTool,'move');
+});
+
+test('canceled and unchanged selection drags preserve Undo and Redo history',()=>{
+  const app=selectionHistoryEditor();selectionDrag(app,[[2,2],[10,10]]);selectionDrag(app,[[20,20],[25,25]]);app.undo();
+  const before=Array.from(app.animationSelectionRaster().alpha),undoCount=app.state.undoStack.length;
+  app.startAnimationCanvasDrag({clientX:30,clientY:30,pointerId:1});app.moveAnimationCanvasDrag({clientX:35,clientY:35});
+  app.finishAnimationCanvasDrag({type:'pointercancel',pointerId:1});
+  assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),before);
+  selectionDrag(app,[[4,4],[6,6]],{shiftKey:true});
+  selectionDrag(app,[[3,3],[3,3]]);
+  assert.equal(app.state.undoStack.length,undoCount);assert.equal(app.state.redoStack.length,1);
+  app.redo();assert.equal(app.animationSelectionRaster().alpha[20*64+20],255);
+});
+
+test('history masks are independent on capture and restore, including geometry and boolean operands',()=>{
+  const app=selectionHistoryEditor();selectionDrag(app,[[2,2],[10,10]]);
+  const saved=app.animationSelectionHistoryState();saved.selection.alpha.fill(0);
+  assert.equal(app.animationSelectionRaster().alpha.filter(Boolean).length,64);
+  const original=app.animationSelectionHistoryState();app.restoreAnimationSelectionHistory(original);original.selection.alpha.fill(0);
+  assert.equal(app.animationSelectionRaster().alpha.filter(Boolean).length,64);
+  const shape={kind:'lasso',points:[{x:1,y:2}],addTo:new Uint8Array([255]),subtractFrom:new Uint8Array([0])};
+  const copy=app.cloneAnimationSelection(shape);shape.points[0].x=7;shape.addTo[0]=0;shape.subtractFrom[0]=255;
+  assert.equal(copy.points[0].x,1);assert.equal(copy.addTo[0],255);assert.equal(copy.subtractFrom[0],0);
+});
+
+test('Undo during an unfinished selection cancels the gesture before recording Redo',()=>{
+  const app=selectionHistoryEditor();const first=Array.from(selectionDrag(app,[[2,2],[6,6]]));
+  app.startAnimationCanvasDrag({clientX:20,clientY:20,pointerId:1});app.moveAnimationCanvasDrag({clientX:30,clientY:30});
+  app.undo();assert.equal(app.validAnimationSelection(),null);assert.equal(app.state.dragging,false);
+  app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),first);
+});
+
+test('switching layers retains the frame selection and erases only the newly selected layer',()=>{
+  for(const tool of ['rectangle','lasso']) {
+    const app=selectionEditor(tool),layers=layeredEditor();app.state.animationLayers=layers.state.animationLayers;app.state.frames=layers.state.frames;
+    app.state.activeAnimationLayerId='a';app.state.indexedFrames=[];
+    const shape=tool==='rectangle'?[[2,2],[6,6]]:[[2,2],[6,2],[6,6],[2,6]],mask=Array.from(selectionDrag(app,shape)),erased=[];
+    app.state.frames[0].animationCels.a.canvas.getContext=()=>{throw Error('wrong layer erased');};
+    app.state.frames[0].animationCels.b.canvas.getContext=()=>({save(){},restore(){},drawImage(){erased.push('b');}});
+    app.animationLocalMask=mask=>mask;
+    app.selectAnimationLayer('b');assert.equal(app.state.animationTool,tool);
+    assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);
+    assert.equal(app.eraseAnimationSelection(),true);assert.deepEqual(erased,['b']);
+    app.state.currentFrame=1;assert.equal(app.validAnimationSelection(),false);
+  }
+});
+
+test('switching Animation tools retains the same frame selection',()=>{
+  const app=selectionEditor();const mask=Array.from(selectionDrag(app,[[2,2],[6,6]]));
+  app.clearActiveCanvasTools=()=>app.resetAnimationTools();
+  for(const tool of ['lasso','rectangle','move','pencil','eraser','dropper']) {
+    app.setAnimationTool(tool);assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);
+  }
 });
 
 test('dragging inside a selection moves it while dragging outside replaces it',()=>{
@@ -201,6 +295,7 @@ test('Delete/Backspace consume the key in selection tools, erase once, and do no
   const app=selectionEditor();let history=0;app.pushHistory=()=>history++;
   assert.equal(app.handleAnimationKeyDown({key:'Delete',preventDefault(){}}),true);assert.equal(history,0);
   selectionDrag(app,[[2,2],[6,6]]);
+  assert.equal(history,1);history=0;
   const canvas=app.state.frames[0].canvas, draws=[];
   canvas.getContext=()=>({save(){},restore(){},drawImage(mask,x,y){draws.push([this.globalCompositeOperation,mask,x,y]);}});
   app.animationBakeBase=()=>canvas;app.state.indexedFrames=[];

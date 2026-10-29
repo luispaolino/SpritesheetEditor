@@ -4109,7 +4109,7 @@
 
     function snapshot() {
       return {
-        animationLayers: cloneAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize,
+        animationLayers: cloneAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationSelectionHistory: animationSelectionHistoryState(),
         sheetImage: state.sheetImage,
         sheetImages: sheetSources().map(sheet => ({ image: sheet.image, name: sheet.name || 'spritesheet' })),
         frames: state.frames.map(f => ({ ...f, skipped: !!f.skipped, canvas: canvasClone(f.canvas), sourceCanvas: canvasClone(f.sourceCanvas || f.canvas), sheetSlice: cloneSheetRect(f.sheetSlice), sheetCrop: cloneSheetRect(f.sheetCrop), pencilLayers: clonePencilLayers(f.pencilLayers || []), animationCels: cloneAnimationCels(f.animationCels), animationVisibility: cloneAnimationVisibility(f.animationVisibility) })), rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, selectedFrameIndices: [...state.selectedFrameIndices], selectionAnchorFrame: state.selectionAnchorFrame, importFrameSkip: state.importFrameSkip, importFrameSkipMax: state.importFrameSkipMax, loopPlayback: state.loopPlayback !== false,
@@ -4318,12 +4318,14 @@
       state.backgroundCustomColor = cloneColor(s.backgroundCustomColor || state.backgroundCustomColor);
       state.paintBucketMode = !!s.paintBucketMode;
       state.eyedropperMode = !!s.eyedropperMode;
+      restoreAnimationSelectionHistory(s.animationSelectionHistory);
       markFrameBitmapsDirty();
       syncAfterDataChange(false);
       state.restoring = false;
     }
     function cancelActiveDrag() {
       if (!state.dragging) return;
+      if (state.dragMode?.startsWith('animation-')) { finishAnimationCanvasDrag({ type: 'pointercancel', pointerId: state.dragPointerId }); return; }
       state.dragging = false;
       state.dragMode = 'offset';
       state.brushCursorVisible = false;

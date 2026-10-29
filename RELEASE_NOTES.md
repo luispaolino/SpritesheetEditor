@@ -16,6 +16,7 @@
 - Added compact Copy/Paste title icons and Ctrl/Cmd+C/V shortcuts for independent layer and group copies within or between frames.
 - Added Shift-drag to add selection areas, Alt-drag to subtract areas, and selection outline movement by dragging inside or using Arrows (Shift+Arrows for ten pixels).
 - Added Delete/Backspace to erase selected pixels on the active Animation layer with undo support.
+- Fixed Animation Undo/Redo restoring previous selections and kept the frame selection when switching layers or tools.
 - Included animation layers in project saving/loading, undo/redo, frame duplication, and sprite exports using the existing canvas and timeline.
 - Added a Re-Order menu with original index order, color similarity, light/dark, hue, and reverse palette sorting.
 

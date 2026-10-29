@@ -342,8 +342,36 @@ function drawAnimationSprite(t, i, x, y, opt) {
   return true;
 }
 function validAnimationSelection() {
-  return animationSelection && animationSelection.frameId === state.frames[state.currentFrame]?.id
-    && animationSelection.layerId === activeAnimationLayer()?.id;
+  // The cage selection belongs to the frame and can be used on any of its layers.
+  return animationSelection && animationSelection.frameId === state.frames[state.currentFrame]?.id;
+}
+function cloneAnimationSelection(selection = animationSelection) {
+  if (!selection) return null;
+  const copy = {...selection};
+  if (selection.points) copy.points = selection.points.map(point => ({...point}));
+  for (const key of ['alpha','subtractFrom','addTo']) if (selection[key]) copy[key] = selection[key].slice();
+  return copy;
+}
+function animationSelectionHistoryState() {
+  return {tool: state.animationTool || 'move', selection: validAnimationSelection() ? cloneAnimationSelection() : null};
+}
+function restoreAnimationSelectionHistory(saved) {
+  state.animationTool = saved?.tool || 'move';
+  animationSelection = cloneAnimationSelection(saved?.selection || null);
+  animationSelectionRasterCache = null;
+}
+function commitAnimationSelection(next, previous = animationSelection) {
+  const same = previous === next || (previous && next && previous.kind === next.kind
+    && previous.frameId === next.frameId
+    && (previous.offsetX || 0) === (next.offsetX || 0) && (previous.offsetY || 0) === (next.offsetY || 0)
+    && previous.width === next.width && previous.height === next.height
+    && JSON.stringify(previous.points) === JSON.stringify(next.points)
+    && ['alpha','subtractFrom','addTo'].every(key => previous[key] === next[key]
+      || (previous[key]?.length === next[key]?.length && previous[key]?.every((value,index) => value === next[key][index]))));
+  animationSelection = previous;
+  if (!same) pushHistory();
+  animationSelection = next;
+  return !same;
 }
 function rasterizeAnimationSelection(selection, width, height) {
   if (selection?.subtractFrom || selection?.addTo) {
@@ -399,7 +427,7 @@ function translateAnimationSelection(selection,dx,dy) {
 }
 function moveAnimationSelection(dx,dy) {
   if (!validAnimationSelection()) return false;
-  animationSelection=translateAnimationSelection(animationSelection,dx,dy);
+  commitAnimationSelection(translateAnimationSelection(animationSelection,dx,dy));
   drawFrame(state.currentFrame);updateAnimationUi();return true;
 }
 function animationSelectionContainsPoint(e) {
@@ -502,7 +530,6 @@ function selectAnimationLayer(id, {toggle=false,range=false} = {}) {
   state.activeAnimationLayerId=state.selectedAnimationLayerIds.includes(id) ? id : state.selectedAnimationLayerIds.at(-1);
   if (!range) state.animationSelectionAnchorId=id;
   if (activeAnimationLayer()?.group && !['move','dropper'].includes(state.animationTool)) state.animationTool='move';
-  animationSelection = null;
   drawFrame(state.currentFrame); updateInfo();
 }
 function setAnimationOffset(id, axis, value, history = true) {
@@ -582,7 +609,7 @@ function updateAnimationUi(force = false) {
   animationEls.newGroup.title='Group selected layers (Ctrl/Cmd-click or Shift-click layer names to select several)';
   if (!validAnimationSelection()) animationSelection = null;
   const selected = !!animationSelection;
-  animationEls.split.disabled = !selected || !animationLayerVisible(active);
+  animationEls.split.disabled = !selected || active?.group || !animationLayerVisible(active);
   animationEls.selectionActions.hidden = !selected;
   const tool = state.animationTool || 'move';
   animationEls.group.querySelectorAll('[data-animation-tool]').forEach(button => {
@@ -749,7 +776,7 @@ function setAnimationTool(tool) {
   const selection = animationSelection;
   clearActiveCanvasTools(false);
   state.animationTool = previous === tool && tool !== 'move' ? 'move' : tool;
-  if (['pencil','eraser','dropper'].includes(state.animationTool)) animationSelection = selection;
+  animationSelection = selection;
   drawFrame(state.currentFrame); updateInfo();
 }
 function animationPoint(e) {
@@ -767,13 +794,12 @@ function startAnimationCanvasDrag(e) {
   }
   if(!animationLayerVisible(layer) || !animationLayerOffset(layer) || (layer.group && tool!=='move')) return true;
   pause();
-  let previousSelection=null,selectionMove=false;
+  let previousSelection=validAnimationSelection()?animationSelection:null,selectionMove=false;
   if(tool==='rectangle'||tool==='lasso') {
-    previousSelection=validAnimationSelection()?animationSelection:null;
     if(e.altKey && !previousSelection)return true;
     selectionMove=!e.altKey && !e.shiftKey && animationSelectionContainsPoint(e);
     if(!selectionMove) {
-      const p=animationPoint(e);animationSelection={kind:tool,points:[p,p],frameId:state.frames[state.currentFrame].id,layerId:layer.id,
+      const p=animationPoint(e);animationSelection={kind:tool,points:[p,p],frameId:state.frames[state.currentFrame].id,
         subtractFrom:e.altKey?rasterizeAnimationSelection(previousSelection,state.cageWidth,state.cageHeight):null,
         addTo:!e.altKey && e.shiftKey && previousSelection?rasterizeAnimationSelection(previousSelection,state.cageWidth,state.cageHeight):null};
     }
@@ -838,9 +864,13 @@ function finishAnimationCanvasDrag(e) {
   state.dragging=false;state.dragMode='offset';state.dragPointerId=null;els.canvasShell.classList.remove('dragging','animation-selection-moving');
   if(els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId);
   if(e.type==='pointercancel')animationSelection=stroke?.previousSelection || null;
-  else if(stroke && !stroke.selectionMove && ['lasso','rectangle'].includes(stroke.tool) && animationSelection) {
-    const alpha=rasterizeAnimationSelection(animationSelection,state.cageWidth,state.cageHeight);
-    animationSelection=alpha.some(value=>value) ? {kind:'mask',alpha,width:state.cageWidth,height:state.cageHeight,offsetX:0,offsetY:0,frameId:animationSelection.frameId,layerId:animationSelection.layerId} : null;
+  else if(stroke && ['lasso','rectangle'].includes(stroke.tool)) {
+    let next=animationSelection;
+    if(!stroke.selectionMove && next) {
+      const alpha=rasterizeAnimationSelection(next,state.cageWidth,state.cageHeight);
+      next=alpha.some(value=>value) ? {kind:'mask',alpha,width:state.cageWidth,height:state.cageHeight,offsetX:0,offsetY:0,frameId:next.frameId} : null;
+    }
+    commitAnimationSelection(next,stroke.previousSelection);
   }
   if(stroke && ['move','pencil','eraser'].includes(stroke.tool))animationChanged();
   else {drawFrame(state.currentFrame);updateAnimationUi();}
@@ -860,7 +890,7 @@ function handleAnimationKeyDown(e) {
     moveAnimationSelection(e.key==='ArrowLeft'?-distance:e.key==='ArrowRight'?distance:0,e.key==='ArrowUp'?-distance:e.key==='ArrowDown'?distance:0);return true;
   }
   if(e.key==='F2'){e.preventDefault();beginAnimationLayerRename(activeAnimationLayer()?.id);return true;}
-  if(e.key==='Escape') {animationSelection=null;state.animationTool='move';drawFrame(state.currentFrame);updateInfo();e.preventDefault();return true;}
+  if(e.key==='Escape') {commitAnimationSelection(null);state.animationTool='move';drawFrame(state.currentFrame);updateInfo();e.preventDefault();return true;}
   const tools={m:'move',l:'lasso',r:'rectangle',p:'pencil',d:'dropper',e:'eraser'};
   if(!e.shiftKey&&tools[key]){e.preventDefault();setAnimationTool(tools[key]);return true;}
   if(!e.shiftKey&&['b','g','w','h'].includes(key)){e.preventDefault();return true;}
@@ -883,7 +913,7 @@ animationEls.paste.addEventListener('click',pasteAnimationLayers);
 animationEls.drop.addEventListener('drop',e=>loadAnimationSprites(e.dataTransfer.files));
 animationEls.group.querySelectorAll('[data-animation-tool]').forEach(button=>button.addEventListener('click',()=>setAnimationTool(button.dataset.animationTool)));
 animationEls.split.addEventListener('click',splitAnimationSelection);
-$('animationClearSelectionButton').addEventListener('click',()=>{animationSelection=null;drawFrame(state.currentFrame);updateAnimationUi();});
+$('animationClearSelectionButton').addEventListener('click',()=>{commitAnimationSelection(null);drawFrame(state.currentFrame);updateAnimationUi();});
 animationEls.size.addEventListener('input',e=>setAnimationBrushSize(e.target.value));
 animationEls.colors.addEventListener('click',e=>{
   const button=e.target.closest('[data-animation-color]');if(!button)return;const index=Number(button.dataset.animationColor);
