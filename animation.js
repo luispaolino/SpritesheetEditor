@@ -835,7 +835,7 @@ function paintAnimationLine(a,b) {
   for(let k=0;k<=steps;k++) {
     let x=Math.floor(a.x+(b.x-a.x)*k/steps)-p.x,y=Math.floor(a.y+(b.y-a.y)*k/steps)-p.y;
     if(cel.flipX)x=canvas.width-1-x;if(cel.flipY)y=canvas.height-1-y;
-    stampHardPencil(t,x+.5,y+.5,size,stroke.tool==='eraser'?{r:0,g:0,b:0,a:255}:state.pencilColor);
+    stampHardPencil(t,x+.5,y+.5,size,stroke.tool==='eraser'?{r:0,g:0,b:0,a:255}:state.pencilColor,stroke.tool==='pencil');
   }
   t.restore();
   if(layer.base)state.frames[stroke.frame].sourceCanvas=canvasClone(canvas);

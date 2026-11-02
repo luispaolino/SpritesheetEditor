@@ -5613,7 +5613,7 @@
         for (let x = 0; x < size; x++) {
           const px = left + x + .5, py = top + y + .5;
           const dx = px - centerX, dy = py - centerY;
-          if (dx * dx + dy * dy > r2) continue;
+          if (!(animationBrush && state.animationTool === 'pencil') && dx * dx + dy * dy > r2) continue;
           const sx = left + x, sy = top + y;
           if (sx < 0 || sy < 0 || sx >= targetCanvas.width || sy >= targetCanvas.height) continue;
           cells.push({ x: sx, y: sy });
@@ -16069,7 +16069,7 @@
       const bounds = Math.ceil(radius + 1);
       c.fillRect(Math.floor(cx - bounds), Math.floor(cy - bounds), bounds * 2, bounds * 2);
     }
-    function stampHardPencil(c, cx, cy, size, color) {
+    function stampHardPencil(c, cx, cy, size, color, square = false) {
       const safeColor = cloneColor(color), alpha = clamp(Math.round(safeColor.a ?? 255), 0, 255) / 255;
       if (!alpha) return;
       c.fillStyle = brushColorWithAlpha(safeColor, alpha);
@@ -16078,6 +16078,10 @@
         return;
       }
       const left = Math.floor(cx - size / 2), top = Math.floor(cy - size / 2), centerX = left + size / 2, centerY = top + size / 2;
+      if (square) {
+        c.fillRect(left, top, size, size);
+        return;
+      }
       const radius = Math.max(.5, size / 2), r2 = radius * radius;
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
@@ -20627,7 +20631,7 @@
     }
 
   </script>
-  <script src="animation.js"></script>
+  <script src="animation.js?v=1.6.0-square-pencil"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

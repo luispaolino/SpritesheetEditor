@@ -34,6 +34,7 @@
 
 ### Bug Fixes
 
+- Kept the Animation pencil and its cursor preview square at every brush size.
 - Fixed Animation Hide/Show affecting every frame. Visibility now belongs to the current frame, including spritesheet imports, and survives saving, undo/redo, frame duplication, and export.
 - Fixed split and pasted layers appearing in other frames' layer lists when those frames have no cel for the layer.
 - Removed skipped-frame timing from preview playback so remaining frames keep the configured FPS, including loop boundaries, ping-pong reversals, and one-shot endings.
