@@ -6485,10 +6485,12 @@
       drawSprite(ctx, i, 0, 0, options);
       drawGhostSprites(ctx, i, options);
       drawFontText(ctx);
-      renderAnimationSelectionOverlay();
-      if (opt.fast) renderDisplayReferenceLayers();
+      if (!opt.animationPaintPreview) {
+        renderAnimationSelectionOverlay();
+        if (opt.fast) renderDisplayReferenceLayers();
+      }
       renderBrushCursorOverlay();
-      renderPivotOverlay();
+      if (!opt.animationPaintPreview) renderPivotOverlay();
       if (!opt.skipThumb) updateActiveThumb();
     }
     function refreshVisiblePreviews() { if (hasFrames()) { buildFilmstrip(); drawFrame(state.currentFrame); } updateInfo(); }
@@ -16106,17 +16108,17 @@
         c.fillRect(Math.floor(cx), Math.floor(cy), 1, 1);
         return;
       }
-      const left = Math.floor(cx - size / 2), top = Math.floor(cy - size / 2), centerX = left + size / 2, centerY = top + size / 2;
+      const left = Math.floor(cx - size / 2), top = Math.floor(cy - size / 2);
       if (square) {
         c.fillRect(left, top, size, size);
         return;
       }
-      const radius = Math.max(.5, size / 2), r2 = radius * radius;
+      const radius = size / 2, r2 = radius * radius, center = radius - .5;
       for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const px = left + x + .5, py = top + y + .5, dx = px - centerX, dy = py - centerY;
-          if (dx * dx + dy * dy <= r2) c.fillRect(left + x, top + y, 1, 1);
-        }
+        const dy = y + .5 - radius;
+        const span = Math.sqrt(r2 - dy * dy);
+        const first = Math.ceil(center - span), last = Math.floor(center + span);
+        c.fillRect(left + first, top + y, last - first + 1, 1);
       }
     }
     function paintMaskLine(i,x1,y1,x2,y2) {
@@ -20664,7 +20666,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.6.0-square-pencil"></script>
+  <script src="animation.js?v=1.6.0-paint-performance"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

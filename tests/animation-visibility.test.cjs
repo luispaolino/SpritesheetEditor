@@ -587,8 +587,7 @@ test('groups cannot receive pencil or eraser strokes, even through keyboard or d
     assert.equal(app.startAnimationCanvasDrag({}),true);
     assert.equal(histories,0);
     assert.equal(app.animationPixelBrushActive(),false);
-    vm.runInContext(`animationStroke={layerId:${JSON.stringify(group.id)},frame:0,tool:${JSON.stringify(tool)}}`,app);
-    app.paintAnimationLine({x:0,y:0},{x:5,y:5});
+    app.paintAnimationStroke({layerId:group.id,frame:0,tool,last:{x:0,y:0},points:[{x:5,y:5}]});
     assert.equal(app.state.frames[0].animationCels[group.id],undefined);
   }
 });

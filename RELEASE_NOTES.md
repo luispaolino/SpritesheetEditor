@@ -36,6 +36,8 @@
 
 ### Bug Fixes
 
+- Improved Animation painting and erasing by batching redraws, clipping selections by pixel runs, and refreshing only the edited frame thumbnail.
+
 - Kept the Animation pencil and its cursor preview square at every brush size.
 - Fixed Animation Hide/Show affecting every frame. Visibility now belongs to the current frame, including spritesheet imports, and survives saving, undo/redo, frame duplication, and export.
 - Fixed split and pasted layers appearing in other frames' layer lists when those frames have no cel for the layer.

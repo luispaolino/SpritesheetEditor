@@ -25,6 +25,7 @@ function animationPixelBrushActive() {
   return animationPanelActive() && !activeAnimationLayer()?.group && ['pencil','eraser'].includes(state.animationTool);
 }
 function setAnimationBrushSize(value) {
+  if (animationStroke?.points?.length) paintAnimationStroke(animationStroke);
   state.animationBrushSize = clamp(Math.round(Number(value) || 1),1,120);
   animationEls.size.value = state.animationBrushSize;
   animationEls.sizeValue.textContent = state.animationBrushSize;
@@ -793,7 +794,8 @@ function startAnimationCanvasDrag(e) {
     if(tool==='dropper'&&!layer?.group)state.animationTool='pencil'; updateInfo(); return true;
   }
   if(!animationLayerVisible(layer) || !animationLayerOffset(layer) || (layer.group && tool!=='move')) return true;
-  pause();
+  const painting=tool==='pencil'||tool==='eraser';
+  pause(false,{updateInfo:!painting});
   let previousSelection=validAnimationSelection()?animationSelection:null,selectionMove=false;
   if(tool==='rectangle'||tool==='lasso') {
     if(e.altKey && !previousSelection)return true;
@@ -805,41 +807,72 @@ function startAnimationCanvasDrag(e) {
     }
   } else {
     pushHistory();
-    if(tool==='pencil'||tool==='eraser') {
+    if(painting) {
       if(layer.base)animationBakeBase(state.currentFrame);
       else animationBakeCel(layer,state.currentFrame);
     }
   }
-  const offset=animationLayerOffset(layer),targets=animationMovementTargets(layer).map(item=>({id:item.id,x:animationCel(item).offsetX,y:animationCel(item).offsetY}));
+  const offset=animationLayerOffset(layer),targets=tool==='move'?animationMovementTargets(layer).map(item=>({id:item.id,x:animationCel(item).offsetX,y:animationCel(item).offsetY})):[];
   animationStroke={layerId:layer.id,frame:state.currentFrame,tool,last:pointerGuidePoint(e),startX:e.clientX,startY:e.clientY,offsetX:offset.x,offsetY:offset.y,targets,previousSelection,selectionMove};
   state.activeAnimationLayerId=layer.id;state.dragging=true;state.dragMode=`animation-${tool}`;state.dragPointerId=e.pointerId;
   els.canvasShell.classList.add('dragging');els.canvasShell.setPointerCapture(e.pointerId);
   els.canvasShell.classList.toggle('animation-selection-moving',selectionMove);
-  if(tool==='pencil'||tool==='eraser') { updateBrushCursorFromEvent(e); paintAnimationLine(animationStroke.last,animationStroke.last); }
-  drawFrame(state.currentFrame);updateAnimationUi();return true;
+  if(painting) {
+    animationStroke.points=[animationStroke.last];
+    animationStroke.previewFrame=null;
+    queueAnimationPaintPreview(animationStroke,e);
+  } else drawFrame(state.currentFrame);
+  updateAnimationUi();return true;
 }
-function paintAnimationLine(a,b) {
-  const stroke=animationStroke,layer=animationLayerList().find(item=>item.id===stroke.layerId),cel=animationCel(layer,stroke.frame);
-  if(!cel)return;
-  const p=layer.base?{x:0,y:0}:animationCelPosition(cel),canvas=cel.canvas,t=canvas.getContext('2d');
-  const size=Math.max(1,Math.round(state.animationBrushSize||1)),mask=animationSelectionMask();
-  t.save();
-  if(mask) {
-    // Paint through the selection without changing pixels outside it.
-    const stencil=layer.base?mask:animationLocalMask(mask,cel),image=stencil.getContext('2d').getImageData(0,0,stencil.width,stencil.height),path=new Path2D();
-    for(let y=0;y<stencil.height;y++)for(let x=0;x<stencil.width;x++)if(image.data[(y*stencil.width+x)*4+3])path.rect(x,y,1,1);
-    t.clip(path);
+function animationPaintClip() {
+  // Paint targets have been baked into cage space. Clip by runs of selected pixels.
+  const alpha=animationSelectionRaster()?.alpha;
+  if(!alpha)return null;
+  const path=new Path2D(), width=state.cageWidth, height=state.cageHeight;
+  for(let y=0;y<height;y++) {
+    const row=y*width;
+    for(let x=0;x<width;) {
+      if(!alpha[row+x]) {x++;continue;}
+      const left=x++;
+      while(x<width&&alpha[row+x])x++;
+      path.rect(left,y,x-left,1);
+    }
   }
-  if(stroke.tool==='eraser')t.globalCompositeOperation='destination-out';
-  const distance=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y)),steps=Math.max(1,Math.ceil(distance));
-  for(let k=0;k<=steps;k++) {
-    let x=Math.floor(a.x+(b.x-a.x)*k/steps)-p.x,y=Math.floor(a.y+(b.y-a.y)*k/steps)-p.y;
-    if(cel.flipX)x=canvas.width-1-x;if(cel.flipY)y=canvas.height-1-y;
-    stampHardPencil(t,x+.5,y+.5,size,stroke.tool==='eraser'?{r:0,g:0,b:0,a:255}:state.pencilColor,stroke.tool==='pencil');
+  return path;
+}
+function paintAnimationStroke(stroke) {
+  const layer=animationLayerList().find(item=>item.id===stroke.layerId),cel=animationCel(layer,stroke.frame);
+  if(!cel||!stroke.points.length)return;
+  const t=cel.canvas.getContext('2d');
+  const size=Math.max(1,Math.round(state.animationBrushSize||1)),eraser=stroke.tool==='eraser';
+  const color=eraser?{r:0,g:0,b:0,a:255}:state.pencilColor;
+  if(stroke.clip===undefined)stroke.clip=animationPaintClip();
+  t.save();
+  if(stroke.clip)t.clip(stroke.clip);
+  if(eraser)t.globalCompositeOperation='destination-out';
+  let a=stroke.last;
+  for(const b of stroke.points) {
+    const distance=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y)),steps=Math.max(1,Math.ceil(distance));
+    for(let k=0;k<=steps;k++) {
+      const x=Math.floor(a.x+(b.x-a.x)*k/steps),y=Math.floor(a.y+(b.y-a.y)*k/steps);
+      stampHardPencil(t,x+.5,y+.5,size,color,!eraser);
+    }
+    a=b;
   }
   t.restore();
-  if(layer.base)state.frames[stroke.frame].sourceCanvas=canvasClone(canvas);
+  stroke.last=a;stroke.points.length=0;
   state.indexedFrames[stroke.frame]=null;markFrameBitmapsDirty();
+}
+function queueAnimationPaintPreview(stroke,e) {
+  stroke.cursorEvent=e;
+  if(stroke.previewFrame!==null)return;
+  stroke.previewFrame=requestAnimationFrame(()=>{
+    stroke.previewFrame=null;
+    if(animationStroke!==stroke)return;
+    paintAnimationStroke(stroke);
+    updateBrushCursorFromEvent(stroke.cursorEvent);
+    drawFrame(state.currentFrame,{fast:true,skipThumb:true,animationPaintPreview:true});
+  });
 }
 function moveAnimationCanvasDrag(e) {
   const stroke=animationStroke;if(!stroke)return;
@@ -855,12 +888,24 @@ function moveAnimationCanvasDrag(e) {
     stroke.targets.forEach(record=>{const layer=layers.find(item=>item.id===record.id);if(layer)writeAnimationOffset(layer,stroke.frame,record.x+d.dx,record.y+d.dy);});
     animationSelection=null;
   } else if(stroke.tool==='pencil'||stroke.tool==='eraser') {
-    const p=pointerGuidePoint(e);updateBrushCursorFromEvent(e);paintAnimationLine(stroke.last,p);stroke.last=p;
+    stroke.points.push(pointerGuidePoint(e));
+    queueAnimationPaintPreview(stroke,e);
+    return;
   }
   drawFrame(state.currentFrame,{fast:true,skipThumb:true});updateAnimationUi();
 }
 function finishAnimationCanvasDrag(e) {
   const stroke=animationStroke;animationStroke=null;
+  const painting=stroke && (stroke.tool==='pencil'||stroke.tool==='eraser');
+  if(painting) {
+    if(stroke.previewFrame!==null) {
+      cancelAnimationFrame(stroke.previewFrame);
+      paintAnimationStroke(stroke);
+      updateBrushCursorFromEvent(stroke.cursorEvent);
+    }
+    const frame=state.frames[stroke.frame];
+    if(stroke.layerId===ANIMATION_BASE_ID&&frame)frame.sourceCanvas=canvasClone(frame.canvas);
+  }
   state.dragging=false;state.dragMode='offset';state.dragPointerId=null;els.canvasShell.classList.remove('dragging','animation-selection-moving');
   if(els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId);
   if(e.type==='pointercancel')animationSelection=stroke?.previousSelection || null;
@@ -872,7 +917,10 @@ function finishAnimationCanvasDrag(e) {
     }
     commitAnimationSelection(next,stroke.previousSelection);
   }
-  if(stroke && ['move','pencil','eraser'].includes(stroke.tool))animationChanged();
+  if(painting) {
+    if(!updateFrameThumb(stroke.frame))buildFilmstrip();
+    drawFrame(state.currentFrame);updateInfo();
+  } else if(stroke?.tool==='move')animationChanged();
   else {drawFrame(state.currentFrame);updateAnimationUi();}
 }
 function handleAnimationKeyDown(e) {
