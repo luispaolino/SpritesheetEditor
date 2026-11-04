@@ -190,7 +190,7 @@ function selectionHistoryEditor(tool='rectangle') {
     app.resetAnimationTools();app.state.currentFrame=saved.currentFrame;app.state.activeAnimationLayerId=saved.activeAnimationLayerId;
     app.restoreAnimationSelectionHistory(saved.animationSelectionHistory);
   };
-  for(const name of ['pushHistory','cancelActiveDrag','undo','redo'])vm.runInContext(sourceFunction(name),app);
+  for(const name of ['syncHistoryButtons','pushHistory','cancelActiveDrag','undo','redo'])vm.runInContext(sourceFunction(name),app);
   return app;
 }
 

@@ -193,6 +193,7 @@
     .floating-tool-tabs {
       position: absolute; z-index: 4; top: var(--floating-menu-gutter); left: var(--floating-menu-gutter); right: var(--floating-menu-gutter);
       display: flex; flex-wrap: wrap; gap: 8px; align-items: center; align-content: flex-start; pointer-events: auto;
+      min-height: 38px; padding-right: 92px;
       overflow: visible; transition: right 180ms ease;
     }
     .floating-tool-tabs:empty { display: none; }
@@ -206,6 +207,9 @@
     }
     .inspector-tab-button.active { color: #071018; background: var(--warning); border-color: transparent; }
     .floating-visibility-buttons { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
+    .canvas-history-buttons { position: absolute; top: 0; right: 0; display: flex; gap: 8px; }
+    .canvas-history-buttons button { display: grid; place-items: center; }
+    .canvas-history-buttons svg { width: 20px; height: 20px; }
     .floating-tool-tabs .floating-overlay-button {
       width: 38px; height: 38px; min-width: 38px; min-height: 38px; padding: 0; border-radius: 14px;
       backdrop-filter: blur(14px) saturate(1.08);
@@ -1414,7 +1418,12 @@
         <div id="referenceCompositorTrackList" class="reference-compositor-body" aria-label="Reference compositor timeline"></div>
       </div>
 
-      <div class="floating-tool-tabs" id="floatingToolTabs" aria-label="Canvas inspector tools"></div>
+      <div class="floating-tool-tabs" id="floatingToolTabs" aria-label="Canvas tools">
+        <div class="canvas-history-buttons" id="canvasHistoryButtons" role="group" aria-label="Edit history">
+          <button id="canvasUndoButton" class="secondary floating-overlay-button" type="button" disabled aria-label="Undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+          <button id="canvasRedoButton" class="secondary floating-overlay-button" type="button" disabled aria-label="Redo" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5m5 5H9a5 5 0 0 0 0 10h3"/></svg></button>
+        </div>
+      </div>
 
       <div class="side-panels inspector-hidden">
     <aside class="right-panel">
@@ -2217,6 +2226,7 @@
   <div class="context-menu" id="frameContextMenu" role="menu" aria-label="Frame actions">
     <button id="duplicateFrameMenuButton" type="button" role="menuitem">Duplicate</button>
     <button id="addFrameNextMenuButton" type="button" role="menuitem">Add Frame Next</button>
+    <button id="makeFrameFirstMenuButton" type="button" role="menuitem">Make it First</button>
     <button id="ghostFrameMenuButton" type="button" role="menuitem">Ghost Sprite</button>
     <button id="skipFrameMenuButton" type="button" role="menuitem">Skip Frame</button>
     <button id="deleteFrameMenuButton" type="button" role="menuitem">Delete Frame</button>
@@ -2505,6 +2515,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const els = {
+      canvasHistoryButtons: $('canvasHistoryButtons'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'),
       fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), referencePaletteFileInput: $('referencePaletteFileInput'), dropZone: $('dropZone'), importFrameSkipInput: $('importFrameSkipInput'), importFrameSkipValue: $('importFrameSkipValue'), importVideoInfo: $('importVideoInfo'),
       rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'), pingPongInput: $('pingPongInput'), oneRowPackInput: $('oneRowPackInput'),
       frameInput: $('frameInput'), frameValue: $('frameValue'), totalFramesValue: $('totalFramesValue'), reverseOrderButton: $('reverseOrderButton'), showSkippedFramesInput: $('showSkippedFramesInput'), deleteSkippedButton: $('deleteSkippedButton'), backgroundInput: $('backgroundInput'), scanlinesInput: $('scanlinesInput'), scanlineOpacityInput: $('scanlineOpacityInput'), scanlineOpacityValue: $('scanlineOpacityValue'), rulersBeyondCageInput: $('rulersBeyondCageInput'), rulerColorButton: $('rulerColorButton'), rulerColorSwatch: $('rulerColorSwatch'), referenceShadowInput: $('referenceShadowInput'), referenceShadowColorButton: $('referenceShadowColorButton'), referenceShadowColorSwatch: $('referenceShadowColorSwatch'), referenceShadowHeightInput: $('referenceShadowHeightInput'), referenceShadowHeightValue: $('referenceShadowHeightValue'), referenceShadowOffsetYInput: $('referenceShadowOffsetYInput'),
@@ -4341,7 +4352,11 @@
       try { return fn(); }
       finally { historySuppressDepth = Math.max(0, historySuppressDepth - 1); }
     }
-    function pushHistory() { if (state.restoring || historySuppressDepth) return; state.undoStack.push(snapshot()); if (state.undoStack.length > 40) state.undoStack.shift(); state.redoStack = []; }
+    function syncHistoryButtons() {
+      if (els.canvasUndoButton) els.canvasUndoButton.disabled = !state.undoStack.length;
+      if (els.canvasRedoButton) els.canvasRedoButton.disabled = !state.redoStack.length;
+    }
+    function pushHistory() { if (state.restoring || historySuppressDepth) return; state.undoStack.push(snapshot()); if (state.undoStack.length > 40) state.undoStack.shift(); state.redoStack = []; syncHistoryButtons(); }
     function undo() { cancelActiveDrag(); finishKeyboardNudge(false); if (!state.undoStack.length) return; state.redoStack.push(snapshot()); restore(state.undoStack.pop()); }
     function redo() { cancelActiveDrag(); finishKeyboardNudge(false); if (!state.redoStack.length) return; state.undoStack.push(snapshot()); restore(state.redoStack.pop()); }
 
@@ -6833,6 +6848,7 @@
     }
 
     function updateInfo() {
+      syncHistoryButtons();
       if (typeof updateAnimationUi === 'function') updateAnimationUi();
       syncEmptyState();
       const o = state.frameOffsets[state.currentFrame] || {x:0,y:0};
@@ -11158,6 +11174,23 @@
       if (!skipped.length) return;
       deleteFramesAt(skipped);
     }
+    function makeFrameFirst(i) {
+      const count = state.frames.length;
+      if (!Number.isInteger(i) || i <= 0 || i >= count) return;
+      ensureArrays();
+      pushHistory();
+      const order = state.frames.map((_, index) => (i + index) % count);
+      const newIndex = index => (index - i + count) % count;
+      const selected = normalizeTimelineSelection().map(newIndex);
+      const anchor = newIndex(state.selectionAnchorFrame);
+      applyFrameOrder(order);
+      state.currentFrame = 0;
+      state.selectedFrameIndices = normalizeIndexList(selected, count);
+      state.selectionAnchorFrame = anchor;
+      state.indexPreviewVisible = false;
+      markFrameBitmapsDirty();
+      syncAfterDataChange(true);
+    }
     function reverseFrameOrder() {
       if (state.frames.length < 2) return;
       pushHistory();
@@ -11216,15 +11249,17 @@
       state.contextFrameIndex = state.currentFrame;
       if (!normalizeTimelineSelection().includes(state.currentFrame)) setTimelineSelection([state.currentFrame], state.currentFrame);
       const targets = frameActionIndices(state.currentFrame);
+      els.makeFrameFirstMenuButton.disabled = state.currentFrame === 0;
       els.ghostFrameMenuButton.textContent = targets.length > 1 ? (targets.every(frameIsGhosted) ? 'Disable Ghosts' : 'Ghost Sprites') : (frameIsGhosted(state.currentFrame) ? 'Disable Ghost' : 'Ghost Sprite');
       els.skipFrameMenuButton.textContent = targets.length > 1 ? (targets.every(frameIsSkipped) ? 'Unskip Frames' : 'Skip Frames') : (frameIsSkipped(state.currentFrame) ? 'Unskip Frame' : 'Skip Frame');
       els.deleteFrameMenuButton.textContent = targets.length > 1 ? 'Delete Frames' : 'Delete Frame';
       drawFrame(state.currentFrame);
       updateInfo();
-      const maxX = window.innerWidth - 188, maxY = window.innerHeight - 188;
-      els.frameContextMenu.style.left = `${Math.max(8, Math.min(clientX, maxX))}px`;
-      els.frameContextMenu.style.top = `${Math.max(8, Math.min(clientY, maxY))}px`;
-      els.frameContextMenu.classList.add('show');
+      const menu = els.frameContextMenu;
+      menu.classList.add('show');
+      const maxX = window.innerWidth - menu.offsetWidth - 8, maxY = window.innerHeight - menu.offsetHeight - 8;
+      menu.style.left = `${Math.max(8, Math.min(clientX, maxX))}px`;
+      menu.style.top = `${Math.max(8, Math.min(clientY, maxY))}px`;
     }
     function closeFrameContextMenu() {
       state.contextFrameIndex = null;
@@ -11498,6 +11533,12 @@
     function moveFrame(from, to) {
       moveFrames([from], to);
     }
+    function applyFrameOrder(order) {
+      for (const key of ['frames', 'frameOffsets', 'frameMasks', 'maskDirty', 'indexedFrames', 'frameScales', 'frameFlips', 'frameFlipYs']) {
+        const list = state[key], copy = list.slice();
+        order.forEach((oldIndex, newIndex) => { list[newIndex] = copy[oldIndex]; });
+      }
+    }
     function moveFrames(indices, to) {
       if (!hasFrames()) return;
       ensureArrays();
@@ -11512,20 +11553,8 @@
       if (nextOrder.every((oldIndex, newIndex) => oldIndex === newIndex)) return;
       const oldCurrentFrame = state.currentFrame;
       const oldAnchorFrame = state.selectionAnchorFrame;
-      const reorder = list => {
-        const copy = list.slice();
-        list.length = 0;
-        nextOrder.forEach(oldIndex => list.push(copy[oldIndex]));
-      };
       pushHistory();
-      reorder(state.frames);
-      reorder(state.frameOffsets);
-      reorder(state.frameMasks);
-      reorder(state.maskDirty);
-      reorder(state.indexedFrames);
-      reorder(state.frameScales);
-      reorder(state.frameFlips);
-      reorder(state.frameFlipYs);
+      applyFrameOrder(nextOrder);
       const remap = new Map(nextOrder.map((oldIndex, newIndex) => [oldIndex, newIndex]));
       state.selectedFrameIndices = selected.map(i => remap.get(i)).filter(Number.isInteger).sort((a, b) => a - b);
       state.currentFrame = Number.isInteger(remap.get(oldCurrentFrame)) ? remap.get(oldCurrentFrame) : (state.selectedFrameIndices[0] ?? 0);
@@ -18840,6 +18869,9 @@
     els.removePaletteLayerColorsButton.addEventListener('click', removeSelectedColorsFromLayer);
     els.duplicateFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); addFrameNext(i); });
     els.addFrameNextMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); addFrameNext(i); });
+    els.makeFrameFirstMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); makeFrameFirst(i); });
+    els.canvasUndoButton.addEventListener('click', undo);
+    els.canvasRedoButton.addEventListener('click', redo);
     els.ghostFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame, targets = frameActionIndices(i); closeFrameContextMenu(); toggleFrameGhost(targets); });
     els.skipFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame, targets = frameActionIndices(i); closeFrameContextMenu(); toggleFrameSkipped(targets); });
     els.deleteFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame, targets = frameActionIndices(i); closeFrameContextMenu(); deleteFramesAt(targets); });
@@ -20507,7 +20539,7 @@
         });
       };
       if (els.floatingToolTabs) {
-        els.floatingToolTabs.textContent = '';
+        els.floatingToolTabs.replaceChildren();
         let referenceTabButton = null;
         floatingGroups.forEach((group, index) => {
           const label = floatingLabel(group);
@@ -20576,6 +20608,7 @@
           if (sourceActions && !sourceActions.children.length) sourceActions.remove();
           els.floatingToolTabs.insertBefore(visibilityGroup, els.floatingToolTabs.firstChild);
         }
+        els.floatingToolTabs.appendChild(els.canvasHistoryButtons);
       }
       document.querySelectorAll('.group-title-actions').forEach(actions => {
         actions.addEventListener('pointerdown', e => e.stopPropagation());

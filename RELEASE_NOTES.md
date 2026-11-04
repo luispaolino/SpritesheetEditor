@@ -4,6 +4,8 @@
 
 ### New Features
 
+- Added Make it First to the timeline context menu, rotating the frame sequence around the selected sprite while preserving each frame's edits.
+- Added icon-only Undo and Redo buttons to the upper-right canvas toolbar, sharing history with the keyboard shortcuts.
 - Added the Animation floating panel with Load Sprite support for images, GIFs, and WebP files.
 - Added sprite layers with names, visibility, removal, per-frame X/Y offsets, and horizontal/vertical flips.
 - Added drag ordering for sprite layers; the top layer renders in front.
