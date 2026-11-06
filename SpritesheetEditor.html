@@ -1197,6 +1197,8 @@
     .reference-fade-color-field,
     .reference-clip-outline-color-field,
     .reference-text-color-field { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: end; }
+    .reference-fade-color-field { grid-template-columns: 54px minmax(0, 1fr) minmax(0, 1fr); }
+    .reference-fade-color-field .reference-clip-check { height: 44px; min-height: 44px; }
     .reference-fade-color-field .swatch-button,
     .reference-clip-outline-color-field .swatch-button,
     .reference-text-color-field .swatch-button { width: 54px; height: 44px; min-width: 54px; min-height: 44px; padding: 0; display: grid; place-items: center; }
@@ -2293,6 +2295,8 @@
             <option value="in">In</option>
             <option value="out">Out</option>
             <option value="inout">In/Out</option>
+            <option value="horizontal">H Gradation</option>
+            <option value="vertical">V Gradation</option>
           </select>
         </div>
         <div class="field">
@@ -2308,6 +2312,7 @@
           <label for="referenceFadeHoldInput">Hold Duration</label>
           <input id="referenceFadeHoldInput" type="number" min="0" step="1" value="0" />
         </div>
+        <label class="check-field reference-clip-check"><input id="referenceFadeMirrorInput" type="checkbox" /> Mirror</label>
       </div>
       <div class="color-picker-actions">
         <button id="applyReferenceFadeButton" type="button">Apply</button>
@@ -2515,6 +2520,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const els = {
+      referenceFadeMirrorInput: $('referenceFadeMirrorInput'),
       canvasHistoryButtons: $('canvasHistoryButtons'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'),
       fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), referencePaletteFileInput: $('referencePaletteFileInput'), dropZone: $('dropZone'), importFrameSkipInput: $('importFrameSkipInput'), importFrameSkipValue: $('importFrameSkipValue'), importVideoInfo: $('importVideoInfo'),
       rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'), pingPongInput: $('pingPongInput'), oneRowPackInput: $('oneRowPackInput'),
@@ -3387,7 +3393,10 @@
       return previewFrameSize();
     }
     function normalizeReferenceFadeType(value) {
-      return ['solid', 'in', 'out', 'inout'].includes(value) ? value : 'in';
+      return ['solid', 'in', 'out', 'inout', 'horizontal', 'vertical'].includes(value) ? value : 'in';
+    }
+    function referenceFadeIsStatic(type) {
+      return ['solid', 'horizontal', 'vertical'].includes(type);
     }
     function normalizeReferenceAnimationType(value) {
       return value === 'pingpong' ? 'pingpong' : 'linear';
@@ -3417,12 +3426,12 @@
     }
     function referenceFadeTransitionUnits(type) {
       const fadeType = normalizeReferenceFadeType(type);
-      if (fadeType === 'solid') return 0;
+      if (referenceFadeIsStatic(fadeType)) return 0;
       return fadeType === 'inout' ? 2 : 1;
     }
     function referenceFadeDuration(type, transitionDuration, holdDuration) {
       const fadeType = normalizeReferenceFadeType(type);
-      if (fadeType === 'solid') return Math.max(1, Math.round(parseFloat(holdDuration) || DEFAULT_COMPOSITOR_FADE_HOLD || 1));
+      if (referenceFadeIsStatic(fadeType)) return Math.max(1, Math.round(parseFloat(holdDuration) || DEFAULT_COMPOSITOR_FADE_HOLD || 1));
       const transition = Math.max(1, Math.round(parseFloat(transitionDuration) || DEFAULT_COMPOSITOR_FADE_TRANSITION));
       const hold = Math.max(0, Math.round(parseFloat(holdDuration) || 0));
       return Math.max(1, referenceFadeTransitionUnits(fadeType) * transition + hold);
@@ -3431,7 +3440,7 @@
       if (!clip || clip.kind !== 'fade') return clip;
       const fadeType = normalizeReferenceFadeType(clip.fadeType);
       clip.duration = Math.max(1, Math.round(parseFloat(clip.duration) || 1));
-      if (fadeType === 'solid') {
+      if (referenceFadeIsStatic(fadeType)) {
         clip.holdDuration = clip.duration;
         clip.transitionDuration = Math.max(1, Math.round(parseFloat(clip.transitionDuration) || DEFAULT_COMPOSITOR_FADE_TRANSITION));
         return clip;
@@ -3446,7 +3455,7 @@
       if (!clip || clip.kind !== 'fade') return clip;
       clip.fadeType = normalizeReferenceFadeType(clip.fadeType);
       clip.transitionDuration = Math.max(1, Math.round(parseFloat(clip.transitionDuration) || DEFAULT_COMPOSITOR_FADE_TRANSITION));
-      clip.holdDuration = clip.fadeType === 'solid'
+      clip.holdDuration = referenceFadeIsStatic(clip.fadeType)
         ? Math.max(1, Math.round(parseFloat(clip.holdDuration) || parseFloat(clip.duration) || DEFAULT_COMPOSITOR_FADE_HOLD || 1))
         : Math.max(0, Math.round(parseFloat(clip.holdDuration) || 0));
       clip.duration = referenceFadeDuration(clip.fadeType, clip.transitionDuration, clip.holdDuration);
@@ -3500,8 +3509,9 @@
         textShadowOffsetX: kind === 'text' ? normalizeFontShadowOffsetValue(clip.textShadowOffsetX ?? clip.shadowOffsetX, 2) : 2,
         textShadowOffsetY: kind === 'text' ? normalizeFontShadowOffsetValue(clip.textShadowOffsetY ?? clip.shadowOffsetY, 2) : 2,
         fadeType,
+        mirror: !!clip.mirror,
         transitionDuration,
-        holdDuration: fadeType === 'solid'
+        holdDuration: referenceFadeIsStatic(fadeType)
           ? Math.max(1, Math.round(parseFloat(clip.holdDuration ?? clip.duration) || defaultDuration))
           : holdDuration,
         color: cloneColor(clip.color || DEFAULT_COMPOSITOR_FADE_COLOR)
@@ -3808,6 +3818,7 @@
         textShadowOffsetX: normalizeFontShadowOffsetValue(clip.textShadowOffsetX, 2),
         textShadowOffsetY: normalizeFontShadowOffsetValue(clip.textShadowOffsetY, 2),
         fadeType: clip.fadeType || 'in',
+        mirror: !!clip.mirror,
         transitionDuration: clip.transitionDuration || DEFAULT_COMPOSITOR_FADE_TRANSITION,
         holdDuration: clip.holdDuration || DEFAULT_COMPOSITOR_FADE_HOLD,
         color: cloneColor(clip.color || DEFAULT_COMPOSITOR_FADE_COLOR)
@@ -3929,7 +3940,7 @@
       const local = Math.round(cursor) - Math.round(clip.start || 0);
       if (local < 0 || local >= clip.duration) return 0;
       const type = normalizeReferenceFadeType(clip.fadeType);
-      if (type === 'solid') return 1;
+      if (referenceFadeIsStatic(type)) return 1;
       const transition = Math.max(1, Math.round(parseFloat(clip.transitionDuration) || DEFAULT_COMPOSITOR_FADE_TRANSITION));
       const hold = Math.max(0, Math.round(parseFloat(clip.holdDuration) || 0));
       if (type === 'out') {
@@ -3943,6 +3954,24 @@
       }
       if (local < transition) return clamp(local / transition, 0, 1);
       return 1;
+    }
+    function drawReferenceFade(t, entry, width, height, offsetX = 0, offsetY = 0) {
+      const clip = entry.clip;
+      const color = cloneColor(clip.color || DEFAULT_COMPOSITOR_FADE_COLOR);
+      const type = normalizeReferenceFadeType(clip.fadeType);
+      t.save();
+      t.translate(offsetX, offsetY);
+      t.globalAlpha *= clamp(entry.alpha, 0, 1);
+      if (type === 'horizontal' || type === 'vertical') {
+        const gradient = t.createLinearGradient(0, 0, type === 'horizontal' ? width : 0, type === 'vertical' ? height : 0);
+        const opaque = colorToCss(color);
+        const transparent = colorToCss({ ...color, a: 0 });
+        gradient.addColorStop(0, clip.mirror ? transparent : opaque);
+        gradient.addColorStop(1, clip.mirror ? opaque : transparent);
+        t.fillStyle = gradient;
+      } else t.fillStyle = colorToCss(color);
+      t.fillRect(0, 0, width, height);
+      t.restore();
     }
     function activeReferenceFadeEntries() {
       normalizeReferenceCompositorState();
@@ -5288,15 +5317,13 @@
         [...host.querySelectorAll('.compositor-fade-layer')].forEach(canvas => { canvas.style.display = 'none'; canvas.style.clipPath = ''; });
         return;
       }
-      const shell = els.canvasShell.getBoundingClientRect();
-      const visible = canvasVisibleRange();
       const frame = previewFrameSize();
-      const display = canvasDisplaySize(frame);
-      const width = display.width;
-      const height = display.height;
-      const offset = canvasDisplayOffset(visible);
-      const left = Math.round(shell.width / 2 + offset.x - width / 2);
-      const top = Math.round(shell.height / 2 + offset.y - height / 2);
+      const main = els.mainCanvas.getBoundingClientRect();
+      const hostBounds = host.getBoundingClientRect();
+      const width = Math.max(1, Math.round(main.width));
+      const height = Math.max(1, Math.round(main.height));
+      const left = main.left - hostBounds.left;
+      const top = main.top - hostBounds.top;
       entries.forEach(entry => {
         let fadeCanvas = [...host.querySelectorAll('.compositor-fade-layer')].find(canvas => canvas.dataset.compositorFadeId === entry.clip.id);
         if (!fadeCanvas) {
@@ -5314,17 +5341,12 @@
         }
         const octx = fadeCanvas.getContext('2d', { alpha: true });
         octx.clearRect(0, 0, width, height);
-        const color = cloneColor(entry.clip.color || DEFAULT_COMPOSITOR_FADE_COLOR);
-        const alpha = clamp(entry.alpha * (clamp(Math.round(color.a ?? 255), 0, 255) / 255), 0, 1);
-        if (alpha) {
-          octx.fillStyle = `rgba(${clamp(color.r, 0, 255)}, ${clamp(color.g, 0, 255)}, ${clamp(color.b, 0, 255)}, ${alpha})`;
-          octx.fillRect(0, 0, width, height);
-        }
-        fadeCanvas.style.display = alpha ? 'block' : 'none';
-        fadeCanvas.style.width = `${width}px`;
-        fadeCanvas.style.height = `${height}px`;
-        fadeCanvas.style.left = `${left}px`;
-        fadeCanvas.style.top = `${top}px`;
+        drawReferenceFade(octx, entry, width, height);
+        fadeCanvas.style.display = 'block';
+        fadeCanvas.style.width = `${main.width}px`;
+        fadeCanvas.style.height = `${main.height}px`;
+        fadeCanvas.style.left = `${left + entry.clip.offsetX * main.width / frame.width}px`;
+        fadeCanvas.style.top = `${top + entry.clip.offsetY * main.height / frame.height}px`;
         fadeCanvas.style.zIndex = String(referenceLayerZIndex(entry.order));
         fadeCanvas.style.transform = 'none';
         applyReferenceCompositorMaskToOverlay(fadeCanvas);
@@ -6897,7 +6919,7 @@
       if (els.referenceCompositorVideoBitrateInput) els.referenceCompositorVideoBitrateInput.disabled = !state.referenceCompositorVisible;
       if (els.referenceCompositorAudioBitrateInput) els.referenceCompositorAudioBitrateInput.disabled = !state.referenceCompositorVisible;
       const activeCompositorClip = (state.referenceCompositorClips || []).find(clip => clip.id === state.activeReferenceCompositorClipId) || null;
-      const activeCompositorPositionClip = activeCompositorClip && (activeCompositorClip.kind === 'reference' || activeCompositorClip.kind === 'text') ? activeCompositorClip : null;
+      const activeCompositorPositionClip = activeCompositorClip && ['reference', 'text', 'fade'].includes(activeCompositorClip.kind) ? activeCompositorClip : null;
       const activeCompositorScaleClip = activeCompositorClip && (activeCompositorClip.kind === 'reference' || activeCompositorClip.kind === 'text') ? activeCompositorClip : null;
       const activeCompositorSpeedClip = activeCompositorClip && (activeCompositorClip.kind === 'reference' || activeCompositorClip.kind === 'audio') ? activeCompositorClip : null;
       setVal(els.referenceCompositorClipOffsetXInput, Math.round(parseFloat(activeCompositorPositionClip?.offsetX) || 0));
@@ -13739,7 +13761,7 @@
             }
             const fadeType = normalizeReferenceFadeType(clip.fadeType);
             const clipLabel = clip.kind === 'fade'
-              ? (fadeType === 'solid' ? 'Solid' : `Fade ${fadeType === 'out' ? 'Out' : fadeType === 'inout' ? 'In/Out' : 'In'}`)
+              ? ({ solid: 'Solid', horizontal: 'H Gradation', vertical: 'V Gradation', in: 'Fade In', out: 'Fade Out', inout: 'Fade In/Out' }[fadeType])
               : (clip.kind === 'audio' ? (audioAsset?.name || 'Audio Clip') : (clip.kind === 'text' ? referenceTextClipLabel(clip) : (layer?.name || 'Reference Clip')));
             clipEl.title = `${clipLabel}: frame ${clipStart} to ${clipStart + clipDuration}`;
             const leftHandle = document.createElement('span');
@@ -14255,19 +14277,19 @@
       updateInfo();
     }
     function activeReferenceCompositorOffsetClip() {
-      return (state.referenceCompositorClips || []).find(clip => clip.id === state.activeReferenceCompositorClipId && (clip.kind === 'reference' || clip.kind === 'text')) || null;
+      return (state.referenceCompositorClips || []).find(clip => clip.id === state.activeReferenceCompositorClipId && ['reference', 'text', 'fade'].includes(clip.kind)) || null;
     }
     function selectedReferenceCompositorOffsetClips() {
       const ids = selectedReferenceCompositorClipIdsForAction(state.activeReferenceCompositorClipId);
       const clips = ids
-        .map(id => (state.referenceCompositorClips || []).find(clip => clip.id === id && (clip.kind === 'reference' || clip.kind === 'text')))
+        .map(id => (state.referenceCompositorClips || []).find(clip => clip.id === id && ['reference', 'text', 'fade'].includes(clip.kind)))
         .filter(Boolean);
       if (clips.length) return clips;
       const active = activeReferenceCompositorOffsetClip();
       return active ? [active] : [];
     }
     function selectedReferenceCompositorScaleClips() {
-      return selectedReferenceCompositorOffsetClips();
+      return selectedReferenceCompositorOffsetClips().filter(clip => clip.kind !== 'fade');
     }
     function setActiveReferenceCompositorClipScale(value, options = {}) {
       const clips = selectedReferenceCompositorScaleClips();
@@ -14306,7 +14328,7 @@
       referenceClipKeyboardNudgeSession.records.forEach(record => {
         record.dx += dx;
         record.dy += dy;
-        const clip = (state.referenceCompositorClips || []).find(item => item.id === record.id && (item.kind === 'reference' || item.kind === 'text'));
+        const clip = (state.referenceCompositorClips || []).find(item => item.id === record.id && ['reference', 'text', 'fade'].includes(item.kind));
         if (!clip) return;
         clip.offsetX = record.startX + record.dx;
         clip.offsetY = record.startY + record.dy;
@@ -14349,7 +14371,7 @@
       if (!Array.isArray(state.dragStartClipOffsets) || !state.dragStartClipOffsets.length) return;
       const d = pointerDelta(e, state.dragStartX, state.dragStartY);
       state.dragStartClipOffsets.forEach(record => {
-        const clip = (state.referenceCompositorClips || []).find(item => item.id === record.id && (item.kind === 'reference' || item.kind === 'text'));
+        const clip = (state.referenceCompositorClips || []).find(item => item.id === record.id && ['reference', 'text', 'fade'].includes(item.kind));
         if (!clip) return;
         clip.offsetX = Math.round(record.x + d.dx);
         clip.offsetY = Math.round(record.y + d.dy);
@@ -14363,12 +14385,13 @@
       return (state.referenceCompositorClips || []).find(clip => clip.id === state.activeReferenceCompositorClipId && (clip.kind === 'reference' || clip.kind === 'audio')) || null;
     }
     function setActiveReferenceCompositorClipOffset(axis, value, options = {}) {
-      const clip = activeReferenceCompositorOffsetClip();
+      let clip = activeReferenceCompositorOffsetClip();
       if (!clip) return;
       const next = Math.round(parseFloat(value) || 0);
       const key = axis === 'y' ? 'offsetY' : 'offsetX';
       if (Math.round(parseFloat(clip[key]) || 0) === next) return;
       if (options.history !== false) pushHistory();
+      clip = activeReferenceCompositorOffsetClip();
       clip[key] = next;
       renderDisplayReferenceLayers();
       renderCompositorFadeOverlay();
@@ -14667,37 +14690,44 @@
       if (els.referenceFadeColorSwatch) els.referenceFadeColorSwatch.style.background = colorToCss(color || DEFAULT_COMPOSITOR_FADE_COLOR);
     }
     function syncReferenceFadeTimingControls() {
-      const isSolid = normalizeReferenceFadeType(els.referenceFadeTypeInput?.value) === 'solid';
+      const type = normalizeReferenceFadeType(els.referenceFadeTypeInput?.value);
+      const isStatic = referenceFadeIsStatic(type);
       if (els.referenceFadeTransitionInput) {
-        els.referenceFadeTransitionInput.disabled = isSolid;
-        els.referenceFadeTransitionInput.closest('.field')?.classList.toggle('disabled', isSolid);
+        els.referenceFadeTransitionInput.disabled = isStatic;
+        els.referenceFadeTransitionInput.closest('.field')?.classList.toggle('disabled', isStatic);
       }
       if (els.referenceFadeHoldInput) {
         els.referenceFadeHoldInput.disabled = false;
+        els.referenceFadeHoldInput.min = isStatic ? '1' : '0';
         els.referenceFadeHoldInput.closest('.field')?.classList.remove('disabled');
       }
+      els.referenceFadeMirrorInput.disabled = type !== 'horizontal' && type !== 'vertical';
     }
-    function prepareReferenceFadeModalChange() {
-      if (referenceFadeModalHistoryPushed) return;
-      if (hasFrames() || (state.displayReferenceLayers || []).length || (state.referenceCompositorClips || []).length || (state.referenceCompositorTracks || []).length) pushHistory();
-      referenceFadeModalHistoryPushed = true;
+    function prepareReferenceFadeModalChange(clip) {
+      if (!referenceFadeModalHistoryPushed) {
+        if (hasFrames() || (state.displayReferenceLayers || []).length || (state.referenceCompositorClips || []).length || (state.referenceCompositorTracks || []).length) pushHistory();
+        referenceFadeModalHistoryPushed = true;
+      }
+      // Snapshot normalization replaces clip records, so edit the current record.
+      return (state.referenceCompositorClips || []).find(item => item.id === clip.id);
     }
     function readReferenceFadeModalTiming(clip) {
       const fadeType = normalizeReferenceFadeType(els.referenceFadeTypeInput?.value);
       const transitionFallback = clip?.transitionDuration || DEFAULT_COMPOSITOR_FADE_TRANSITION;
-      const holdFallback = fadeType === 'solid'
+      const holdFallback = referenceFadeIsStatic(fadeType)
         ? referenceCompositorClipDuration(clip)
         : clip?.holdDuration || DEFAULT_COMPOSITOR_FADE_HOLD;
       return {
         fadeType,
         transitionDuration: Math.max(1, Math.round(parseFloat(els.referenceFadeTransitionInput?.value) || transitionFallback)),
-        holdDuration: Math.max(fadeType === 'solid' ? 1 : 0, Math.round(parseFloat(els.referenceFadeHoldInput?.value) || holdFallback))
+        holdDuration: Math.max(referenceFadeIsStatic(fadeType) ? 1 : 0, Math.round(parseFloat(els.referenceFadeHoldInput?.value) || holdFallback))
       };
     }
     function applyReferenceFadeModalTimingToClip(clip) {
       if (!clip || clip.kind !== 'fade') return;
       const timing = readReferenceFadeModalTiming(clip);
       clip.fadeType = timing.fadeType;
+      clip.mirror = els.referenceFadeMirrorInput.checked;
       clip.transitionDuration = timing.transitionDuration;
       clip.holdDuration = timing.holdDuration;
       syncReferenceFadeClipDurationFromTiming(clip);
@@ -14709,18 +14739,18 @@
       const nextColor = cloneColor(color || DEFAULT_COMPOSITOR_FADE_COLOR);
       referenceFadeModalColor = cloneColor(nextColor);
       syncReferenceFadeModalColor(nextColor);
-      const clip = (state.referenceCompositorClips || []).find(item => item.id === clipId && item.kind === 'fade');
+      let clip = (state.referenceCompositorClips || []).find(item => item.id === clipId && item.kind === 'fade');
       if (!clip || colorsMatch(clip.color || DEFAULT_COMPOSITOR_FADE_COLOR, nextColor)) return false;
-      prepareReferenceFadeModalChange();
+      clip = prepareReferenceFadeModalChange(clip);
       clip.color = cloneColor(nextColor);
       renderCompositorFadeOverlay();
       updateReferenceCompositorUi();
       return true;
     }
     function previewReferenceFadeTypeFromModal() {
-      const clip = (state.referenceCompositorClips || []).find(item => item.id === referenceFadeModalClipId && item.kind === 'fade');
+      let clip = (state.referenceCompositorClips || []).find(item => item.id === referenceFadeModalClipId && item.kind === 'fade');
       if (!clip) return;
-      prepareReferenceFadeModalChange();
+      clip = prepareReferenceFadeModalChange(clip);
       applyReferenceFadeModalTimingToClip(clip);
       if (els.referenceFadeTransitionInput) els.referenceFadeTransitionInput.value = String(clip.transitionDuration);
       if (els.referenceFadeHoldInput) els.referenceFadeHoldInput.value = String(clip.holdDuration);
@@ -14738,6 +14768,7 @@
       state.activeReferenceCompositorTrackId = clip.trackId || state.activeReferenceCompositorTrackId;
       syncReferenceFadeTimingFromDuration(clip);
       if (els.referenceFadeTypeInput) els.referenceFadeTypeInput.value = normalizeReferenceFadeType(clip.fadeType);
+      els.referenceFadeMirrorInput.checked = !!clip.mirror;
       if (els.referenceFadeTransitionInput) els.referenceFadeTransitionInput.value = String(Math.max(1, Math.round(clip.transitionDuration || DEFAULT_COMPOSITOR_FADE_TRANSITION)));
       if (els.referenceFadeHoldInput) els.referenceFadeHoldInput.value = String(Math.max(0, Math.round(clip.holdDuration || DEFAULT_COMPOSITOR_FADE_HOLD)));
       syncReferenceFadeTimingControls();
@@ -14752,9 +14783,9 @@
       els.referenceFadeModal?.classList.remove('show');
     }
     function applyReferenceFadeModal() {
-      const clip = (state.referenceCompositorClips || []).find(item => item.id === referenceFadeModalClipId && item.kind === 'fade');
+      let clip = (state.referenceCompositorClips || []).find(item => item.id === referenceFadeModalClipId && item.kind === 'fade');
       if (!clip) return closeReferenceFadeModal();
-      prepareReferenceFadeModalChange();
+      clip = prepareReferenceFadeModalChange(clip);
       applyReferenceFadeModalTimingToClip(clip);
       if (referenceFadeModalColor) clip.color = cloneColor(referenceFadeModalColor);
       state.activeReferenceCompositorClipId = clip.id;
@@ -17859,11 +17890,8 @@
         if (item.type === 'shadow') drawCompositorReferenceShadow(ctx2d, item.ref, item.layer, frame);
         else if (item.type === 'image') drawCompositorReferenceImage(ctx2d, item.ref, item.layer, frame);
         else if (item.type === 'fade') {
-          const color = cloneColor(item.entry.clip.color || DEFAULT_COMPOSITOR_FADE_COLOR);
-          const alpha = clamp(item.entry.alpha * (clamp(Math.round(color.a ?? 255), 0, 255) / 255), 0, 1);
-          if (!alpha) return;
-          ctx2d.fillStyle = `rgba(${clamp(color.r, 0, 255)}, ${clamp(color.g, 0, 255)}, ${clamp(color.b, 0, 255)}, ${alpha})`;
-          ctx2d.fillRect(0, 0, frame.width, frame.height);
+          const clip = item.entry.clip;
+          drawReferenceFade(ctx2d, item.entry, frame.width, frame.height, clip.offsetX, clip.offsetY);
         }
       });
       drawExportScanlines(ctx2d, frame.width, frame.height);
@@ -19723,6 +19751,7 @@
       syncReferenceFadeTimingControls();
       previewReferenceFadeTypeFromModal();
     });
+    els.referenceFadeMirrorInput.addEventListener('change', previewReferenceFadeTypeFromModal);
     [els.referenceFadeTransitionInput, els.referenceFadeHoldInput].forEach(input => {
       input?.addEventListener('input', previewReferenceFadeTypeFromModal);
       input?.addEventListener('change', previewReferenceFadeTypeFromModal);
@@ -20666,7 +20695,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.6.0-paint-performance"></script>
+  <script src="animation.js"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);
