@@ -21,10 +21,11 @@
 .animation-layer-actions { grid-column: 1; }
 .animation-layer-flips { grid-column: 3; }
 .side-panels .animation-layer-actions .lock-button { width: 26px; min-width: 26px; height: 32px; min-height: 32px; justify-self: center; }
-.side-panels .animation-layer-flips .reference-flip-button { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
+.side-panels .animation-layer-item .reference-flip-button { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
+.animation-layer-heading { grid-column: 2; grid-row: 1; display: flex; gap: 6px; margin-left: 16px; min-width: 0; }
 .side-panels .animation-layer-item .animation-layer-name,
 .side-panels .animation-layer-item .animation-layer-rename-input {
-  grid-column: 2; grid-row: 1; margin-left: 16px; width: calc(100% - 16px); min-width: 0;
+  flex: 1 1 0; min-width: 0;
   height: 32px; min-height: 32px; padding: 0 8px; align-self: stretch;
 }
 .animation-layer-name { cursor: grab; user-select: none; touch-action: none; }

@@ -47,15 +47,19 @@ function animationFrameLayers(i = state.currentFrame) {
   const layers=animationLayerList(), frame=state.frames[i], available=new Set();
   if (!frame) return [];
   layers.forEach(layer=>{
-    if (layer.group || !(layer.base ? frame.canvas : frame.animationCels?.[layer.id]?.canvas)) return;
+    if (!animationCel(layer,i)?.canvas) return;
     available.add(layer.id);animationAncestors(layer,layers).forEach(parent=>available.add(parent.id));
   });
   return layers.filter(layer=>available.has(layer.id));
 }
-function cloneAnimationLayers(layers) {
+function cloneAnimationLayers(layers, copySharedCel = cloneAnimationCel) {
   if (!Array.isArray(layers)) return null;
-  const copy = layers.map(layer => ({ id: String(layer.id), name: String(layer.name || (layer.group ? 'Group' : 'Sprite')), visible: layer.visible !== false,
-    base: layer.id === ANIMATION_BASE_ID, group: !!layer.group && layer.id !== ANIMATION_BASE_ID, parentId: String(layer.parentId || ''), collapsed: !!layer.collapsed }));
+  const copy = layers.map(layer => {
+    const record = { id: String(layer.id), name: String(layer.name || (layer.group ? 'Group' : 'Sprite')), visible: layer.visible !== false,
+      base: layer.id === ANIMATION_BASE_ID, group: !!layer.group && layer.id !== ANIMATION_BASE_ID, parentId: String(layer.parentId || ''), collapsed: !!layer.collapsed };
+    if (!record.group && layer.sharedCel) record.sharedCel = copySharedCel(layer.sharedCel);
+    return record;
+  });
   const byId = new Map(copy.map(layer => [layer.id,layer]));
   copy.forEach(layer => {
     const seen = new Set([layer.id]); let parent = byId.get(layer.parentId);
@@ -117,21 +121,41 @@ function toggleAnimationVisibility(id) {
   frame.animationVisibility = { ...cloneAnimationVisibility(frame.animationVisibility), [id]: !visible };
   animationChanged();
 }
+function animationCelTransform(cel) {
+  return { offsetX: Math.round(cel.offsetX || 0), offsetY: Math.round(cel.offsetY || 0), flipX: !!cel.flipX, flipY: !!cel.flipY };
+}
+function cloneAnimationCel(cel) {
+  return { canvas: canvasClone(cel.canvas), ...animationCelTransform(cel) };
+}
+function serializeAnimationCel(cel) {
+  return { data: cel.canvas.toDataURL('image/png'), ...animationCelTransform(cel) };
+}
+async function restoreAnimationCel(cel) {
+  return { canvas: await canvasFromDataURL(cel.data), ...animationCelTransform(cel) };
+}
+function serializeAnimationLayers(layers) {
+  return cloneAnimationLayers(layers, serializeAnimationCel);
+}
+async function restoreAnimationLayers(layers) {
+  const restored = cloneAnimationLayers(layers, cel => cel);
+  if (!restored) return null;
+  for (const layer of restored) {
+    if (layer.sharedCel?.data) layer.sharedCel = await restoreAnimationCel(layer.sharedCel);
+    else delete layer.sharedCel;
+  }
+  return restored;
+}
 function cloneAnimationCels(cels = {}) {
-  return Object.fromEntries(Object.entries(cels || {}).filter(([,cel]) => cel?.canvas).map(([id,cel]) => [id, {
-    canvas: canvasClone(cel.canvas), offsetX: Math.round(cel.offsetX || 0), offsetY: Math.round(cel.offsetY || 0), flipX: !!cel.flipX, flipY: !!cel.flipY
-  }]));
+  return Object.fromEntries(Object.entries(cels || {}).filter(([,cel]) => cel?.canvas).map(([id,cel]) => [id, cloneAnimationCel(cel)]));
 }
 function serializeAnimationCels(cels = {}) {
-  return Object.fromEntries(Object.entries(cels || {}).filter(([,cel]) => cel?.canvas).map(([id,cel]) => [id, {
-    data: cel.canvas.toDataURL('image/png'), offsetX: Math.round(cel.offsetX || 0), offsetY: Math.round(cel.offsetY || 0), flipX: !!cel.flipX, flipY: !!cel.flipY
-  }]));
+  return Object.fromEntries(Object.entries(cels || {}).filter(([,cel]) => cel?.canvas).map(([id,cel]) => [id, serializeAnimationCel(cel)]));
 }
 async function restoreAnimationCels(cels = {}) {
   const restored = {};
   for (const [id,cel] of Object.entries(cels || {})) {
     if (!cel?.data) continue;
-    restored[id] = { canvas: await canvasFromDataURL(cel.data), offsetX: Math.round(cel.offsetX || 0), offsetY: Math.round(cel.offsetY || 0), flipX: !!cel.flipX, flipY: !!cel.flipY };
+    restored[id] = await restoreAnimationCel(cel);
   }
   return restored;
 }
@@ -151,15 +175,18 @@ function resetAnimationState() {
   state.animationBrushSize = 1;
   resetAnimationTools();
 }
+function animationLayerUsesBaseFrame(layer) {
+  return !!layer?.base && !layer.sharedCel;
+}
 function animationCel(layer, i = state.currentFrame) {
-  if (!layer || layer.group) return null;
+  const frame = state.frames[i];
+  if (!layer || layer.group || !frame) return null;
+  if (layer.sharedCel) return layer.sharedCel;
   if (layer.base) {
-    const frame = state.frames[i];
-    if (!frame) return null;
     const offset = state.frameOffsets[i] || { x: 0, y: 0 };
     return { canvas: frame.canvas, offsetX: offset.x, offsetY: offset.y, flipX: frameFlipX(i), flipY: frameFlipY(i) };
   }
-  return state.frames[i]?.animationCels?.[layer.id] || null;
+  return frame.animationCels?.[layer.id] || null;
 }
 function animationCelPosition(cel) {
   return { x: Math.round((state.cageWidth - cel.canvas.width) / 2) + Math.round(cel.offsetX || 0), y: Math.round((state.cageHeight - cel.canvas.height) / 2) + Math.round(cel.offsetY || 0) };
@@ -171,7 +198,8 @@ function animationMovementTargets(layer, i = state.currentFrame) {
 function animationLayerBounds(layer, i = state.currentFrame) {
   const cel = animationCel(layer,i);
   if (!cel) return null;
-  const position = layer.base ? framePos(i) : animationCelPosition(cel), scale = layer.base ? frameScale(i) : {x:1,y:1};
+  const base = animationLayerUsesBaseFrame(layer);
+  const position = base ? framePos(i) : animationCelPosition(cel), scale = base ? frameScale(i) : {x:1,y:1};
   return { left:position.x, top:position.y, right:position.x+cel.canvas.width*scale.x, bottom:position.y+cel.canvas.height*scale.y };
 }
 function animationGroupBounds(layer, i = state.currentFrame) {
@@ -184,7 +212,7 @@ function animationLayerOffset(layer, i = state.currentFrame) {
   return bounds ? {x:Math.round((bounds.left+bounds.right-state.cageWidth)/2),y:Math.round((bounds.top+bounds.bottom-state.cageHeight)/2)} : null;
 }
 function writeAnimationOffset(layer, i, x, y) {
-  if (layer.base) state.frameOffsets[i] = {x:Math.round(x),y:Math.round(y)};
+  if (animationLayerUsesBaseFrame(layer)) state.frameOffsets[i] = {x:Math.round(x),y:Math.round(y)};
   else { const cel=animationCel(layer,i); if(cel) {cel.offsetX=Math.round(x);cel.offsetY=Math.round(y);} }
 }
 function newAnimationId(kind = 'layer') { return `animation-${kind}-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -203,6 +231,25 @@ function createEmptyAnimationLayer() {
   state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
   animationSelection=null;state.animationTool='move';animationChanged();
 }
+function captureAnimationCel(layer) {
+  const cel = animationCel(layer);
+  if (!cel?.canvas) return null;
+  if (!animationLayerUsesBaseFrame(layer)) return cloneAnimationCel(cel);
+  // Capture the visible base without baking or changing the source frame.
+  const canvas = makeMask();
+  drawBaseSprite(canvas.getContext('2d'), state.currentFrame, 0, 0, { applyMask: true });
+  return { canvas, offsetX: 0, offsetY: 0, flipX: false, flipY: false };
+}
+function toggleAnimationAllFrames(id) {
+  const layer = animationLayerList().find(item => item.id === id);
+  if (!animationCel(layer)?.canvas) return;
+  pause();
+  pushHistory();
+  const target = ensureAnimationLayers().find(item => item.id === id);
+  if (target.sharedCel) delete target.sharedCel;
+  else target.sharedCel = captureAnimationCel(target);
+  animationChanged();
+}
 function copyAnimationLayers() {
   if (!hasFrames()) return false;
   const layers=animationLayerList(), selected=new Set(selectedAnimationLayerIds());
@@ -211,16 +258,7 @@ function copyAnimationLayers() {
   const rootIds=new Set(roots.map(layer=>layer.id));
   const ids=new Set(roots.flatMap(layer=>[...animationSubtreeIds(layer.id,layers)]));
   const records=animationFrameLayers().filter(layer=>ids.has(layer.id)).map(layer=>{
-    let cel=null;
-    if (layer.base) {
-      // Capture the rendered base without baking or changing the source frame.
-      const canvas=makeMask();
-      drawBaseSprite(canvas.getContext('2d'),state.currentFrame,0,0,{applyMask:true});
-      cel={canvas,offsetX:0,offsetY:0,flipX:false,flipY:false};
-    } else if (!layer.group) {
-      const source=animationCel(layer);
-      if (source) cel=cloneAnimationCels({source}).source;
-    }
+    const cel = captureAnimationCel(layer);
     return {id:layer.id,name:layer.name,group:!!layer.group,collapsed:!!layer.collapsed,
       parentId:rootIds.has(layer.id)?'':layer.parentId,
       visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),cel};
@@ -294,7 +332,7 @@ function mergeAnimationLayers() {
     const canvas=makeMask(),t=canvas.getContext('2d');t.imageSmoothingEnabled=false;
     for(const layer of [...leaves].reverse()) {
       if(!visible(layer,i))continue;
-      if(layer.base) { const base=makeMask();drawBaseSprite(base.getContext('2d'),i,0,0,{applyMask:true});t.drawImage(base,0,0); }
+      if(animationLayerUsesBaseFrame(layer)) { const base=makeMask();drawBaseSprite(base.getContext('2d'),i,0,0,{applyMask:true});t.drawImage(base,0,0); }
       else drawAnimationCel(t,animationCel(layer,i));
     }
     return {canvas,offsetX:0,offsetY:0,flipX:false,flipY:false};
@@ -332,7 +370,7 @@ function drawAnimationSprite(t, i, x, y, opt) {
   t.save(); t.beginPath(); t.rect(x, y, state.cageWidth, state.cageHeight); t.clip();
   for (const layer of [...state.animationLayers].reverse()) {
     if (layer.group || !animationLayerVisible(layer, i)) continue;
-    if (layer.base) {
+    if (animationLayerUsesBaseFrame(layer)) {
       // Base masks and blend modes must not erase or recolor lower sprite layers.
       const base = makeMask();
       drawBaseSprite(base.getContext('2d'), i, 0, 0, opt);
@@ -558,7 +596,7 @@ function toggleAnimationFlip(id, axis) {
       const delta=axis==='x' ? groupBounds.left+groupBounds.right-record.bounds.left-record.bounds.right : groupBounds.top+groupBounds.bottom-record.bounds.top-record.bounds.bottom;
       writeAnimationOffset(item,state.currentFrame,cel.offsetX+(axis==='x'?delta:0),cel.offsetY+(axis==='y'?delta:0));
     }
-    if (item.base) {const flips=axis==='x'?state.frameFlips:state.frameFlipYs;flips[state.currentFrame]=!flips[state.currentFrame];}
+    if (animationLayerUsesBaseFrame(item)) {const flips=axis==='x'?state.frameFlips:state.frameFlipYs;flips[state.currentFrame]=!flips[state.currentFrame];}
     else cel[axis==='x'?'flipX':'flipY']=!cel[axis==='x'?'flipX':'flipY'];
   });
   state.activeAnimationLayerId = id; animationSelection = null; animationChanged();
@@ -631,11 +669,21 @@ function updateAnimationUi(force = false) {
       const item = document.createElement('div'); item.className = `reference-layer-item animation-layer-item${layer.group?' animation-group-item':''}`; item.dataset.animationId = layer.id;
       item.style.setProperty('--animation-layer-depth',animationAncestors(layer,layers).length);
       const actions = document.createElement('div'); actions.className = 'animation-layer-actions';
+      const heading = document.createElement('div'); heading.className = 'animation-layer-heading';
       const name = document.createElement('button'); name.type = 'button'; name.className = 'reference-layer-name animation-layer-name secondary';
       if(layer.group) {const arrow=document.createElement('span');arrow.className='animation-group-arrow';arrow.textContent=layer.collapsed?'▸':'▾';arrow.setAttribute('aria-hidden','true');name.append(arrow);name.setAttribute('aria-expanded',String(!layer.collapsed));}
       name.append(layer.name);
       name.title = layer.group ? 'Double-click to expand/collapse; Ctrl/Cmd-click to select multiple; F2 to rename' : 'Drag to reorder; double-click to rename; Ctrl/Cmd-click or Shift-click to select multiple';
       name.setAttribute('aria-label', `Select ${layer.name}`);
+      heading.append(name);
+      if (!layer.group) {
+        const allFrames = document.createElement('button');
+        allFrames.type = 'button';
+        allFrames.className = 'secondary reference-flip-button';
+        allFrames.dataset.animationAction = 'all-frames';
+        allFrames.innerHTML = `<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true">${ICON_LOOP}</svg>`;
+        heading.append(allFrames);
+      }
       const eye = document.createElement('button'); eye.type = 'button'; eye.className = 'lock-button reference-visibility-button'; eye.dataset.animationAction = 'visible';
       eye.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'lock-button reference-remove-button'; remove.dataset.animationAction = 'remove'; remove.setAttribute('aria-label',`Remove ${layer.name}`); remove.title = 'Remove Layer';
@@ -654,7 +702,7 @@ function updateAnimationUi(force = false) {
         const label = axis === 'x' ? 'Flip horizontal' : 'Flip vertical'; flip.title = label; flip.setAttribute('aria-label',`${label} for ${layer.name}`);
         const icon = document.createElement('img'); icon.className = 'tool-icon-image'; icon.alt = ''; icon.src = `icons/flip-${axis === 'x' ? 'horizontal' : 'vertical'}.svg`; flip.append(icon); flips.append(flip);
       });
-      item.append(actions,name,controls,flips); list.append(item);
+      item.append(actions,heading,controls,flips); list.append(item);
     });
   }
   visibleLayers.forEach(layer => {
@@ -662,6 +710,13 @@ function updateAnimationUi(force = false) {
     const cel = animationCel(layer), offset=animationLayerOffset(layer); item.classList.toggle('active',selectedIds.has(layer.id));
     const visible = animationLayerOwnVisible(layer);
     item.classList.toggle('animation-inherited-hidden',visible&&!animationLayerVisible(layer));
+    const allFrames = item.querySelector('[data-animation-action="all-frames"]');
+    if (allFrames) {
+      allFrames.classList.toggle('active', !!layer.sharedCel);
+      allFrames.setAttribute('aria-pressed', String(!!layer.sharedCel));
+      allFrames.setAttribute('aria-label', `Render ${layer.name} in all frames`);
+      allFrames.title = layer.sharedCel ? 'Restore per-frame artwork' : 'Render this artwork in all frames';
+    }
     const eye = item.querySelector('[data-animation-action="visible"]'); eye.classList.toggle('active',visible); eye.setAttribute('aria-pressed',String(visible)); eye.setAttribute('aria-label',`${visible ? 'Hide' : 'Show'} ${layer.name}`); eye.title = `${visible ? 'Hide' : 'Show'} ${layer.group?'group':'sprite'} in current frame`;
     item.querySelectorAll('[data-animation-offset]').forEach(input => { if (document.activeElement !== input || input.hasAttribute('data-numeric-committing')) input.value = Math.round(offset?.[input.dataset.animationOffset] || 0); input.disabled = !offset; });
     item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); if(layer.group)button.removeAttribute('aria-pressed');else button.setAttribute('aria-pressed',String(flip)); button.disabled = !offset; });
@@ -738,11 +793,13 @@ function eraseAnimationSelection() {
   const layer=activeAnimationLayer(), raster=animationSelectionRaster();
   if (!layer || layer.group || !animationLayerVisible(layer) || !animationCel(layer) || !raster?.alpha.some(value=>value)) return false;
   pause();pushHistory();
-  if(layer.base)animationBakeBase(state.currentFrame);
-  const cel=animationCel(layer), mask=layer.base?raster.mask:animationLocalMask(raster.mask,cel), t=cel.canvas.getContext('2d');
+  const base = animationLayerUsesBaseFrame(layer);
+  if(base)animationBakeBase(state.currentFrame);
+  const cel=animationCel(layer), mask=base?raster.mask:animationLocalMask(raster.mask,cel), t=cel.canvas.getContext('2d');
   t.save();t.imageSmoothingEnabled=false;t.globalCompositeOperation='destination-out';t.drawImage(mask,0,0);t.restore();
-  if(layer.base)state.frames[state.currentFrame].sourceCanvas=canvasClone(cel.canvas);
-  state.indexedFrames[state.currentFrame]=null;animationChanged();return true;
+  if(base)state.frames[state.currentFrame].sourceCanvas=canvasClone(cel.canvas);
+  if(!layer.sharedCel)state.indexedFrames[state.currentFrame]=null;
+  animationChanged();return true;
 }
 function animationBakeCel(layer, i) {
   const cel = animationCel(layer, i), canvas = makeMask();
@@ -753,22 +810,33 @@ function splitAnimationSelection() {
   const layer = activeAnimationLayer(), mask = animationSelectionMask();
   if (!animationLayerVisible(layer) || !mask || !animationCel(layer)) return;
   const source = makeMask(), t = source.getContext('2d');
-  if (layer.base) drawBaseSprite(t,state.currentFrame,0,0,{applyMask:true});
+  const base = animationLayerUsesBaseFrame(layer);
+  if (base) drawBaseSprite(t,state.currentFrame,0,0,{applyMask:true});
   else drawAnimationCel(t,animationCel(layer));
   t.globalCompositeOperation = 'destination-in'; t.drawImage(mask,0,0); t.globalCompositeOperation = 'source-over';
   const pixels = t.getImageData(0,0,source.width,source.height); let left=source.width,top=source.height,right=-1,bottom=-1;
   for (let y=0;y<source.height;y++) for (let x=0;x<source.width;x++) if(pixels.data[(y*source.width+x)*4+3]) {left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);}
   if (right < left) { showError('Select some visible pixels on the active sprite before splitting.'); return; }
   pushHistory();
-  const target = layer.base ? {canvas:animationBakeBase(state.currentFrame),offsetX:0,offsetY:0,flipX:false,flipY:false} : animationCel(layer);
-  const cut = layer.base ? mask : animationLocalMask(mask,target), targetContext = target.canvas.getContext('2d');
+  const target = base ? {canvas:animationBakeBase(state.currentFrame),offsetX:0,offsetY:0,flipX:false,flipY:false} : animationCel(layer);
+  const cut = base ? mask : animationLocalMask(mask,target), targetContext = target.canvas.getContext('2d');
   targetContext.save(); targetContext.globalCompositeOperation='destination-out'; targetContext.drawImage(cut,0,0); targetContext.restore();
-  if(layer.base) state.frames[state.currentFrame].sourceCanvas = canvasClone(target.canvas);
+  if(base) state.frames[state.currentFrame].sourceCanvas = canvasClone(target.canvas);
   const cropped = makeMask(right-left+1,bottom-top+1); cropped.getContext('2d').drawImage(source,left,top,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
   const id=`animation-${Date.now()}-${Math.random().toString(36).slice(2)}`, layers=ensureAnimationLayers(), index=layers.findIndex(item=>item.id===layer.id);
-  layers.splice(index,0,{id,name:`${layer.name} split`,visible:true,base:false,parentId:layer.parentId || ''});
+  const splitLayer = {id,name:`${layer.name} split`,visible:true,base:false,parentId:layer.parentId || ''};
+  layers.splice(index,0,splitLayer);
   const frame=state.frames[state.currentFrame]; frame.animationCels ||= {};
-  frame.animationCels[id]={canvas:cropped,offsetX:left-Math.round((state.cageWidth-cropped.width)/2),offsetY:top-Math.round((state.cageHeight-cropped.height)/2),flipX:false,flipY:false};
+  const splitCel = {canvas:cropped,offsetX:left-Math.round((state.cageWidth-cropped.width)/2),offsetY:top-Math.round((state.cageHeight-cropped.height)/2),flipX:false,flipY:false};
+  frame.animationCels[id] = splitCel;
+  if (layer.sharedCel) {
+    splitLayer.sharedCel = cloneAnimationCel(splitCel);
+    splitLayer.visible = layer.visible;
+    for (const item of state.frames) {
+      const visible = item.animationVisibility?.[layer.id];
+      if (typeof visible === 'boolean') item.animationVisibility[id] = visible;
+    }
+  }
   state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id]; animationSelection=null; state.animationTool='move'; showError(''); animationChanged();
 }
 function setAnimationTool(tool) {
@@ -808,7 +876,7 @@ function startAnimationCanvasDrag(e) {
   } else {
     pushHistory();
     if(painting) {
-      if(layer.base)animationBakeBase(state.currentFrame);
+      if(animationLayerUsesBaseFrame(layer))animationBakeBase(state.currentFrame);
       else animationBakeCel(layer,state.currentFrame);
     }
   }
@@ -861,7 +929,8 @@ function paintAnimationStroke(stroke) {
   }
   t.restore();
   stroke.last=a;stroke.points.length=0;
-  state.indexedFrames[stroke.frame]=null;markFrameBitmapsDirty();
+  if(!layer.sharedCel)state.indexedFrames[stroke.frame]=null;
+  markFrameBitmapsDirty();
 }
 function queueAnimationPaintPreview(stroke,e) {
   stroke.cursorEvent=e;
@@ -897,6 +966,7 @@ function moveAnimationCanvasDrag(e) {
 function finishAnimationCanvasDrag(e) {
   const stroke=animationStroke;animationStroke=null;
   const painting=stroke && (stroke.tool==='pencil'||stroke.tool==='eraser');
+  const layer = painting ? animationLayerList().find(item => item.id === stroke.layerId) : null;
   if(painting) {
     if(stroke.previewFrame!==null) {
       cancelAnimationFrame(stroke.previewFrame);
@@ -904,7 +974,7 @@ function finishAnimationCanvasDrag(e) {
       updateBrushCursorFromEvent(stroke.cursorEvent);
     }
     const frame=state.frames[stroke.frame];
-    if(stroke.layerId===ANIMATION_BASE_ID&&frame)frame.sourceCanvas=canvasClone(frame.canvas);
+    if(animationLayerUsesBaseFrame(layer)&&frame)frame.sourceCanvas=canvasClone(frame.canvas);
   }
   state.dragging=false;state.dragMode='offset';state.dragPointerId=null;els.canvasShell.classList.remove('dragging','animation-selection-moving');
   if(els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId);
@@ -918,7 +988,7 @@ function finishAnimationCanvasDrag(e) {
     commitAnimationSelection(next,stroke.previousSelection);
   }
   if(painting) {
-    if(!updateFrameThumb(stroke.frame))buildFilmstrip();
+    if(layer?.sharedCel || !updateFrameThumb(stroke.frame))buildFilmstrip();
     drawFrame(state.currentFrame);updateInfo();
   } else if(stroke?.tool==='move')animationChanged();
   else {drawFrame(state.currentFrame);updateAnimationUi();}
@@ -974,6 +1044,7 @@ animationEls.list.addEventListener('click',e=>{
   const id=item.dataset.animationId,action=e.target.closest('[data-animation-action]')?.dataset.animationAction;
   if(action==='remove'){removeAnimationLayer(id);return;}
   if(action==='visible'){toggleAnimationVisibility(id);return;}
+  if(action==='all-frames'){toggleAnimationAllFrames(id);return;}
   const flip=e.target.closest('[data-animation-flip]');if(flip){toggleAnimationFlip(id,flip.dataset.animationFlip);return;}
   selectAnimationLayer(id,{toggle:e.ctrlKey||e.metaKey,range:e.shiftKey});
 });
