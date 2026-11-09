@@ -9,6 +9,7 @@ const animationEls = {
   wandSettings: $('animationWandSettings'), wandAntialias: $('animationWandAntialias'),
   wandContiguous: $('animationWandContiguous'), wandTolerance: $('animationWandTolerance'),
   selectionActions: $('animationSelectionActions'), newLayer: $('animationNewLayerButton'), newGroup: $('animationGroupLayersButton'), merge: $('animationMergeButton'),
+  exportLayer: $('animationExportLayerButton'),
   copy: $('animationCopyButton'), paste: $('animationPasteButton')
 };
 let animationSelection = null;
@@ -225,8 +226,8 @@ function animationCel(layer, i = state.currentFrame) {
   }
   return frame.animationCels?.[layer.id] || null;
 }
-function animationCelPosition(cel) {
-  return { x: Math.round((state.cageWidth - cel.canvas.width) / 2) + Math.round(cel.offsetX || 0), y: Math.round((state.cageHeight - cel.canvas.height) / 2) + Math.round(cel.offsetY || 0) };
+function animationCelPosition(cel, cageWidth = state.cageWidth, cageHeight = state.cageHeight) {
+  return { x: Math.round((cageWidth - cel.canvas.width) / 2) + Math.round(cel.offsetX || 0), y: Math.round((cageHeight - cel.canvas.height) / 2) + Math.round(cel.offsetY || 0) };
 }
 function selectedAnimationMaskLayer() {
   const layer = state.animationLayers?.find(item => item.id === state.activeAnimationLayerId);
@@ -419,6 +420,67 @@ function maskedAnimationCelCanvas(cel) {
   applyMaskCanvasToCanvas(canvas, cel.mask);
   animationMaskedCanvases.set(cel.mask, { canvas, source: cel.canvas, version, revision });
   return canvas;
+}
+function animationSpriteBounds(layer, i = state.currentFrame) {
+  let bounds = null;
+  for (const item of animationMovementTargets(layer, i)) {
+    if (!animationLayerVisible(item, i)) continue;
+    const cel = animationCel(item, i), base = animationLayerUsesBaseFrame(item);
+    const canvas = base ? makeMask() : maskedAnimationCelCanvas(cel);
+    if (base) drawBaseSprite(canvas.getContext('2d'), i, 0, 0, { applyMask: true });
+    const alpha = canvasAlphaBounds(canvas, 1);
+    if (!alpha) continue;
+    const position = base ? { x: 0, y: 0 } : animationCelPosition(cel);
+    const flipX = !base && cel.flipX, flipY = !base && cel.flipY;
+    const left = position.x + (flipX ? canvas.width - 1 - alpha.maxX : alpha.minX);
+    const top = position.y + (flipY ? canvas.height - 1 - alpha.maxY : alpha.minY);
+    const right = left + alpha.maxX - alpha.minX + 1;
+    const bottom = top + alpha.maxY - alpha.minY + 1;
+    bounds = bounds ? {
+      left: Math.min(bounds.left, left), top: Math.min(bounds.top, top),
+      right: Math.max(bounds.right, right), bottom: Math.max(bounds.bottom, bottom)
+    } : { left, top, right, bottom };
+  }
+  return bounds;
+}
+function exportAnimationLayerPng() {
+  const layer = activeAnimationLayer(), i = state.currentFrame;
+  if (!animationLayerVisible(layer, i)) return;
+  try {
+    const bounds = animationSpriteBounds(layer, i);
+    if (!bounds) return showError('The selected layer has no visible pixels to export.');
+    const canvas = makeMask(bounds.right - bounds.left, bounds.bottom - bounds.top);
+    const context = canvas.getContext('2d');
+    const x = -bounds.left, y = -bounds.top;
+    for (const item of animationMovementTargets(layer, i).reverse()) {
+      if (!animationLayerVisible(item, i)) continue;
+      if (animationLayerUsesBaseFrame(item)) {
+        const base = makeMask();
+        drawBaseSprite(base.getContext('2d'), i, 0, 0, { applyMask: true });
+        context.drawImage(base, x, y);
+      } else {
+        drawAnimationCel(context, animationCel(item, i), x, y);
+      }
+    }
+    const blob = autoIndexedPngBlob(context.getImageData(0, 0, canvas.width, canvas.height));
+    const filename = layer.name.replace(/[^a-z0-9_-]+/gi, '_') || 'layer';
+    showError();
+    downloadBlob(blob, `${filename}.png`);
+  } catch (error) {
+    showError(error?.message || 'Could not export the selected layer.');
+  }
+}
+function reframeAnimationCels(origin, oldWidth, oldHeight) {
+  const cels = new Set(animationLayerList().map(layer => layer.sharedCel));
+  for (const frame of state.frames) {
+    for (const cel of Object.values(frame.animationCels || {})) cels.add(cel);
+  }
+  for (const cel of cels) {
+    if (!cel?.canvas) continue;
+    const before = animationCelPosition(cel, oldWidth, oldHeight), after = animationCelPosition(cel);
+    cel.offsetX = Math.round(cel.offsetX || 0) + before.x - after.x - origin.x;
+    cel.offsetY = Math.round(cel.offsetY || 0) + before.y - after.y - origin.y;
+  }
 }
 function drawAnimationCel(t, cel, x = 0, y = 0, showMask = false) {
   if (!cel?.canvas) return;
@@ -712,6 +774,7 @@ function updateAnimationUi(force = false) {
   animationEls.newLayer.disabled=!hasFrames();
   animationEls.newGroup.disabled=!hasFrames() || !selectedIds.size;
   animationEls.merge.disabled=!hasFrames() || (selectedIds.size<2 && !layers.some(layer=>selectedIds.has(layer.id) && layer.group));
+  animationEls.exportLayer.disabled = !hasFrames() || !animationLayerVisible(active);
   animationEls.merge.title='Merge selected layers or flatten a selected group across its frames';
   animationEls.newGroup.title='Group selected layers (Ctrl/Cmd-click or Shift-click layer names to select several)';
   if (!validAnimationSelection()) animationSelection = null;
@@ -1215,6 +1278,7 @@ animationEls.input.addEventListener('change',e=>loadAnimationSprites(e.target.fi
 animationEls.newLayer.addEventListener('click',createEmptyAnimationLayer);
 animationEls.newGroup.addEventListener('click',createAnimationGroup);
 animationEls.merge.addEventListener('click',mergeAnimationLayers);
+animationEls.exportLayer.addEventListener('click', exportAnimationLayerPng);
 animationEls.copy.addEventListener('click',copyAnimationLayers);
 animationEls.paste.addEventListener('click',pasteAnimationLayers);
 ['dragenter','dragover'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.add('dragover');}));

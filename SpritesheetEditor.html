@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.6.0-4" />
+  <link rel="stylesheet" href="animation.css?v=1.6.0-5" />
   <style>
     :root {
       --bg: #10131b;
@@ -1992,6 +1992,7 @@
               <button id="animationNewLayerButton" class="secondary small-button" type="button">New Layer</button>
               <button id="animationGroupLayersButton" class="secondary small-button" type="button">Group</button>
               <button id="animationMergeButton" class="secondary small-button" type="button">Merge</button>
+              <button id="animationExportLayerButton" class="secondary small-button animation-layer-export-button" type="button" disabled>Export Layer to 8-Bits PNG</button>
             </div>
           </div>
           <div class="group">
@@ -7254,11 +7255,11 @@
       const frame = state.frames[i], canvas = frame?.sourceCanvas || frame?.canvas;
       return canvas ? canvas.getContext('2d', { alpha: true }).getImageData(0, 0, canvas.width, canvas.height) : null;
     }
-    function collectOpaqueHistogram(img) {
+    function collectOpaqueHistogram(img, alphaThreshold = 16) {
       const map = new Map(); let hasTransparency = false;
       for (let p = 0; p < img.data.length; p += 4) {
         const a = img.data[p + 3];
-        if (a < 16) { hasTransparency = true; continue; }
+        if (a < alphaThreshold) { hasTransparency = true; continue; }
         const r = img.data[p], g = img.data[p + 1], b = img.data[p + 2];
         const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
         const found = map.get(key);
@@ -7381,8 +7382,8 @@
       if (sample[3] < 16) return opt.allowTransparent ? { r: 0, g: 0, b: 0, a: 0 } : null;
       return { r: sample[0], g: sample[1], b: sample[2], a: sample[3] };
     }
-    function buildIndexPaletteInfo(img, maxColors, keepTransparency) {
-      const histogram = collectOpaqueHistogram(img), colorLimit = clamp(Math.round(maxColors) || 256, 3, 256), reserveTransparency = keepTransparency && histogram.hasTransparency ? 1 : 0, opaqueLimit = Math.max(1, colorLimit - reserveTransparency);
+    function buildIndexPaletteInfo(img, maxColors, keepTransparency, alphaThreshold = 16) {
+      const histogram = collectOpaqueHistogram(img, alphaThreshold), colorLimit = clamp(Math.round(maxColors) || 256, 3, 256), reserveTransparency = keepTransparency && histogram.hasTransparency ? 1 : 0, opaqueLimit = Math.max(1, colorLimit - reserveTransparency);
       const opaquePalette = buildIndexedPalette(histogram.entries, opaqueLimit);
       const palette = reserveTransparency ? [{ r: 0, g: 0, b: 0, a: 0, count: 0, transparent: true }, ...opaquePalette] : [...opaquePalette];
       return { palette, opaquePalette, hasTransparency: histogram.hasTransparency, opaqueCount: opaquePalette.length, colorLimit, keepTransparency };
@@ -13570,9 +13571,58 @@
     function canvasShortcutTargetActive(active = document.activeElement) {
       return fullscreenElement() === els.canvasShell || !!(els.canvasShell?.matches?.(':hover') || els.canvasShell?.contains?.(active));
     }
-    function setCage(w,h) { if (!hasFrames()) return; const oldMaskLayouts = captureFrameMaskLayouts(); pushHistory(); state.cageCustom = true; state.cageWidth = clamp(Math.round(w),1,8192); state.cageHeight = clamp(Math.round(h),1,8192); recropSheetFramesForCage(); if (Number.isFinite(parseFloat(state.pivotX))) state.pivotX = clamp(Math.round(parseFloat(state.pivotX)),0,state.cageWidth); state.pivotY = clamp(state.pivotY,0,state.cageHeight); clampRulers(); ensureArrays(oldMaskLayouts); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); }
+    function setCage(w, h, origin = null) {
+      if (!hasFrames()) return;
+      const oldWidth = state.cageWidth, oldHeight = state.cageHeight;
+      const oldMaskLayouts = captureFrameMaskLayouts();
+      pushHistory();
+      state.cageCustom = true;
+      state.cageWidth = clamp(Math.round(w), 1, 8192);
+      state.cageHeight = clamp(Math.round(h), 1, 8192);
+      if (origin) {
+        // Move the cage origin without recropping the underlying spritesheet cells.
+        reframeAnimationCels(origin, oldWidth, oldHeight);
+        state.frameOffsets = oldMaskLayouts.map((before, i) => {
+          const after = frameLayoutForCage(i, state.cageWidth, state.cageHeight);
+          const offset = state.frameOffsets[i] || { x: 0, y: 0 };
+          return { x: offset.x + before.x - after.x - origin.x, y: offset.y + before.y - after.y - origin.y };
+        });
+        for (const frame of state.frames) {
+          for (const layer of frame.pencilLayers || []) {
+            const source = layer.canvas;
+            if (!source || (layer.space !== 'cage' && (source.width !== oldWidth || source.height !== oldHeight))) continue;
+            const canvas = makeMask();
+            canvas.getContext('2d').drawImage(source, -origin.x, -origin.y);
+            layer.canvas = canvas;
+            layer.space = 'cage';
+          }
+        }
+        if (Number.isFinite(parseFloat(state.pivotX))) state.pivotX -= origin.x;
+        state.pivotY -= origin.y;
+        state.rulersV = state.rulersV.map(value => value - origin.x);
+        state.rulersH = state.rulersH.map(value => value - origin.y);
+        markFrameBitmapsDirty();
+      } else recropSheetFramesForCage();
+      if (Number.isFinite(parseFloat(state.pivotX))) state.pivotX = clamp(Math.round(parseFloat(state.pivotX)), 0, state.cageWidth);
+      state.pivotY = clamp(state.pivotY, 0, state.cageHeight);
+      clampRulers();
+      ensureArrays(oldMaskLayouts);
+      buildFilmstrip();
+      drawFrame(state.currentFrame);
+      updateInfo();
+    }
     function fitCageToCurrentSprite() {
       if (!hasFrames()) return;
+      const layer = activeAnimationLayer();
+      if (layer && !animationLayerUsesBaseFrame(layer)) {
+        const bounds = animationSpriteBounds(layer);
+        if (!bounds) { showError('The selected Animation layer has no visible pixels to fit.'); return; }
+        const width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
+        showError('');
+        if (width === state.cageWidth && height === state.cageHeight && !bounds.left && !bounds.top) return;
+        setCage(width, height, { x: bounds.left, y: bounds.top });
+        return;
+      }
       const frame = state.frames[state.currentFrame], scale = frameScale(state.currentFrame);
       if (!frame?.canvas) return;
       const width = clamp(Math.round(frame.canvas.width * scale.x), 1, 8192);
@@ -18165,15 +18215,15 @@
       cache.set(key, best);
       return best;
     }
-    function indexedPngBlob(imageData, paletteInfo) {
+    function indexedPngBlob(imageData, paletteInfo, alphaThreshold = 16) {
       const palette = normalizedPngPalette(paletteInfo);
       if (!palette.length || palette.length > 256) return null;
       const { width, height, data } = imageData;
       let hasTransparentPixels = false;
       for (let p = 3; p < data.length; p += 4) {
-        if (data[p] < 16) { hasTransparentPixels = true; break; }
+        if (data[p] < alphaThreshold) { hasTransparentPixels = true; break; }
       }
-      let transparentIndex = palette.findIndex(color => color.a < 16);
+      let transparentIndex = palette.findIndex(color => color.a < alphaThreshold);
       if (hasTransparentPixels && transparentIndex < 0) {
         if (palette.length < 256) {
           transparentIndex = palette.length;
@@ -18185,7 +18235,7 @@
       }
       const exact = new Map(), opaqueEntries = [];
       palette.forEach((color, index) => {
-        if (color.a < 16) return;
+        if (color.a < alphaThreshold) return;
         const key = colorKey(color);
         if (!exact.has(key)) exact.set(key, index);
         opaqueEntries.push({ color, index });
@@ -18196,11 +18246,34 @@
         rows[row] = 0;
         for (let x = 0; x < width; x++) {
           const p = (y * width + x) * 4, a = data[p + 3];
-          rows[row + 1 + x] = a < 16
+          rows[row + 1 + x] = a < alphaThreshold
             ? transparentIndex >= 0 ? transparentIndex : fallbackIndex
             : exact.get(`${data[p]},${data[p + 1]},${data[p + 2]}`) ?? nearestIndexedPaletteSlot(data[p], data[p + 1], data[p + 2], opaqueEntries, cache);
         }
       }
+      return encodeIndexedPngRows(width, height, palette, rows);
+    }
+    function autoIndexedPngBlob(imageData) {
+      const { width, height, data } = imageData;
+      const palette = [], indices = new Map(), rows = new Uint8Array((width + 1) * height);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = (y * width + x) * 4;
+          const a = data[p + 3], r = a ? data[p] : 0, g = a ? data[p + 1] : 0, b = a ? data[p + 2] : 0;
+          const key = (r << 24) | (g << 16) | (b << 8) | a;
+          let index = indices.get(key);
+          if (index === undefined) {
+            if (palette.length === 256) return indexedPngBlob(imageData, buildIndexPaletteInfo(imageData, 256, true, 1), 1);
+            index = palette.length;
+            indices.set(key, index);
+            palette.push({ r, g, b, a });
+          }
+          rows[y * (width + 1) + x + 1] = index;
+        }
+      }
+      return encodeIndexedPngRows(width, height, palette, rows);
+    }
+    function encodeIndexedPngRows(width, height, palette, rows) {
       const ihdr = new Uint8Array(13);
       writeUint32BE(ihdr, 0, width);
       writeUint32BE(ihdr, 4, height);
