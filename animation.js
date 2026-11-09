@@ -1,9 +1,15 @@
 // Animation layers use the existing frame timeline. Cels belong to frame records,
 // so timeline duplication, deletion, and reordering keep artwork with its frame.
 const ANIMATION_BASE_ID = 'animation-base';
+const ANIMATION_GRID_PADDING = 'animation-grid-padding';
+const ANIMATION_SELECTION_TOOLS = {
+  lasso: { label: 'Lasso selection (L)', icon: 'selection-lasso.svg' },
+  rectangle: { label: 'Rectangle selection (R)', icon: 'selection-rectangle.svg' },
+  wand: { label: 'Magic Wand (W)', icon: 'wand.svg' }
+};
 const animationEls = {
   group: $('animationGroup'), input: $('animationFileInput'), drop: $('animationDropZone'),
-  list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'),
+  list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'), addColor: $('animationAddColorButton'),
   size: $('animationBrushSizeInput'), sizeValue: $('animationBrushSizeValue'), sizeField: $('animationBrushSizeField'),
   selectionButton: $('animationSelectionToolButton'), selectionMenu: $('animationSelectionToolMenu'),
   wandSettings: $('animationWandSettings'), wandAntialias: $('animationWandAntialias'),
@@ -48,12 +54,21 @@ function setAnimationSelectionMenuOpen(open) {
 }
 
 function animationPanelActive() {
-  return animationEls.group.classList.contains('inspector-active') && !state.referenceCompositorVisible;
+  return animationEls.group.classList.contains('inspector-active') && !animationBuilderCompanionActive() && !state.referenceCompositorVisible;
+}
+function animationBuilderCompanionActive() {
+  return animationEls.group.classList.contains('sprite-sheet-builder-tool-panel');
 }
 function animationPixelBrushActive() {
   return animationPanelActive() && !activeAnimationLayer()?.group && ['pencil','eraser'].includes(state.animationTool);
 }
 function setAnimationBrushSize(value) {
+  if (animationBuilderCompanionActive()) {
+    state.brushSize = clamp(Math.round(Number(value) || 1), 1, 120);
+    updateAnimationUi();
+    renderBrushCursorOverlay();
+    return;
+  }
   if (animationStroke?.points?.length) paintAnimationStroke(animationStroke);
   state.animationBrushSize = clamp(Math.round(Number(value) || 1),1,120);
   animationEls.size.value = state.animationBrushSize;
@@ -81,12 +96,18 @@ function animationFrameLayers(i = state.currentFrame) {
   });
   return layers.filter(layer=>available.has(layer.id));
 }
-function cloneAnimationLayers(layers, copySharedCel = cloneAnimationCel) {
+function normalizeAnimationOpacity(value) {
+  const percent = value == null ? 100 : Number(value);
+  return Number.isFinite(percent) ? clamp(Math.round(percent), 0, 100) : 100;
+}
+function cloneAnimationLayers(layers, copySharedCel = cloneAnimationCel, copySheet = source => source) {
   if (!Array.isArray(layers)) return null;
   const copy = layers.map(layer => {
     const record = { id: String(layer.id), name: String(layer.name || (layer.group ? 'Group' : 'Sprite')), visible: layer.visible !== false,
-      base: layer.id === ANIMATION_BASE_ID, group: !!layer.group && layer.id !== ANIMATION_BASE_ID, parentId: String(layer.parentId || ''), collapsed: !!layer.collapsed };
+      base: layer.id === ANIMATION_BASE_ID, group: !!layer.group && layer.id !== ANIMATION_BASE_ID, parentId: String(layer.parentId || ''), collapsed: !!layer.collapsed, opacity: normalizeAnimationOpacity(layer.opacity) };
     if (!record.group && layer.sharedCel) record.sharedCel = copySharedCel(layer.sharedCel);
+    if (!record.group && !record.base && layer.sheetCanvas) record.sheetCanvas = copySheet(layer.sheetCanvas);
+    if (!record.group && layer.sourceFrameCount > 1) record.sourceFrameCount = layer.sourceFrameCount;
     return record;
   });
   const byId = new Map(copy.map(layer => [layer.id,layer]));
@@ -169,7 +190,7 @@ async function restoreAnimationCel(cel) {
   return restored;
 }
 function serializeAnimationLayers(layers) {
-  return cloneAnimationLayers(layers, serializeAnimationCel);
+  return cloneAnimationLayers(layers, serializeAnimationCel, canvas => canvas.toDataURL('image/png'));
 }
 async function restoreAnimationLayers(layers) {
   const restored = cloneAnimationLayers(layers, cel => cel);
@@ -177,6 +198,8 @@ async function restoreAnimationLayers(layers) {
   for (const layer of restored) {
     if (layer.sharedCel?.data) layer.sharedCel = await restoreAnimationCel(layer.sharedCel);
     else delete layer.sharedCel;
+    if (typeof layer.sheetCanvas === 'string') layer.sheetCanvas = await canvasFromDataURL(layer.sheetCanvas);
+    else delete layer.sheetCanvas;
   }
   return restored;
 }
@@ -316,7 +339,7 @@ function copyAnimationLayers() {
     const cel = captureAnimationCel(layer);
     return {id:layer.id,name:layer.name,group:!!layer.group,collapsed:!!layer.collapsed,
       parentId:rootIds.has(layer.id)?'':layer.parentId,
-      visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),cel};
+      visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),opacity:layer.opacity,cel};
   });
   animationClipboard={records};
   updateAnimationUi();
@@ -336,7 +359,7 @@ function pasteAnimationLayers() {
     if (!record.parentId) roots.push(id);
     if (!record.group) frame.animationCels[id]=record.cel ? cloneAnimationCels({source:record.cel}).source : {canvas:makeMask(),offsetX:0,offsetY:0,flipX:false,flipY:false};
     frame.animationVisibility[id]=record.visible;
-    return {id,name,base:false,group:record.group,collapsed:record.collapsed,visible:true,
+    return {id,name,base:false,group:record.group,collapsed:record.collapsed,visible:true,opacity:record.opacity,
       parentId:ids.get(record.parentId) || active?.parentId || ''};
   });
   const index=active ? layers.findIndex(layer=>layer.id===active.id) : 0;
@@ -373,23 +396,19 @@ function mergeAnimationLayers() {
   const memberIds=new Set(roots.flatMap(layer=>[...animationSubtreeIds(layer.id,layers)]));
   const leaves=layers.filter(layer=>memberIds.has(layer.id) && !layer.group), id=newAnimationId();
   const name=roots.length===1?roots[0].name:uniqueAnimationName('Merged Layer');
-  // Bake only visibility below the surviving parent; that parent still controls the result.
-  const visible=(layer,i)=>{
-    if(!animationLayerOwnVisible(layer,i))return false;
-    for(const parent of animationAncestors(layer,layers)) {
-      if(parent.id===parentId)break;
-      if(!animationLayerOwnVisible(parent,i))return false;
+  // Bake visibility and opacity below the surviving parent.
+  const renderIds = new Set(memberIds);
+  for (const root of roots) {
+    for (const parent of animationAncestors(root, layers)) {
+      if (parent.id === parentId) break;
+      renderIds.add(parent.id);
     }
-    return true;
-  };
+  }
+  const renderLayers = layers.filter(layer => renderIds.has(layer.id));
   const cels=state.frames.map((_frame,i)=>{
     if(!leaves.some(layer=>animationCel(layer,i)))return null;
     const canvas=makeMask(),t=canvas.getContext('2d');t.imageSmoothingEnabled=false;
-    for(const layer of [...leaves].reverse()) {
-      if(!visible(layer,i))continue;
-      if(animationLayerUsesBaseFrame(layer)) { const base=makeMask();drawBaseSprite(base.getContext('2d'),i,0,0,{applyMask:true});t.drawImage(base,0,0); }
-      else drawAnimationCel(t,animationCel(layer,i));
-    }
+    drawAnimationLayers(t, renderLayers, i, 0, 0, { parentId });
     return {canvas,offsetX:0,offsetY:0,flipX:false,flipY:false};
   });
   pause();pushHistory();
@@ -424,7 +443,7 @@ function maskedAnimationCelCanvas(cel) {
 function animationSpriteBounds(layer, i = state.currentFrame) {
   let bounds = null;
   for (const item of animationMovementTargets(layer, i)) {
-    if (!animationLayerVisible(item, i)) continue;
+    if (!animationLayerVisible(item, i) || !animationEffectiveOpacity(item)) continue;
     const cel = animationCel(item, i), base = animationLayerUsesBaseFrame(item);
     const canvas = base ? makeMask() : maskedAnimationCelCanvas(cel);
     if (base) drawBaseSprite(canvas.getContext('2d'), i, 0, 0, { applyMask: true });
@@ -451,18 +470,13 @@ function exportAnimationLayerPng() {
     if (!bounds) return showError('The selected layer has no visible pixels to export.');
     const canvas = makeMask(bounds.right - bounds.left, bounds.bottom - bounds.top);
     const context = canvas.getContext('2d');
-    const x = -bounds.left, y = -bounds.top;
-    for (const item of animationMovementTargets(layer, i).reverse()) {
-      if (!animationLayerVisible(item, i)) continue;
-      if (animationLayerUsesBaseFrame(item)) {
-        const base = makeMask();
-        drawBaseSprite(base.getContext('2d'), i, 0, 0, { applyMask: true });
-        context.drawImage(base, x, y);
-      } else {
-        drawAnimationCel(context, animationCel(item, i), x, y);
-      }
-    }
-    const blob = autoIndexedPngBlob(context.getImageData(0, 0, canvas.width, canvas.height));
+    const ids = animationSubtreeIds(layer.id);
+    const layers = animationLayerList().filter(item => ids.has(item.id));
+    for (const parent of animationAncestors(layer)) context.globalAlpha *= normalizeAnimationOpacity(parent.opacity) / 100;
+    drawAnimationLayers(context, layers, i, -bounds.left, -bounds.top, { parentId: layer.parentId || '', bounds });
+    const alpha = canvasAlphaBounds(canvas, 1);
+    if (!alpha) return showError('The selected layer has no visible pixels to export.');
+    const blob = autoIndexedPngBlob(context.getImageData(alpha.minX, alpha.minY, alpha.maxX - alpha.minX + 1, alpha.maxY - alpha.minY + 1));
     const filename = layer.name.replace(/[^a-z0-9_-]+/gi, '_') || 'layer';
     showError();
     downloadBlob(blob, `${filename}.png`);
@@ -496,19 +510,53 @@ function drawAnimationCel(t, cel, x = 0, y = 0, showMask = false) {
 function drawAnimationSprite(t, i, x, y, opt = {}) {
   if (!Array.isArray(state.animationLayers)) return false;
   const maskLayer = opt.maskOverlay ? selectedAnimationMaskLayer() : null;
+  const baseOptions = maskLayer ? { ...opt, maskOverlay: false, applyMask: true } : opt;
   t.save(); t.beginPath(); t.rect(x, y, state.cageWidth, state.cageHeight); t.clip();
-  for (const layer of [...state.animationLayers].reverse()) {
-    if (layer.group || !animationLayerVisible(layer, i)) continue;
-    if (animationLayerUsesBaseFrame(layer)) {
-      // Base masks and blend modes must not erase or recolor lower sprite layers.
-      const base = makeMask();
-      const baseOptions = maskLayer ? { ...opt, maskOverlay: false, applyMask: true } : opt;
-      drawBaseSprite(base.getContext('2d'), i, 0, 0, baseOptions);
-      t.drawImage(base, x, y);
-    } else drawAnimationCel(t, animationCel(layer, i), x, y, layer.id === maskLayer?.id);
-  }
+  drawAnimationLayers(t, state.animationLayers, i, x, y, { baseOptions, maskLayer });
   t.restore();
   return true;
+}
+function drawAnimationLayers(target, layers, i, x, y, {
+  parentId = '', baseOptions = { applyMask: true }, maskLayer = null,
+  bounds = { left: 0, top: 0, right: state.cageWidth, bottom: state.cageHeight }
+} = {}) {
+  const children = new Map();
+  for (const layer of layers) {
+    const parent = layer.parentId || '';
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(layer);
+  }
+  function draw(t, parent, x, y) {
+    const stack = children.get(parent) || [];
+    for (let n = stack.length - 1; n >= 0; n--) {
+      const layer = stack[n], alpha = normalizeAnimationOpacity(layer.opacity) / 100;
+      if (!alpha || !animationLayerOwnVisible(layer, i)) continue;
+      if (alpha < 1) {
+        t.save();
+        t.globalAlpha *= alpha;
+      }
+      if (layer.group && alpha < 1) {
+        // Composite overlapping children before applying group opacity.
+        const group = makeMask(bounds.right - bounds.left, bounds.bottom - bounds.top);
+        draw(group.getContext('2d'), layer.id, -bounds.left, -bounds.top);
+        t.drawImage(group, x + bounds.left, y + bounds.top);
+      } else if (layer.group) {
+        draw(t, layer.id, x, y);
+      } else if (animationLayerUsesBaseFrame(layer)) {
+        // Isolate the base's masks and blend modes from the other layers.
+        const base = makeMask();
+        drawBaseSprite(base.getContext('2d'), i, 0, 0, baseOptions);
+        t.drawImage(base, x, y);
+      } else {
+        drawAnimationCel(t, animationCel(layer, i), x, y, layer.id === maskLayer?.id);
+      }
+      if (alpha < 1) t.restore();
+    }
+  }
+  draw(target, parentId, x, y);
+}
+function animationEffectiveOpacity(layer) {
+  return [layer, ...animationAncestors(layer)].reduce((alpha, item) => alpha * normalizeAnimationOpacity(item.opacity) / 100, 1);
 }
 function validAnimationSelection() {
   // The cage selection belongs to the frame and can be used on any of its layers.
@@ -546,7 +594,7 @@ function rasterizeAnimationSelection(selection, width, height) {
   if (selection?.subtractFrom || selection?.addTo) {
     const shape=rasterizeAnimationSelection({...selection,subtractFrom:null,addTo:null},width,height);
     const base=selection.subtractFrom || selection.addTo;
-    return base.map((value,index)=>(selection.subtractFrom ? value && !shape[index] : value || shape[index]) ? 255 : 0);
+    return base.map((value, index) => selection.subtractFrom ? Math.min(value, 255 - shape[index]) : Math.max(value, shape[index]));
   }
   if (selection?.kind==='mask') {
     const alpha=new Uint8Array(width*height), dx=Math.round(selection.offsetX || 0),dy=Math.round(selection.offsetY || 0);
@@ -615,8 +663,10 @@ function animationSelectionRaster() {
     const index = y * width + x;
     if (!alpha[index]) continue;
     const pixel = index * 4;
-    maskImage.data[pixel] = maskImage.data[pixel+1] = maskImage.data[pixel+2] = maskImage.data[pixel+3] = 255;
-    fillImage.data[pixel] = 112; fillImage.data[pixel+1] = 205; fillImage.data[pixel+2] = 248; fillImage.data[pixel+3] = 31;
+    maskImage.data[pixel] = maskImage.data[pixel+1] = maskImage.data[pixel+2] = 255;
+    maskImage.data[pixel+3] = alpha[index];
+    fillImage.data[pixel] = 112; fillImage.data[pixel+1] = 205; fillImage.data[pixel+2] = 248;
+    fillImage.data[pixel+3] = Math.round(31 * alpha[index] / 255);
     if (!y || !alpha[index-width]) edges.push([x,y,x+1,y]);
     if (y === height-1 || !alpha[index+width]) edges.push([x,y+1,x+1,y+1]);
     if (!x || !alpha[index-1]) edges.push([x,y,x,y+1]);
@@ -781,24 +831,32 @@ function updateAnimationUi(force = false) {
   const selected = !!animationSelection;
   animationEls.split.disabled = !selected || active?.group || !animationLayerVisible(active);
   animationEls.selectionActions.hidden = !selected;
-  const tool = state.animationTool || 'move';
+  const builder = animationBuilderCompanionActive();
+  const builderReady = builder && spriteSheetBuilderEditingAvailable();
+  const tool = builder ? spriteSheetBuilderPaintTool() : state.animationTool || 'move';
   const selectionButton = animationEls.selectionButton;
-  if (['lasso', 'rectangle'].includes(tool) && selectionButton.dataset.animationTool !== tool) {
-    const label = tool === 'lasso' ? 'Lasso selection (L)' : 'Rectangle selection (R)';
+  const selectionTool = ANIMATION_SELECTION_TOOLS[tool];
+  if (selectionTool && selectionButton.dataset.animationTool !== tool) {
+    const { label, icon } = selectionTool;
     selectionButton.dataset.animationTool = tool;
-    selectionButton.querySelector('img').src = `icons/selection-${tool}.svg`;
+    selectionButton.querySelector('img').src = `icons/${icon}`;
     selectionButton.title = `${label}. Hold to change selection tool.`;
     selectionButton.setAttribute('aria-label', label);
   }
   animationEls.group.querySelectorAll('[data-animation-tool]').forEach(button => {
-    const on = button.dataset.animationTool === tool;
+    const buttonTool = button.dataset.animationTool;
+    const on = buttonTool === tool;
     button.classList.toggle('active',on); button.setAttribute('aria-pressed',String(on));
-    const paintTool=['pencil','eraser','lasso','rectangle','wand'].includes(button.dataset.animationTool);
-    button.disabled = !hasFrames() || (!active && button.dataset.animationTool !== 'dropper') || (active?.group && paintTool);
+    if (buttonTool === 'brush') button.hidden = !builder;
+    const selection = ANIMATION_SELECTION_TOOLS[buttonTool];
+    const paintTool = ['pencil', 'eraser', 'bucket'].includes(buttonTool) || selection;
+    button.disabled = builder ? !builderReady || !!selection : !hasFrames() || (!active && buttonTool !== 'dropper') || (active?.group && paintTool);
   });
-  animationEls.sizeField.hidden = !['pencil','eraser'].includes(tool);
-  animationEls.size.value = state.animationBrushSize || 1;
-  animationEls.sizeValue.textContent = state.animationBrushSize || 1;
+  animationEls.sizeField.hidden = !['pencil', 'eraser', 'brush'].includes(tool);
+  const size = builder ? state.brushSize : state.animationBrushSize || 1;
+  animationEls.size.value = size;
+  animationEls.sizeValue.textContent = size;
+  animationEls.addColor.disabled = builder ? !builderReady : !hasFrames();
   animationEls.wandSettings.hidden = tool !== 'wand';
   const wand = animationWandSettings();
   animationEls.wandAntialias.checked = wand.antialias;
@@ -841,6 +899,15 @@ function updateAnimationUi(force = false) {
         const input = document.createElement('input'); input.type = 'number'; input.step = '1'; input.className = 'reference-offset-input'; input.dataset.animationOffset = axis; input.setAttribute('aria-label',`Offset ${axis.toUpperCase()} for ${layer.name}`);
         label.append(input); controls.append(label);
       });
+      const opacityField = document.createElement('label');
+      opacityField.className = 'animation-offset-field';
+      opacityField.append('O');
+      const opacity = document.createElement('input');
+      opacity.type = 'number'; opacity.min = '0'; opacity.max = '100'; opacity.step = '1';
+      opacity.className = 'reference-offset-input'; opacity.dataset.animationOpacity = '';
+      opacity.title = 'Layer opacity (0–100%)';
+      opacity.setAttribute('aria-label', `Opacity (%) for ${layer.name}`);
+      opacityField.append(opacity); controls.append(opacityField);
       ['x','y'].forEach(axis => {
         const flip = document.createElement('button'); flip.type = 'button'; flip.className = 'secondary reference-flip-button'; flip.dataset.animationFlip = axis;
         const label = axis === 'x' ? 'Flip horizontal' : 'Flip vertical'; flip.title = label; flip.setAttribute('aria-label',`${label} for ${layer.name}`);
@@ -863,16 +930,109 @@ function updateAnimationUi(force = false) {
     }
     const eye = item.querySelector('[data-animation-action="visible"]'); eye.classList.toggle('active',visible); eye.setAttribute('aria-pressed',String(visible)); eye.setAttribute('aria-label',`${visible ? 'Hide' : 'Show'} ${layer.name}`); eye.title = `${visible ? 'Hide' : 'Show'} ${layer.group?'group':'sprite'} in current frame`;
     item.querySelectorAll('[data-animation-offset]').forEach(input => { if (document.activeElement !== input || input.hasAttribute('data-numeric-committing')) input.value = Math.round(offset?.[input.dataset.animationOffset] || 0); input.disabled = !offset; });
+    const opacity = item.querySelector('[data-animation-opacity]');
+    if (state.restoring || document.activeElement !== opacity || opacity.hasAttribute('data-numeric-committing')) opacity.value = normalizeAnimationOpacity(layer.opacity);
     item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); if(layer.group)button.removeAttribute('aria-pressed');else button.setAttribute('aria-pressed',String(flip)); button.disabled = !offset; });
   });
-  const colorKey = JSON.stringify([state.pencilColors,state.activePencilColorIndex]);
+  const colorsEnabled = !animationEls.addColor.disabled;
+  const colorKey = JSON.stringify([state.pencilColors,state.activePencilColorIndex,colorsEnabled]);
   if (animationEls.colors.dataset.colorKey !== colorKey) {
     animationEls.colors.dataset.colorKey = colorKey; animationEls.colors.replaceChildren();
     (state.pencilColors || [state.pencilColor]).forEach((color,index) => {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'swatch-button pencil-color-button'; button.dataset.animationColor = index; button.setAttribute('aria-label',`Animation pencil color ${index+1}`); button.classList.toggle('active',index === state.activePencilColorIndex); button.setAttribute('aria-pressed',String(index === state.activePencilColorIndex));
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'swatch-button pencil-color-button'; button.dataset.animationColor = index; button.disabled = !colorsEnabled; button.setAttribute('aria-label',`Pencil color ${index+1}`); button.classList.toggle('active',index === state.activePencilColorIndex); button.setAttribute('aria-pressed',String(index === state.activePencilColorIndex));
       const chip = document.createElement('span'); chip.className = 'swatch-chip'; const background = pencilColorSwatchBackground(color); chip.style.backgroundImage = background.image; chip.style.backgroundSize = background.size; chip.style.backgroundPosition = background.position; button.append(chip); animationEls.colors.append(button);
     });
   }
+}
+function validateAnimationSheetGrid(canvas, rows, cols) {
+  if (canvas.width < cols || canvas.height < rows) throw new Error('Rows and columns must leave at least one pixel in every frame.');
+}
+function extendAnimationTimeline(count, kind) {
+  while (state.frames.length < count) {
+    const i = state.frames.length - 1, frame = cloneFrameRecord(state.frames[i]);
+    frame.kind = kind;
+    state.frames.push(frame);
+    state.frameOffsets.push({ ...(state.frameOffsets[i] || { x: 0, y: 0 }) });
+    state.frameMasks.push(canvasClone(state.frameMasks[i] || makeMask()));
+    state.maskDirty.push(!!state.maskDirty[i]);
+    state.indexedFrames.push(null);
+    state.frameScales.push({ ...frameScaleMultiplier(i) });
+    state.frameFlips.push(frameFlipX(i));
+    state.frameFlipYs.push(frameFlipY(i));
+  }
+}
+function writeAnimationImportCels(layer, slices) {
+  state.frames.forEach((frame, i) => {
+    frame.animationCels ||= {};
+    const previous = frame.animationCels[layer.id];
+    frame.animationCels[layer.id] = {
+      canvas: canvasClone(slices[i % slices.length].canvas),
+      ...animationCelTransform(previous || {})
+    };
+  });
+}
+function resliceAnimationGrid(rows, cols) {
+  if (!hasFrames() || !Array.isArray(state.animationLayers)) return false;
+  const oldFrames = state.frames, sheets = sheetSources();
+  const legacy = rows * cols > 1 && oldFrames.length === 1 ? oldFrames[0] : null;
+  const legacyBase = legacy?.kind === 'image' && !sheets.length
+    && state.animationLayers.some(layer => layer.base && layer.name === state.imageName && !layer.sharedCel);
+  const overlays = state.animationLayers.flatMap(layer => {
+    // Older one-frame imports stored the whole sheet as a single cel.
+    const source = layer.sheetCanvas || (legacy && !layer.sourceFrameCount && /^animation-\d+-/.test(layer.id) && legacy.animationCels?.[layer.id]?.canvas);
+    return source ? [{ layer, source }] : [];
+  });
+  if (!sheets.length && !legacyBase && !overlays.length) return false;
+  const sameGrid = rows === state.rows && cols === state.cols;
+  if (sameGrid && !legacyBase && !overlays.some(({ layer }) => !layer.sheetCanvas)) return true;
+  const sources = legacyBase ? [{ image: legacy.sourceCanvas || legacy.canvas, name: state.imageName }] : sheets;
+  try {
+    for (const { image } of sources) validateAnimationSheetGrid(image, rows, cols);
+    for (const { source } of overlays) validateAnimationSheetGrid(source, rows, cols);
+  } catch (error) {
+    els.rowsInput.value = state.rows;
+    els.colsInput.value = state.cols;
+    showError(error.message);
+    return true;
+  }
+  const slices = overlays.map(({ layer, source }) => applyImportFrameSkip(createSheetFrames(source, rows, cols, layer.name)));
+  const sheetFrames = sources.flatMap(({ image, name }, index) => createSheetFrames(image, rows, cols, name, index));
+  pause(false, { updateInfo: false });
+  pushHistory();
+  state.rows = rows; state.cols = cols;
+  state.sheetImages = sources; state.sheetImage = sources[0]?.image || null;
+  const padding = oldFrames.filter(frame => frame.kind === ANIMATION_GRID_PADDING);
+  const oldSheetFrames = legacyBase ? [legacy] : oldFrames.filter(frame => frame.kind === 'sheet');
+  const previousSheetFrames = [...oldSheetFrames, ...padding];
+  const rebuilt = applyImportFrameSkip(sheetFrames).map((frame, i) => ({
+    ...frame,
+    animationCels: { ...previousSheetFrames[i]?.animationCels },
+    animationVisibility: cloneAnimationVisibility(previousSheetFrames[i]?.animationVisibility)
+  }));
+  const animatedFrames = Math.min(oldFrames.length, Math.max(0, ...state.animationLayers.map(layer => layer.sourceFrameCount || 0)));
+  const minFrames = Math.max(1, animatedFrames, ...slices.map(frames => frames.length));
+  const retained = oldFrames.filter(frame => frame.kind !== 'sheet' && frame !== (legacyBase ? legacy : null) && frame.kind !== ANIMATION_GRID_PADDING);
+  // Reuse generated records when the new grid still needs those timeline slots.
+  const paddingUsed = Math.max(0, rebuilt.length - oldSheetFrames.length);
+  const paddingNeeded = Math.max(0, minFrames - rebuilt.length - retained.length);
+  state.frames = [...rebuilt, ...retained, ...padding.slice(paddingUsed, paddingUsed + paddingNeeded)];
+  const originalIndices = new Map(oldFrames.map((frame, i) => [frame, i]));
+  for (const key of ['frameOffsets', 'frameMasks', 'maskDirty', 'indexedFrames', 'frameScales', 'frameFlips', 'frameFlipYs']) {
+    const previous = state[key];
+    state[key] = state.frames.map(frame => previous[originalIndices.get(frame)]);
+  }
+  extendAnimationTimeline(minFrames, ANIMATION_GRID_PADDING);
+  overlays.forEach(({ layer, source }, i) => {
+    layer.sheetCanvas = source;
+    writeAnimationImportCels(layer, slices[i]);
+  });
+  if (rebuilt.length) state.cageCustom = false;
+  state.truePixelPreviewVisible = false;
+  showError('');
+  resetAnimationTools();
+  markFrameBitmapsDirty();
+  syncAfterDataChange(true);
+  return true;
 }
 async function loadAnimationSprites(files) {
   const accepted = displayReferenceFileList(files); if (!accepted.length) return;
@@ -880,38 +1040,42 @@ async function loadAnimationSprites(files) {
     showError('');
     // Decode before committing, so an invalid file leaves the current project intact.
     const sprites = [];
-    for (const file of accepted) sprites.push(await createDisplayReferenceLayerFromFile(file,{ id: `animation-${Date.now()}-${Math.random().toString(36).slice(2)}` }));
+    for (const file of accepted) {
+      sprites.push(await createDisplayReferenceLayerFromFile(file,{ id: `animation-${Date.now()}-${Math.random().toString(36).slice(2)}` }));
+    }
+    const { rows, cols } = state;
+    for (const sprite of sprites) {
+      if (!sprite.frames.length) validateAnimationSheetGrid(sprite.canvas, rows, cols);
+    }
     pause(true); pushHistory();
     for (const sprite of sprites) {
-      const sources = sprite.frames.length ? sprite.frames.map(f => f.canvas) : [sprite.canvas];
+      const sheet = !sprite.frames.length;
+      const frames = sheet ? applyImportFrameSkip(createSheetFrames(sprite.canvas, rows, cols, sprite.name)) : sprite.frames;
       if (!hasFrames()) {
-        state.frames = sources.map((canvas,i) => ({ kind:'image', id:`image-${Date.now()}-${state.importedId++}`, name:`${sprite.name} ${i+1}`, canvas:canvasClone(canvas), sourceCanvas:canvasClone(canvas) }));
-        state.imageName = sprite.name; state.sheetImage = null; state.sheetImages = [];
+        state.frames = sheet ? frames : frames.map(({ canvas },i) => ({ kind:'image', id:`image-${Date.now()}-${state.importedId++}`, name:`${sprite.name} ${i+1}`, canvas:canvasClone(canvas), sourceCanvas:canvasClone(canvas) }));
+        state.imageName = sprite.name;
+        state.sheetImage = sheet ? sprite.canvas : null;
+        state.sheetImages = sheet ? [{ image: sprite.canvas, name: sprite.name }] : [];
         state.frameOffsets = []; state.frameMasks = []; state.maskDirty = []; state.indexedFrames = []; state.frameScales = []; state.frameFlips = []; state.frameFlipYs = [];
         state.scaleX = 1; state.scaleY = 1; state.offsetXAll = 0; state.offsetYAll = 0;
         state.cageCustom = false; state.currentFrame = 0; state.selectedFrameIndices = [0]; state.selectionAnchorFrame = 0;
         state.animationLayers = [{ id:ANIMATION_BASE_ID, name:sprite.name, visible:true, base:true }];
         state.activeAnimationLayerId = ANIMATION_BASE_ID;
-        autoFitGridToFrameCount(); updateMetrics();
+        if (!sprites.some(item => !item.frames.length)) autoFitGridToFrameCount();
+        updateMetrics();
         state.pivotX = defaultPivotX(); state.pivotY = state.cageHeight;
       } else {
         const layers = ensureAnimationLayers();
-        while (state.frames.length < sources.length) {
-          const at = state.frames.length-1;
-          state.frames.push(cloneFrameRecord(state.frames[at]));
-          state.frameOffsets.push({ ...(state.frameOffsets[at] || {x:0,y:0}) });
-          state.frameMasks.push(canvasClone(state.frameMasks[at] || makeMask())); state.maskDirty.push(!!state.maskDirty[at]);
-          state.indexedFrames.push(null); state.frameScales.push({ ...frameScaleMultiplier(at) }); state.frameFlips.push(frameFlipX(at)); state.frameFlipYs.push(frameFlipY(at));
-        }
-        const id = sprite.id; layers.unshift({ id,name:sprite.name,visible:true,base:false });
-        state.frames.forEach((frame,i) => {
-          frame.animationCels ||= {};
-          frame.animationCels[id] = { canvas:canvasClone(sources[i % sources.length]),offsetX:0,offsetY:0,flipX:false,flipY:false };
-        });
-        state.activeAnimationLayerId = id;
+        extendAnimationTimeline(frames.length, sheet ? ANIMATION_GRID_PADDING : 'image');
+        const layer = { id:sprite.id,name:sprite.name,visible:true,base:false };
+        if (sheet) layer.sheetCanvas = sprite.canvas;
+        else layer.sourceFrameCount = frames.length;
+        layers.unshift(layer);
+        writeAnimationImportCels(layer, frames);
+        state.activeAnimationLayerId = layer.id;
       }
     }
-    resetAnimationTools(); syncAfterDataChange(true);
+    resetAnimationTools(); markFrameBitmapsDirty(); syncAfterDataChange(true);
   } catch (error) { showError(error.message || 'Could not load that sprite.'); }
   finally { animationEls.input.value = ''; }
 }
@@ -969,7 +1133,7 @@ function splitAnimationSelection() {
   if(base) state.frames[state.currentFrame].sourceCanvas = canvasClone(target.canvas);
   const cropped = makeMask(right-left+1,bottom-top+1); cropped.getContext('2d').drawImage(source,left,top,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
   const id=`animation-${Date.now()}-${Math.random().toString(36).slice(2)}`, layers=ensureAnimationLayers(), index=layers.findIndex(item=>item.id===layer.id);
-  const splitLayer = {id,name:`${layer.name} split`,visible:true,base:false,parentId:layer.parentId || ''};
+  const splitLayer = {id,name:`${layer.name} split`,visible:true,base:false,parentId:layer.parentId || '',opacity:layer.opacity};
   layers.splice(index,0,splitLayer);
   const frame=state.frames[state.currentFrame]; frame.animationCels ||= {};
   const splitCel = {canvas:cropped,offsetX:left-Math.round((state.cageWidth-cropped.width)/2),offsetY:top-Math.round((state.cageHeight-cropped.height)/2),flipX:false,flipY:false};
@@ -985,7 +1149,11 @@ function splitAnimationSelection() {
   state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id]; animationSelection=null; state.animationTool='move'; showError(''); animationChanged();
 }
 function setAnimationTool(tool) {
-  if(activeAnimationLayer()?.group && ['pencil','eraser','lasso','rectangle','wand'].includes(tool))return;
+  if (animationBuilderCompanionActive()) {
+    setSpriteSheetBuilderPaintTool(tool);
+    return;
+  }
+  if (activeAnimationLayer()?.group && (['pencil', 'eraser', 'bucket'].includes(tool) || ANIMATION_SELECTION_TOOLS[tool])) return;
   const previous = state.animationTool;
   const selection = animationSelection;
   clearActiveCanvasTools(false);
@@ -1014,7 +1182,7 @@ function setAnimationPaintShiftHeld(held, redraw = true) {
 }
 function animationLayerAtPixel(x, y, i = state.currentFrame) {
   for (const layer of animationFrameLayers(i)) {
-    if (layer.group || !animationLayerVisible(layer, i)) continue;
+    if (layer.group || !animationLayerVisible(layer, i) || !animationEffectiveOpacity(layer)) continue;
     if (animationLayerUsesBaseFrame(layer)) {
       const pixel = makeMask(1, 1).getContext('2d');
       drawBaseSprite(pixel, i, -x, -y, { applyMask: true });
@@ -1028,8 +1196,73 @@ function animationLayerAtPixel(x, y, i = state.currentFrame) {
   }
   return null;
 }
+function selectAnimationWandRegion(layer, point, e) {
+  const i = state.currentFrame;
+  if (!animationLayerVisible(layer, i) || !animationCel(layer, i)) return;
+  const canvas = makeMask(), { width, height } = canvas, context = canvas.getContext('2d');
+  if (animationLayerUsesBaseFrame(layer)) drawBaseSprite(context, i, 0, 0, { applyMask: true });
+  else drawAnimationCel(context, animationCel(layer, i));
+  const previous = animationSelectionRaster()?.alpha;
+  if (e.altKey && !previous) return;
+  let alpha = magicWandAlpha(context.getImageData(0, 0, width, height), point.x, point.y, animationWandSettings());
+  if (previous && (e.altKey || e.shiftKey)) {
+    alpha = previous.map((value, index) => e.altKey ? Math.min(value, 255 - alpha[index]) : Math.max(value, alpha[index]));
+  }
+  const next = alpha.some(Boolean) ? { kind: 'mask', alpha, width, height, frameId: state.frames[i].id } : null;
+  commitAnimationSelection(next);
+  renderAnimationSelectionOverlay();
+  updateAnimationUi();
+}
+function paintAnimationBucket(layer, point, i = state.currentFrame) {
+  const cel = animationCel(layer, i);
+  if (!cel || !animationLayerVisible(layer, i)) return false;
+  const base = animationLayerUsesBaseFrame(layer), { canvas } = cel, { width, height } = canvas;
+  const pixel = base ? framePixelPoint(i, point.x, point.y) : animationCelPixel(cel, point.x, point.y);
+  if (!pixel || pixel.x < 0 || pixel.y < 0 || pixel.x >= width || pixel.y >= height) return false;
+  const context = canvas.getContext('2d'), image = context.getImageData(0, 0, width, height);
+  const { r, g, b, a } = cloneColor(state.pencilColor), color = a ? [r, g, b, a] : [0, 0, 0, 0];
+  const seed = (pixel.y * width + pixel.x) * 4;
+  if (color.every((value, channel) => image.data[seed + channel] === value)) return false;
+  const mask = animationSelectionMask();
+  let canVisit = null;
+  if (mask) {
+    const local = base ? makeMask(width, height) : animationLocalMask(mask, cel);
+    const localContext = local.getContext('2d');
+    if (base) drawCageLayerIntoSource(localContext, mask, i);
+    const selected = localContext.getImageData(0, 0, width, height).data;
+    canVisit = id => selected[id * 4 + 3] > 0;
+  }
+  const region = magicWandAlpha(image, pixel.x, pixel.y, { contiguous: true, tolerance: 0 }, canVisit);
+  if (!region.some(Boolean)) return false;
+  const fill = pixels => {
+    for (let id = 0; id < region.length; id++) {
+      if (region[id]) pixels.data.set(color, id * 4);
+    }
+  };
+  pushHistory();
+  fill(image);
+  context.putImageData(image, 0, 0);
+  if (base) {
+    const frame = state.frames[i], source = frame.sourceCanvas;
+    if (source && source !== canvas && source.width === width && source.height === height) {
+      const sourceContext = source.getContext('2d'), original = sourceContext.getImageData(0, 0, width, height);
+      fill(original);
+      sourceContext.putImageData(original, 0, 0);
+    } else frame.sourceCanvas = canvasClone(canvas);
+  }
+  if (!layer.sharedCel) state.indexedFrames[i] = null;
+  markFrameBitmapsDirty();
+  if (layer.sharedCel || !updateFrameThumb(i)) buildFilmstrip();
+  drawFrame(state.currentFrame);
+  updateInfo({ deferHiddenPalette: true });
+  return true;
+}
 function startAnimationCanvasDrag(e) {
   if(!animationPanelActive() || !hasFrames()) return false;
+  if (temporaryPencilColorPickerActive(e)) {
+    pickPencilColorFromCanvasEvent(e);
+    return true;
+  }
   if (e.ctrlKey || e.metaKey) {
     const point = pointerCagePoint(e);
     const picked = point && animationLayerAtPixel(point.x, point.y);
@@ -1047,15 +1280,12 @@ function startAnimationCanvasDrag(e) {
     const p=pointerCagePoint(e); if(p) {const color=sampleVisibleFrameColor(state.currentFrame,p.x,p.y,{allowTransparent:true});if(color)setPencilColorAt(state.activePencilColorIndex,color,{refresh:false});}
     if(tool==='dropper'&&!layer?.group)state.animationTool='pencil'; updateInfo(); return true;
   }
-  if (tool === 'wand') {
+  if (tool === 'wand' || tool === 'bucket') {
     const point = pointerCagePoint(e), i = state.currentFrame;
     if (point && layer) {
       pause(false, { updateInfo: false });
-      if (applyMagicWand(i, point.x, point.y, animationWandSettings(), layer)) {
-        updateMaskEditThumbs(i, layer);
-        drawFrame(i);
-        updateInfo();
-      }
+      if (tool === 'wand') selectAnimationWandRegion(layer, point, e);
+      else paintAnimationBucket(layer, point, i);
     }
     return true;
   }
@@ -1243,7 +1473,7 @@ function finishAnimationCanvasDrag(e) {
   }
   if(painting) {
     if(layer?.sharedCel || !updateFrameThumb(stroke.frame))buildFilmstrip();
-    drawFrame(state.currentFrame);updateInfo();
+    drawFrame(state.currentFrame);updateInfo({ deferHiddenPalette: true });
   } else if(stroke?.tool==='move')animationChanged();
   else {drawFrame(state.currentFrame);updateAnimationUi();}
 }
@@ -1254,18 +1484,18 @@ function handleAnimationKeyDown(e) {
     e.preventDefault();if(!e.repeat)(key==='c'?copyAnimationLayers:pasteAnimationLayers)();return true;
   }
   if(e.ctrlKey||e.metaKey)return false;
-  if(['lasso','rectangle'].includes(state.animationTool) && ['Delete','Backspace'].includes(e.key)) {
+  if(ANIMATION_SELECTION_TOOLS[state.animationTool] && ['Delete','Backspace'].includes(e.key)) {
     e.preventDefault();if(!e.repeat)eraseAnimationSelection();return true;
   }
-  if(validAnimationSelection() && ['lasso','rectangle'].includes(state.animationTool) && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+  if(validAnimationSelection() && ANIMATION_SELECTION_TOOLS[state.animationTool] && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
     e.preventDefault();const distance=e.shiftKey?10:1;
     moveAnimationSelection(e.key==='ArrowLeft'?-distance:e.key==='ArrowRight'?distance:0,e.key==='ArrowUp'?-distance:e.key==='ArrowDown'?distance:0);return true;
   }
   if(e.key==='F2'){e.preventDefault();beginAnimationLayerRename(activeAnimationLayer()?.id);return true;}
   if(e.key==='Escape') {commitAnimationSelection(null);state.animationTool='move';drawFrame(state.currentFrame);updateInfo();e.preventDefault();return true;}
-  const tools={m:'move',l:'lasso',r:'rectangle',p:'pencil',d:'dropper',e:'eraser',w:'wand'};
+  const tools={m:'move',l:'lasso',r:'rectangle',p:'pencil',d:'dropper',e:'eraser',w:'wand',g:'bucket'};
   if(!e.shiftKey&&tools[key]){e.preventDefault();setAnimationTool(tools[key]);return true;}
-  if(!e.shiftKey&&['b','g','h'].includes(key)){e.preventDefault();return true;}
+  if(!e.shiftKey&&['b','h'].includes(key)){e.preventDefault();return true;}
   if(e.shiftKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
     const layer=activeAnimationLayer(),offset=animationLayerOffset(layer);if(!offset)return true;
     e.preventDefault();const axis=['ArrowLeft','ArrowRight'].includes(e.key)?'x':'y',delta=['ArrowLeft','ArrowUp'].includes(e.key)?-1:1;
@@ -1352,7 +1582,17 @@ animationEls.size.addEventListener('input',e=>setAnimationBrushSize(e.target.val
 animationEls.colors.addEventListener('click',e=>{
   const button=e.target.closest('[data-animation-color]');if(!button)return;const index=Number(button.dataset.animationColor);
   if(index===state.activePencilColorIndex)openColorPicker({type:'pencil',index},state.pencilColors[index]||state.pencilColor,'Pencil Color');
-  else{state.activePencilColorIndex=index;state.pencilColor=cloneColor(state.pencilColors[index]);updateInfo();}
+  else selectPencilColor(index);
+});
+animationEls.colors.addEventListener('contextmenu', e => {
+  const button = e.target.closest('[data-animation-color]');
+  if (!button || button.disabled) return;
+  e.preventDefault();
+  openPencilColorContextMenu(Number(button.dataset.animationColor), e.clientX, e.clientY);
+});
+animationEls.addColor.addEventListener('click', () => {
+  openColorPicker({ type: 'pencil-add', applyOnPick: true }, state.pencilColor, 'Pencil Color');
+  beginColorPickerCanvasPick();
 });
 animationEls.list.addEventListener('click',e=>{
   if(animationLayerDrag?.active)return;
@@ -1377,14 +1617,38 @@ animationEls.list.addEventListener('dblclick',e=>{
   if(layer?.group){toggleAnimationGroup(id);return;}
   if(e.target.closest('.animation-layer-name'))beginAnimationLayerRename(id);
 });
-animationEls.list.addEventListener('focusin',e=>{if(e.target.matches('[data-animation-offset]')){pause();animationInputHistory=null;}});
+animationEls.list.addEventListener('focusin',e=>{if(e.target.matches('[data-animation-offset],[data-animation-opacity]')){pause(false,{updateInfo:false});animationInputHistory=null;}});
 animationEls.list.addEventListener('input',e=>{
-  const input=e.target;if(!input.matches('[data-animation-offset]'))return;
+  const input=e.target;
+  if (input.matches('[data-animation-opacity]')) {
+    const id = input.closest('[data-animation-id]').dataset.animationId, key = `${id}:opacity`;
+    const layer = animationLayerList().find(item => item.id === id), opacity = normalizeAnimationOpacity(input.value);
+    if (!layer || opacity === normalizeAnimationOpacity(layer.opacity)) return;
+    if (animationInputHistory !== key) { pushHistory(); animationInputHistory = key; }
+    ensureAnimationLayers().find(item => item.id === id).opacity = opacity;
+    markFrameBitmapsDirty();
+    drawFrame(state.currentFrame, { fast: true, skipThumb: true });
+    return;
+  }
+  if(!input.matches('[data-animation-offset]'))return;
   const id=input.closest('[data-animation-id]').dataset.animationId,key=`${id}:${state.currentFrame}:${input.dataset.animationOffset}`;
   if(animationInputHistory!==key){pushHistory();animationInputHistory=key;}
   setAnimationOffset(id,input.dataset.animationOffset,input.value,false);
 });
-animationEls.list.addEventListener('change',e=>{if(e.target.matches('[data-animation-offset]')){animationInputHistory=null;animationChanged();}});
+function finishAnimationOpacityInput(e) {
+  if (!e.target.matches('[data-animation-opacity]')) return;
+  const id = e.target.closest('[data-animation-id]').dataset.animationId;
+  if (animationInputHistory !== `${id}:opacity`) return;
+  animationInputHistory = null;
+  e.target.value = normalizeAnimationOpacity(e.target.value);
+  buildFilmstrip();
+  updateInfo({ deferHiddenPalette: true });
+}
+animationEls.list.addEventListener('change', e => {
+  if (e.target.matches('[data-animation-offset]')) { animationInputHistory = null; animationChanged(); }
+  else finishAnimationOpacityInput(e);
+});
+animationEls.list.addEventListener('focusout', finishAnimationOpacityInput);
 animationEls.list.addEventListener('keydown',e=>{
   if(e.target.closest('input'))return;
   const item=e.target.closest('[data-animation-id]');if(!item||!e.altKey||!['ArrowUp','ArrowDown'].includes(e.key))return;

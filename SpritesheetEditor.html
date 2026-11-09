@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.6.0-5" />
+  <link rel="stylesheet" href="animation.css?v=1.6.5" />
   <style>
     :root {
       --bg: #10131b;
@@ -460,29 +460,29 @@
     .palette-adjust-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) 58px; gap: 8px; align-items: center; }
     .palette-adjust-row label { color: var(--text); font-size: 12px; font-weight: 750; }
     .palette-adjust-row input:is([type="number"], [data-numeric-input]) { min-height: 34px; padding: 7px 8px; cursor: text; text-align: center; }
-    .edit-tool-section {
+    .inspector-section {
       display: grid; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,.08);
     }
-    .edit-tool-section summary {
+    .inspector-section summary {
       min-height: 22px; display: flex; align-items: center; gap: 8px; line-height: 1.1;
       color: var(--text); font-size: 13px; font-weight: 900; cursor: pointer; user-select: none;
       list-style: none;
     }
-    .edit-tool-section summary::-webkit-details-marker { display: none; }
-    .edit-tool-section summary::marker { content: ""; }
-    .edit-tool-section summary::before {
+    .inspector-section summary::-webkit-details-marker { display: none; }
+    .inspector-section summary::marker { content: ""; }
+    .inspector-section summary::before {
       content: ""; width: 0; height: 0; flex: 0 0 auto;
       border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent;
       opacity: .72; transform: rotate(90deg); transition: transform 140ms ease;
     }
-    .edit-tool-section:not([open]) summary::before { transform: rotate(0deg); }
-    .edit-tool-section-body { display: grid; gap: 10px; }
-    .edit-tool-section[open] .edit-tool-section-body { display: grid; }
-    .edit-tool-section:not([open]) .edit-tool-section-body { display: none; }
-    .side-panels .edit-tool-section + .edit-tool-section { margin-top: 0; }
-    .side-panels .edit-tool-section summary { min-height: 20px; }
-    .edit-tool-section summary .summary-count { margin-left: auto; }
-    .edit-tool-color-actions { display: grid; gap: 8px; }
+    .inspector-section:not([open]) summary::before { transform: rotate(0deg); }
+    .inspector-section-body { display: grid; gap: 10px; }
+    .inspector-section[open] .inspector-section-body { display: grid; }
+    .inspector-section:not([open]) .inspector-section-body { display: none; }
+    .side-panels .inspector-section + .inspector-section { margin-top: 0; }
+    .side-panels .inspector-section summary { min-height: 20px; }
+    .inspector-section summary .summary-count { margin-left: auto; }
+    .edit-image-color-actions { display: grid; gap: 8px; }
     .clip-outline-controls { display: grid; gap: 10px; }
     .clip-outline-main-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: end; }
     .clip-outline-main-row .check-field { min-height: 44px; }
@@ -603,14 +603,12 @@
       width: 54px; height: 54px; min-width: 54px; padding: 0; display: grid; place-items: center;
       color: var(--text); background: rgba(255,255,255,.06); border: 1px solid var(--border); border-radius: 16px;
     }
-    .pencil-color-row { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
     .pencil-color-strip {
       min-width: 0; flex: 1 1 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
       align-items: center; justify-content: start; gap: 8px; overflow: visible; padding: 2px 0 4px;
     }
     .pencil-color-strip .swatch-button { width: 100%; min-width: 0; display: grid; place-items: center; border-radius: 14px; }
     .pencil-color-strip .swatch-button.active { border-color: var(--warning); box-shadow: 0 0 0 2px rgba(240,200,104,.2); }
-    #pencilPickColorButton { margin-left: 0; font-size: 22px; line-height: 1; flex: 0 0 auto; align-self: start; }
     .swatch-chip {
       width: 34px; height: 34px; margin: auto; display: block; border-radius: 10px; border: 1px solid rgba(255,255,255,.22); background: #b6c0cf;
       box-shadow: inset 0 0 0 1px rgba(0,0,0,.18);
@@ -644,28 +642,6 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     }
     .button-with-icon .tool-icon-image { width: 16px; height: 16px; }
-    .pencil-layer-panel { display: grid; gap: 8px; }
-    .pencil-layer-list { display: grid; gap: 6px; max-height: 150px; overflow-y: auto; scrollbar-width: thin; }
-    .pencil-layer-item {
-      min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(82px, 104px) 30px 30px 30px; gap: 8px; align-items: center;
-      padding: 7px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.05);
-      cursor: pointer;
-    }
-    .pencil-layer-item.active { border-color: var(--warning); background: rgba(240,200,104,.12); }
-    .pencil-layer-item.layer-hidden { opacity: .62; }
-    .pencil-layer-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 12px; font-weight: 900; }
-    .pencil-layer-rename-input {
-      min-height: 30px; padding: 0 8px; border-radius: 10px; font-size: 12px; font-weight: 900; text-align: left;
-    }
-    .pencil-layer-blend-select {
-      height: 30px; min-height: 30px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 900;
-      text-align: center; text-align-last: center;
-    }
-    .pencil-layer-mask-button,
-    .pencil-layer-visible-button,
-    .pencil-layer-remove-button { width: 30px; height: 30px; min-width: 30px; min-height: 30px; padding: 0; border-radius: 999px; display: grid; place-items: center; line-height: 1; }
-    .pencil-layer-mask-button .tool-icon-image,
-    .pencil-layer-visible-button .tool-icon-image { width: 15px; height: 15px; }
     .lock-button {
       width: 34px; height: 28px; min-width: 34px; padding: 0; border-radius: 999px; display: grid; place-items: center;
       color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); font-size: 13px; line-height: 1;
@@ -717,7 +693,6 @@
     .index-action-row.index-leading-row .swatch-chip { margin: auto; }
     .side-panels .swatch-chip { width: 28px; height: 28px; border-radius: 8px; }
     .side-panels .tool-swatch-row { display: grid; grid-template-columns: repeat(5, 44px); gap: 8px; justify-content: start; }
-    .side-panels #pencilColorButton, .side-panels #pencilPickColorButton { margin-left: 0; padding: 0; display: grid; place-items: center; }
     .side-panels .upload.compact { min-height: 68px; padding: 10px; }
     .side-panels .palette-stage { padding: 8px; border-radius: 16px; }
     .side-panels .lock-button { width: 30px; height: 26px; min-width: 30px; padding: 0; }
@@ -1310,7 +1285,7 @@
       <div class="app-splash__eyebrow">Made by <a href="https://renderpopstudio.com/" target="_blank" rel="noopener noreferrer">RenderPop Studio</a></div>
       <div class="app-splash__title">Spritesheet Editor</div>
       <div class="app-splash__subtitle">Preparing the sprite editor</div>
-      <div class="app-splash__version">Version 1.6.0</div>
+      <div class="app-splash__version">Version 1.6.5</div>
       <div class="app-splash__road" aria-hidden="true"></div>
     </div>
   </div>
@@ -1319,7 +1294,7 @@
     <section class="card left-panel">
       <div class="brand">
         <img class="brand-logo" src="logo.png" alt="Spritesheet Editor" />
-        <span class="tool-version">v1.6.0</span>
+        <span class="tool-version">v1.6.5</span>
       </div>
       <p class="subtitle">Upload a spritesheet, set its grid, adjust each frame offset, draw removal masks, and export a repacked PNG.</p>
 
@@ -1517,9 +1492,9 @@
             <button id="channelBButton" class="secondary small-button channel-button" type="button" disabled title="Show blue channel as grayscale" aria-label="Show blue channel as grayscale">B</button>
             <button id="channelAButton" class="secondary small-button channel-button" type="button" disabled title="Show alpha channel as grayscale" aria-label="Show alpha channel as grayscale">A</button>
           </div>
-          <details class="edit-tool-section" open>
+          <details class="inspector-section" open>
             <summary>Cage</summary>
-            <div class="edit-tool-section-body">
+            <div class="inspector-section-body">
               <div class="field-row">
                 <div class="field"><label for="cageWidthInput">Cage Width</label><input id="cageWidthInput" type="number" min="1" step="1" value="1" /></div>
                 <div class="field"><label for="cageHeightInput">Cage Height</label><input id="cageHeightInput" type="number" min="1" step="1" value="1" /></div>
@@ -1540,9 +1515,9 @@
               </div>
             </div>
           </details>
-          <details class="edit-tool-section" open>
+          <details class="inspector-section" open>
             <summary>Rulers</summary>
-            <div class="edit-tool-section-body">
+            <div class="inspector-section-body">
               <div class="color-check-row">
                 <button id="rulerColorButton" class="swatch-button" type="button" aria-label="Choose ruler color" title="Choose ruler color">
                   <span id="rulerColorSwatch" class="swatch-chip"></span>
@@ -1558,9 +1533,9 @@
               </div>
             </div>
           </details>
-          <details class="edit-tool-section" open>
+          <details class="inspector-section" open>
             <summary>Scanlines</summary>
-            <div class="edit-tool-section-body">
+            <div class="inspector-section-body">
               <label class="check-field">
                 <input id="scanlinesInput" type="checkbox" />
                 Scanlines
@@ -1571,9 +1546,9 @@
               </div>
             </div>
           </details>
-          <details class="edit-tool-section" open>
+          <details class="inspector-section" open>
             <summary>Shadows</summary>
-            <div class="edit-tool-section-body">
+            <div class="inspector-section-body">
               <div class="color-check-row">
                 <button id="referenceShadowColorButton" class="swatch-button" type="button" aria-label="Choose shadow color" title="Choose shadow color">
                   <span id="referenceShadowColorSwatch" class="swatch-chip"></span>
@@ -1631,15 +1606,15 @@
           <label class="upload compact" id="spriteSheetBuilderDropZone">
             <div><strong>Load Animations</strong><span id="spriteSheetBuilderDropName">Click or drag (Images, GIF, PSD)</span></div>
           </label>
-          <details class="edit-tool-section sprite-sheet-builder-rows-section" open>
+          <details class="inspector-section sprite-sheet-builder-rows-section" open>
             <summary>Rows <span class="value-pill summary-count" id="spriteSheetBuilderRowCount">0</span></summary>
-            <div class="edit-tool-section-body">
+            <div class="inspector-section-body">
               <div id="spriteSheetBuilderRowsList" class="sprite-sheet-builder-list" aria-label="Sprite sheet animation rows"></div>
             </div>
           </details>
-          <details class="edit-tool-section" open>
+          <details class="inspector-section" open>
             <summary>Palette</summary>
-            <div class="edit-tool-section-body">
+            <div class="inspector-section-body">
               <div class="two-buttons">
                 <button id="spriteSheetBuilderOpenPaletteButton" class="secondary small-button" type="button">Open Palette</button>
                 <button id="spriteSheetBuilderClearPaletteButton" class="secondary small-button" type="button" disabled>Clear Palette</button>
@@ -1659,120 +1634,6 @@
             <label id="spriteSheetBuilderPreviewName">No animation</label>
             <span class="value-pill" id="spriteSheetBuilderPreviewFrameInfo">0/0</span>
           </div>
-        </div>
-        <div class="group">
-          <p class="group-title">Edit Tools</p>
-          <div class="tool-swatch-row">
-            <button id="eyedropperButton" class="secondary icon-button tool-icon-button" type="button" disabled aria-label="Dropper (D)" title="Dropper (D)">
-              <img class="tool-icon-image" src="icons/pipette.svg" alt="" aria-hidden="true" />
-            </button>
-            <button id="pencilButton" class="tool-button icon-button tool-icon-button" type="button" disabled aria-label="Pencil Tool (P)" title="Pencil Tool (P)">
-              <img class="tool-icon-image" src="icons/pencil.svg" alt="" aria-hidden="true" />
-            </button>
-            <button id="pencilBrushButton" class="tool-button icon-button tool-icon-button" type="button" disabled aria-label="Brush Tool (B)" title="Brush Tool (B)">
-              <img class="tool-icon-image" src="icons/brush.svg" alt="" aria-hidden="true" />
-            </button>
-            <button id="paintBucketButton" class="tool-button icon-button tool-icon-button" type="button" disabled aria-label="Paint Bucket Tool (G)" title="Paint Bucket Tool (G)">
-              <img class="tool-icon-image" src="icons/paint-bucket.svg" alt="" aria-hidden="true" />
-            </button>
-            <button id="pencilEraserButton" class="tool-button icon-button tool-icon-button" type="button" disabled aria-label="Eraser Tool (E)" title="Eraser Tool (E)">
-              <img class="tool-icon-image" src="icons/eraser.svg" alt="" aria-hidden="true" />
-            </button>
-          </div>
-          <div class="field">
-            <div class="line"><label for="brushSizeInput">Brush/Pencil Size</label><span class="value-pill"><span id="brushSizeValue">18</span> px</span></div>
-            <input id="brushSizeInput" type="range" min="1" max="120" step="1" value="18" />
-          </div>
-          <div class="field">
-            <div class="line"><label for="pencilHardnessInput">Hardness</label><span class="value-pill"><span id="pencilHardnessValue">100</span>%</span></div>
-            <input id="pencilHardnessInput" type="range" min="0" max="100" step="1" value="100" />
-          </div>
-          <label id="pencilEraserPixelModeField" class="check-field"><input id="pencilEraserPixelModeInput" type="checkbox" /> Pixel Mode</label>
-          <div class="pencil-color-row">
-            <div id="pencilColorStrip" class="pencil-color-strip" aria-label="Pencil colors">
-            <button id="pencilColorButton" class="swatch-button" type="button" disabled aria-label="Choose pencil color">
-              <span id="pencilColorSwatch" class="swatch-chip"></span>
-            </button>
-            </div>
-            <button id="pencilPickColorButton" class="swatch-button" type="button" disabled aria-label="Pick pencil color from canvas" title="Pick pencil color from canvas">+</button>
-          </div>
-          <div class="pencil-layer-panel">
-            <div class="two-buttons">
-              <button id="addPencilLayerButton" class="secondary small-button" type="button" disabled>+ Layer</button>
-              <button id="mergePencilLayersButton" class="secondary small-button" type="button" disabled>Merge to Sprite</button>
-            </div>
-            <div id="pencilLayerList" class="pencil-layer-list" aria-label="Pencil color layers"></div>
-          </div>
-          <details class="edit-tool-section" open>
-            <summary>Edit Colors</summary>
-            <div class="edit-tool-section-body">
-              <div class="palette-adjust-controls">
-                <div class="palette-adjust-row">
-                  <label for="editToolSpriteEditHueInput">Hue</label>
-                  <input id="editToolSpriteEditHueInput" class="palette-hue-slider" type="range" min="-180" max="180" step="1" value="0" />
-                  <input id="editToolSpriteEditHueValue" type="number" min="-180" max="180" step="1" value="0" />
-                </div>
-                <div class="palette-adjust-row">
-                  <label for="editToolSpriteEditSaturationInput">Saturation</label>
-                  <input id="editToolSpriteEditSaturationInput" type="range" min="-100" max="100" step="1" value="0" />
-                  <input id="editToolSpriteEditSaturationValue" type="number" min="-100" max="100" step="1" value="0" />
-                </div>
-                <div class="palette-adjust-row">
-                  <label for="editToolSpriteEditLightnessInput">Lightness</label>
-                  <input id="editToolSpriteEditLightnessInput" type="range" min="-100" max="100" step="1" value="0" />
-                  <input id="editToolSpriteEditLightnessValue" type="number" min="-100" max="100" step="1" value="0" />
-                </div>
-                <div class="palette-adjust-row">
-                  <label for="editToolSpriteEditBrightnessInput">Brightness</label>
-                  <input id="editToolSpriteEditBrightnessInput" type="range" min="-100" max="100" step="1" value="0" />
-                  <input id="editToolSpriteEditBrightnessValue" type="number" min="-100" max="100" step="1" value="0" />
-                </div>
-                <div class="palette-adjust-row">
-                  <label for="editToolSpriteEditContrastInput">Contrast</label>
-                  <input id="editToolSpriteEditContrastInput" type="range" min="-100" max="100" step="1" value="0" />
-                  <input id="editToolSpriteEditContrastValue" type="number" min="-100" max="100" step="1" value="0" />
-                </div>
-                <div class="palette-adjust-row">
-                  <label for="editToolSpriteEditSharpnessInput">Sharpness</label>
-                  <input id="editToolSpriteEditSharpnessInput" type="range" min="0" max="100" step="1" value="0" />
-                  <input id="editToolSpriteEditSharpnessValue" type="number" min="0" max="100" step="1" value="0" />
-                </div>
-                <div class="edit-tool-color-actions">
-                  <button id="editToolSpriteEditResetButton" class="secondary small-button standalone-button" type="button" disabled>Reset Edit</button>
-                </div>
-              </div>
-            </div>
-          </details>
-          <details class="edit-tool-section" open>
-            <summary>Outline</summary>
-            <div class="edit-tool-section-body clip-outline-controls">
-              <div class="clip-outline-main-row">
-                <label class="check-field"><input id="editToolClipOutlineInput" type="checkbox" /> Outline</label>
-              </div>
-              <div class="clip-outline-settings-row">
-                <div class="clip-outline-color-field">
-                  <label for="editToolClipOutlineColorButton">Outline Color</label>
-                  <button id="editToolClipOutlineColorButton" class="swatch-button" type="button" disabled aria-label="Outline color" title="Outline color">
-                    <span id="editToolClipOutlineColorSwatch" class="swatch-chip"></span>
-                  </button>
-                </div>
-                <div class="field">
-                  <label for="editToolClipOutlineWidthInput">Outline Width</label>
-                  <input id="editToolClipOutlineWidthInput" type="number" min="0" max="64" step="1" value="1" disabled />
-                </div>
-              </div>
-            </div>
-          </details>
-          <details class="edit-tool-section">
-            <summary>Pixel Grid</summary>
-            <div class="edit-tool-section-body">
-              <div class="field">
-                <label for="pixelGridSizeInput">Cell Size (px)</label>
-                <input id="pixelGridSizeInput" type="number" min="1" max="8192" step="1" value="1" disabled />
-              </div>
-              <button id="applyPixelGridButton" class="secondary small-button standalone-button" type="button" disabled>Apply Pixel Grid</button>
-            </div>
-          </details>
         </div>
         <div class="group">
           <p class="group-title">Mask</p>
@@ -1848,9 +1709,9 @@
         <div class="controls">
           <div class="group">
             <p class="group-title">Index Color</p>
-            <details class="edit-tool-section" open>
+            <details class="inspector-section" open>
               <summary>Colors</summary>
-              <div class="edit-tool-section-body">
+              <div class="inspector-section-body">
                 <div class="field">
                   <div class="line"><label for="indexColorsInput">Colors</label><span class="value-pill"><span id="indexColorsValue">256</span></span></div>
                   <input id="indexColorsInput" type="range" min="3" max="256" step="1" value="256" />
@@ -1915,9 +1776,9 @@
                 </div>
               </div>
             </details>
-            <details class="edit-tool-section" open>
+            <details class="inspector-section" open>
               <summary>Color Layer</summary>
-              <div class="edit-tool-section-body">
+              <div class="inspector-section-body">
                 <div class="field">
                   <label for="paletteLayerSelect">Color layer</label>
                   <select id="paletteLayerSelect" disabled>
@@ -1932,9 +1793,9 @@
                 </div>
               </div>
             </details>
-            <details class="edit-tool-section" open>
+            <details class="inspector-section" open>
               <summary>Color Table</summary>
-              <div class="edit-tool-section-body">
+              <div class="inspector-section-body">
                 <button id="referencePaletteToggleButton" class="secondary small-button standalone-button" type="button" disabled>Auxiliar Color Table</button>
                 <div class="reference-palette-anchor">
                   <div class="palette-wrap">
@@ -1966,26 +1827,29 @@
             </details>
           </div>
           <div class="group animation-group" id="animationGroup">
-            <p class="group-title"><span>Animation</span><span class="group-title-actions"><button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy Animation layers (Ctrl/Cmd+C)" title="Copy selected layers or groups from this frame (Ctrl/Cmd+C)"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button><button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste Animation layers (Ctrl/Cmd+V)" title="Paste layers or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button></span></p>
+            <p class="group-title"><span>Edit Image</span><span class="group-title-actions"><button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy layers (Ctrl/Cmd+C)" title="Copy selected layers or groups from this frame (Ctrl/Cmd+C)"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button><button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste layers (Ctrl/Cmd+V)" title="Paste layers or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button></span></p>
             <label class="upload compact" id="animationDropZone">
               <input id="animationFileInput" type="file" accept="image/*,.gif,.webp" multiple />
               <div><strong>Load Sprite</strong><span>Click here or drag image / GIF / WebP file(s)</span></div>
             </label>
-            <div class="animation-tools" aria-label="Animation edit tools">
+            <div class="animation-tools" aria-label="Edit Image tools">
               <button id="animationMoveButton" class="tool-button icon-button tool-icon-button active" type="button" data-animation-tool="move" title="Move sprite (M)" aria-label="Move sprite (M)"><img class="tool-icon-image" src="icons/move.svg" alt="" /></button>
               <div class="animation-selection-tool">
                 <button id="animationSelectionToolButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="lasso" title="Lasso selection (L). Hold to change selection tool." aria-label="Lasso selection (L)" aria-expanded="false" aria-controls="animationSelectionToolMenu"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" draggable="false" /></button>
                 <div id="animationSelectionToolMenu" class="animation-selection-tool-menu" role="group" aria-label="Selection tools" hidden>
                   <button class="secondary" type="button" data-animation-selection-tool="lasso"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" /> Lasso</button>
                   <button class="secondary" type="button" data-animation-selection-tool="rectangle"><img class="tool-icon-image" src="icons/selection-rectangle.svg" alt="" /> Rectangle</button>
+                  <button class="secondary" type="button" data-animation-selection-tool="wand"><img class="tool-icon-image" src="icons/wand.svg" alt="" /> Magic Wand</button>
                 </div>
               </div>
-              <button id="animationWandButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="wand" title="Magic Wand (W)" aria-label="Animation Magic Wand (W)"><img class="tool-icon-image" src="icons/wand.svg" alt="" /></button>
               <button id="animationSplitButton" class="secondary icon-button tool-icon-button" type="button" title="Split selection into a new layer" aria-label="Split selection into a new layer" disabled><img class="tool-icon-image" src="icons/split.svg" alt="" /></button>
-              <button id="animationDropperButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="dropper" title="Dropper (D)" aria-label="Animation dropper (D)"><img class="tool-icon-image" src="icons/pipette.svg" alt="" /></button>
-              <button id="animationPencilButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="pencil" title="Pencil (P)" aria-label="Animation pencil (P)"><img class="tool-icon-image" src="icons/pencil.svg" alt="" /></button>
-              <button id="animationEraserButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="eraser" title="Eraser (E)" aria-label="Animation eraser (E)"><img class="tool-icon-image" src="icons/eraser.svg" alt="" /></button>
-              <div id="animationColorStrip" class="pencil-color-strip" aria-label="Animation pencil colors"></div>
+              <button id="animationDropperButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="dropper" title="Dropper (D)" aria-label="Dropper (D)"><img class="tool-icon-image" src="icons/pipette.svg" alt="" /></button>
+              <button id="animationPencilButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="pencil" title="Pencil (P). Hold Ctrl/Cmd to pick a color." aria-label="Pencil (P)"><img class="tool-icon-image" src="icons/pencil.svg" alt="" /></button>
+              <button class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="brush" title="Brush (B)" aria-label="Brush (B)" hidden><img class="tool-icon-image" src="icons/brush.svg" alt="" /></button>
+              <button id="animationEraserButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="eraser" title="Eraser (E)" aria-label="Eraser (E)"><img class="tool-icon-image" src="icons/eraser.svg" alt="" /></button>
+              <button id="animationBucketButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="bucket" title="Paint Bucket (G). Hold Ctrl/Cmd to pick a color." aria-label="Paint Bucket (G)"><img class="tool-icon-image" src="icons/paint-bucket.svg" alt="" /></button>
+              <div id="animationColorStrip" class="pencil-color-strip" aria-label="Pencil colors"></div>
+              <button id="animationAddColorButton" class="swatch-button" type="button" aria-label="Add a color from the canvas" title="Add a color from the canvas">+</button>
             </div>
             <div class="animation-wand-settings" id="animationWandSettings" role="group" aria-label="Magic Wand settings" hidden>
               <label class="check-field"><input id="animationWandAntialias" type="checkbox" /> Anti-aliasing</label>
@@ -1997,12 +1861,84 @@
               <input id="animationBrushSizeInput" type="range" min="1" max="120" step="1" value="1" />
             </div>
             <div class="animation-selection-actions" id="animationSelectionActions" hidden><button id="animationClearSelectionButton" class="secondary small-button" type="button">Clear Selection</button></div>
-            <div id="animationLayerList" class="reference-layer-list" aria-label="Animation sprite layers"></div>
+            <div id="animationLayerList" class="reference-layer-list" aria-label="Sprite layers"></div>
             <div class="animation-layer-add-actions">
               <button id="animationNewLayerButton" class="secondary small-button" type="button">New Layer</button>
               <button id="animationGroupLayersButton" class="secondary small-button" type="button">Group</button>
               <button id="animationMergeButton" class="secondary small-button" type="button">Merge</button>
-              <button id="animationExportLayerButton" class="secondary small-button animation-layer-export-button" type="button" disabled>Export Layer to 8-Bits PNG</button>
+            </div>
+            <div class="edit-image-effects">
+              <details class="inspector-section" open>
+                <summary>Edit Colors</summary>
+                <div class="inspector-section-body">
+                  <div class="palette-adjust-controls">
+                    <div class="palette-adjust-row">
+                      <label for="editImageSpriteEditHueInput">Hue</label>
+                      <input id="editImageSpriteEditHueInput" class="palette-hue-slider" type="range" min="-180" max="180" step="1" value="0" />
+                      <input id="editImageSpriteEditHueValue" type="number" min="-180" max="180" step="1" value="0" />
+                    </div>
+                    <div class="palette-adjust-row">
+                      <label for="editImageSpriteEditSaturationInput">Saturation</label>
+                      <input id="editImageSpriteEditSaturationInput" type="range" min="-100" max="100" step="1" value="0" />
+                      <input id="editImageSpriteEditSaturationValue" type="number" min="-100" max="100" step="1" value="0" />
+                    </div>
+                    <div class="palette-adjust-row">
+                      <label for="editImageSpriteEditLightnessInput">Lightness</label>
+                      <input id="editImageSpriteEditLightnessInput" type="range" min="-100" max="100" step="1" value="0" />
+                      <input id="editImageSpriteEditLightnessValue" type="number" min="-100" max="100" step="1" value="0" />
+                    </div>
+                    <div class="palette-adjust-row">
+                      <label for="editImageSpriteEditBrightnessInput">Brightness</label>
+                      <input id="editImageSpriteEditBrightnessInput" type="range" min="-100" max="100" step="1" value="0" />
+                      <input id="editImageSpriteEditBrightnessValue" type="number" min="-100" max="100" step="1" value="0" />
+                    </div>
+                    <div class="palette-adjust-row">
+                      <label for="editImageSpriteEditContrastInput">Contrast</label>
+                      <input id="editImageSpriteEditContrastInput" type="range" min="-100" max="100" step="1" value="0" />
+                      <input id="editImageSpriteEditContrastValue" type="number" min="-100" max="100" step="1" value="0" />
+                    </div>
+                    <div class="palette-adjust-row">
+                      <label for="editImageSpriteEditSharpnessInput">Sharpness</label>
+                      <input id="editImageSpriteEditSharpnessInput" type="range" min="0" max="100" step="1" value="0" />
+                      <input id="editImageSpriteEditSharpnessValue" type="number" min="0" max="100" step="1" value="0" />
+                    </div>
+                    <div class="edit-image-color-actions">
+                      <button id="editImageSpriteEditResetButton" class="secondary small-button standalone-button" type="button" disabled>Reset Edit</button>
+                    </div>
+                  </div>
+                </div>
+              </details>
+              <details class="inspector-section" open>
+                <summary>Outline</summary>
+                <div class="inspector-section-body clip-outline-controls">
+                  <div class="clip-outline-main-row">
+                    <label class="check-field"><input id="editImageClipOutlineInput" type="checkbox" /> Outline</label>
+                  </div>
+                  <div class="clip-outline-settings-row">
+                    <div class="clip-outline-color-field">
+                      <label for="editImageClipOutlineColorButton">Outline Color</label>
+                      <button id="editImageClipOutlineColorButton" class="swatch-button" type="button" disabled aria-label="Outline color" title="Outline color">
+                        <span id="editImageClipOutlineColorSwatch" class="swatch-chip"></span>
+                      </button>
+                    </div>
+                    <div class="field">
+                      <label for="editImageClipOutlineWidthInput">Outline Width</label>
+                      <input id="editImageClipOutlineWidthInput" type="number" min="0" max="64" step="1" value="1" disabled />
+                    </div>
+                  </div>
+                </div>
+              </details>
+              <details class="inspector-section">
+                <summary>Pixel Grid</summary>
+                <div class="inspector-section-body">
+                  <div class="field">
+                    <label for="pixelGridSizeInput">Cell Size (px)</label>
+                    <input id="pixelGridSizeInput" type="number" min="1" max="8192" step="1" value="1" disabled />
+                  </div>
+                  <button id="applyPixelGridButton" class="secondary small-button standalone-button" type="button" disabled>Apply Pixel Grid</button>
+                </div>
+              </details>
+              <button id="animationExportLayerButton" class="secondary small-button standalone-button" type="button" disabled>Export Layer to 8-Bits PNG</button>
             </div>
           </div>
           <div class="group">
@@ -2104,9 +2040,9 @@
               <label for="fontOrderInput">Letters order</label>
               <textarea id="fontOrderInput" rows="3">ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890&amp;/!@#$%*;:,"?.&gt;&lt;()-=+</textarea>
             </div>
-            <details class="edit-tool-section" open>
+            <details class="inspector-section" open>
               <summary>Letter Settings</summary>
-              <div class="edit-tool-section-body">
+              <div class="inspector-section-body">
                 <div class="field-row">
                   <div class="field"><label for="fontLetterGapInput">Letter Gap</label><input id="fontLetterGapInput" type="number" min="-512" max="512" step="1" value="0" /></div>
                   <div class="field"><label for="fontSpaceInput">Space</label><input id="fontSpaceInput" type="number" min="-512" max="512" step="1" value="0" /></div>
@@ -2135,9 +2071,9 @@
                 </div>
               </div>
             </details>
-            <details class="edit-tool-section" open>
+            <details class="inspector-section" open>
               <summary>Shadow</summary>
-              <div class="edit-tool-section-body">
+              <div class="inspector-section-body">
                 <div class="color-check-row">
                   <button id="fontShadowColorButton" class="secondary swatch-button" type="button" aria-label="Font shadow color" title="Font shadow color"><span id="fontShadowColorSwatch" class="swatch-chip"></span></button>
                   <label class="check-field"><input id="fontCastShadowInput" type="checkbox" /> Cast Shadow</label>
@@ -2206,27 +2142,26 @@
         <button id="closeShortcutsButton" class="secondary icon-button" type="button" aria-label="Close shortcuts">×</button>
       </div>
       <div class="shortcut-list">
-        <div><kbd>B</kbd><span>Brush in Edit Tools, or Mask Brush when Mask is active</span></div>
+        <div><kbd>B</kbd><span>Mask Brush, or Brush when editing a Sprite Sheet cell</span></div>
         <div><kbd>P</kbd><span>Pencil tool</span></div>
         <div><kbd>E</kbd><span>Eraser tool</span></div>
         <div><kbd>G</kbd><span>Paint Bucket tool</span></div>
         <div><kbd>W</kbd><span>Magic Wand tool</span></div>
         <div><kbd>D</kbd><span>Dropper tool</span></div>
-        <div><kbd>Ctrl/Cmd</kbd><span>Temporary color picker while using Pencil tools in Edit Tools</span></div>
         <div><kbd>H</kbd><span>Hide Mask on/off</span></div>
         <div><kbd>F</kbd><span>Reset view, or fit the Compositor timeline when hovering it</span></div>
         <div><kbd>Mouse Wheel</kbd><span>Zoom preview canvas</span></div>
         <div><kbd>Shift + Wheel</kbd><span>Adjust active brush, pencil, or eraser size</span></div>
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
-        <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Animation</span></div>
-        <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick the topmost visible Animation layer on the canvas, or select multiple layers in the list</span></div>
-        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy / paste Animation layers or groups in the current frame</span></div>
-        <div><kbd>Alt + Drag</kbd><span>Subtract from an Animation lasso or rectangle selection</span></div>
-        <div><kbd>Shift + Drag</kbd><span>Add to an Animation lasso or rectangle selection</span></div>
-        <div><kbd>Arrows / Shift + Arrows</kbd><span>Move an Animation selection 1 / 10 pixels; drag inside it to move with the mouse</span></div>
-        <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active Animation layer while using Lasso or Rectangle</span></div>
-        <div><kbd>F2</kbd><span>Rename the selected Animation layer or group</span></div>
-        <div><kbd>Shift + Arrows</kbd><span>Move the current frame, active Animation layer, or selected Compositor clips</span></div>
+        <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
+        <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick a color with Pencil or Paint Bucket. With other Edit Image tools, pick the topmost visible layer on the canvas. In the layer list, select multiple layers.</span></div>
+        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy / paste layers or groups in the current frame</span></div>
+        <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
+        <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
+        <div><kbd>Arrows / Shift + Arrows</kbd><span>Move a selection 1 / 10 pixels. Drag inside it to move with the mouse.</span></div>
+        <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active layer while using Lasso, Rectangle, or Magic Wand</span></div>
+        <div><kbd>F2</kbd><span>Rename the selected layer or group</span></div>
+        <div><kbd>Shift + Arrows</kbd><span>Move the current frame, active layer, or selected Compositor clips</span></div>
         <div><kbd>Space</kbd><span>Play/Pause</span></div>
         <div><kbd>Delete</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
         <div><kbd>Backspace</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
@@ -2264,7 +2199,7 @@
           </div>
           <div>
             <strong>Current Release</strong>
-            <span>Version 1.6.0</span>
+            <span>Version 1.6.5</span>
           </div>
         </div>
         <p>Built for animation cleanup, reference matching, palette workflows, bitmap font work, and compositor-driven sprite exports.</p>
@@ -2584,9 +2519,9 @@
       rulerVButton: $('rulerVButton'), rulerHButton: $('rulerHButton'), cageVisibilityButton: $('cageVisibilityButton'), rulerVisibilityButton: $('rulerVisibilityButton'), offsetXAllInput: $('offsetXAllInput'), offsetYAllInput: $('offsetYAllInput'), pivotOnlyXInput: $('pivotOnlyXInput'), pivotOnlyYInput: $('pivotOnlyYInput'), offsetXInput: $('offsetXInput'), offsetYInput: $('offsetYInput'), pivotVisibilityButton: $('pivotVisibilityButton'),
       displayReferenceInput: $('displayReferenceInput'), displayReferenceDropZone: $('displayReferenceDropZone'), displayReferenceName: $('displayReferenceName'), displayReferenceLayerList: $('displayReferenceLayerList'), displayReferencePreviewButton: $('displayReferencePreviewButton'), clearDisplayReferenceButton: $('clearDisplayReferenceButton'), displayReferenceUnitButton: $('displayReferenceUnitButton'), displayReferenceOffsetXLabel: $('displayReferenceOffsetXLabel'), displayReferenceOffsetYLabel: $('displayReferenceOffsetYLabel'), displayReferenceScaleLabel: $('displayReferenceScaleLabel'), displayReferenceOffsetXInput: $('displayReferenceOffsetXInput'), displayReferenceOffsetYInput: $('displayReferenceOffsetYInput'), displayReferenceScaleInput: $('displayReferenceScaleInput'), displayReferenceTransparencyInput: $('displayReferenceTransparencyInput'), displayReferenceTransparencyValue: $('displayReferenceTransparencyValue'), reloadReferencesButton: $('reloadReferencesButton'), reloadReferencesMainButton: $('reloadReferencesMainButton'), linkReferencesToCompositorButton: $('linkReferencesToCompositorButton'), referenceCompositor: $('referenceCompositor'), referenceCompositorTrackList: $('referenceCompositorTrackList'), referenceCompositorFileInput: $('referenceCompositorFileInput'), referenceCompositorAudioInput: $('referenceCompositorAudioInput'), referenceCompositorPlayButton: $('referenceCompositorPlayButton'), referenceCompositorStopButton: $('referenceCompositorStopButton'), referenceCompositorLoopButton: $('referenceCompositorLoopButton'), referenceCompositorStartFrameInput: $('referenceCompositorStartFrameInput'), referenceCompositorEndFrameInput: $('referenceCompositorEndFrameInput'), referenceCompositorTimecode: $('referenceCompositorTimecode'), referenceCompositorFadeButton: $('referenceCompositorFadeButton'), referenceCompositorNewButton: $('referenceCompositorNewButton'), referenceCompositorLoadButton: $('referenceCompositorLoadButton'), referenceCompositorSaveButton: $('referenceCompositorSaveButton'), referenceCompositorExportGifButton: $('referenceCompositorExportGifButton'), referenceCompositorExportMp4Button: $('referenceCompositorExportMp4Button'), referenceCompositorExportPsdButton: $('referenceCompositorExportPsdButton'), referenceCompositorExportAudioInput: $('referenceCompositorExportAudioInput'), referenceCompositorVideoQualityInput: $('referenceCompositorVideoQualityInput'), referenceCompositorVideoQualityValue: $('referenceCompositorVideoQualityValue'), referenceCompositorAddTrackButton: $('referenceCompositorAddTrackButton'), referenceCompositorAddClipButton: $('referenceCompositorAddClipButton'), referenceCompositorAddTextButton: $('referenceCompositorAddTextButton'), referenceCompositorAddAudioButton: $('referenceCompositorAddAudioButton'), referenceCompositorMaskOutsideCageInput: $('referenceCompositorMaskOutsideCageInput'), referenceCompositorWidthInput: $('referenceCompositorWidthInput'), referenceCompositorHeightInput: $('referenceCompositorHeightInput'), referenceCompositorClipOffsetXInput: $('referenceCompositorClipOffsetXInput'), referenceCompositorClipOffsetYInput: $('referenceCompositorClipOffsetYInput'), referenceCompositorClipScaleInput: $('referenceCompositorClipScaleInput'), referenceCompositorClipSpeedInput: $('referenceCompositorClipSpeedInput'), referenceCompositorContextMenu: $('referenceCompositorContextMenu'), toggleReferenceCompositorLoopMenuButton: $('toggleReferenceCompositorLoopMenuButton'), refreshReferenceCompositorClipMenuButton: $('refreshReferenceCompositorClipMenuButton'), removeReferenceCompositorClipMenuButton: $('removeReferenceCompositorClipMenuButton'), referenceCompositorTrackContextMenu: $('referenceCompositorTrackContextMenu'), toggleReferenceCompositorTrackMenuButton: $('toggleReferenceCompositorTrackMenuButton'), addReferenceCompositorTrackClipMenuButton: $('addReferenceCompositorTrackClipMenuButton'), addReferenceCompositorTrackAudioMenuButton: $('addReferenceCompositorTrackAudioMenuButton'), removeReferenceCompositorTrackMenuButton: $('removeReferenceCompositorTrackMenuButton'),
       fontInput: $('fontInput'), fontConfigInput: $('fontConfigInput'), fontDropZone: $('fontDropZone'), fontName: $('fontName'), newFontButton: $('newFontButton'), openFontButton: $('openFontButton'), saveFontButton: $('saveFontButton'), saveFontTextPngButton: $('saveFontTextPngButton'), fontRowsInput: $('fontRowsInput'), fontColsInput: $('fontColsInput'), fontOrderInput: $('fontOrderInput'), fontLetterGapInput: $('fontLetterGapInput'), fontSpaceInput: $('fontSpaceInput'), fontRowGapInput: $('fontRowGapInput'), fontAlignInput: $('fontAlignInput'), fontForceUppercaseInput: $('fontForceUppercaseInput'), fontCastShadowInput: $('fontCastShadowInput'), fontShadowColorButton: $('fontShadowColorButton'), fontShadowColorSwatch: $('fontShadowColorSwatch'), fontShadowOffsetXInput: $('fontShadowOffsetXInput'), fontShadowOffsetYInput: $('fontShadowOffsetYInput'), fontLetterSelectInput: $('fontLetterSelectInput'), fontLetterGapPerInput: $('fontLetterGapPerInput'), fontLetterOffsetXInput: $('fontLetterOffsetXInput'), fontLetterOffsetYInput: $('fontLetterOffsetYInput'), fontColorButton: $('fontColorButton'), fontColorSwatch: $('fontColorSwatch'), fontTextInput: $('fontTextInput'),
-      brushSizeInput: $('brushSizeInput'), brushSizeValue: $('brushSizeValue'), pencilHardnessInput: $('pencilHardnessInput'), pencilHardnessValue: $('pencilHardnessValue'), pencilEraserPixelModeField: $('pencilEraserPixelModeField'), pencilEraserPixelModeInput: $('pencilEraserPixelModeInput'), maskBrushSizeInput: $('maskBrushSizeInput'), maskBrushSizeValue: $('maskBrushSizeValue'), maskBrushHardnessInput: $('maskBrushHardnessInput'), maskBrushHardnessValue: $('maskBrushHardnessValue'), pencilButton: $('pencilButton'), pencilBrushButton: $('pencilBrushButton'), pencilEraserButton: $('pencilEraserButton'), paintBucketButton: $('paintBucketButton'), eyedropperButton: $('eyedropperButton'), pencilColorStrip: $('pencilColorStrip'), pencilColorButton: $('pencilColorButton'), pencilPickColorButton: $('pencilPickColorButton'), pencilColorSwatch: $('pencilColorSwatch'), pencilColorContextMenu: $('pencilColorContextMenu'), removePencilColorMenuButton: $('removePencilColorMenuButton'), addPencilLayerButton: $('addPencilLayerButton'), mergePencilLayersButton: $('mergePencilLayersButton'), pencilLayerList: $('pencilLayerList'), magicToleranceInput: $('magicToleranceInput'), magicToleranceValue: $('magicToleranceValue'), magicAntialiasInput: $('magicAntialiasInput'), magicContiguousInput: $('magicContiguousInput'),
+      maskBrushSizeInput: $('maskBrushSizeInput'), maskBrushSizeValue: $('maskBrushSizeValue'), maskBrushHardnessInput: $('maskBrushHardnessInput'), maskBrushHardnessValue: $('maskBrushHardnessValue'), pencilColorContextMenu: $('pencilColorContextMenu'), removePencilColorMenuButton: $('removePencilColorMenuButton'), magicToleranceInput: $('magicToleranceInput'), magicToleranceValue: $('magicToleranceValue'), magicAntialiasInput: $('magicAntialiasInput'), magicContiguousInput: $('magicContiguousInput'),
       haloToleranceInput: $('haloToleranceInput'), haloToleranceValue: $('haloToleranceValue'), showHaloButton: $('showHaloButton'), haloRemoverButton: $('haloRemoverButton'),
-      indexKeepTransparencyInput: $('indexKeepTransparencyInput'), indexHighlightColorsInput: $('indexHighlightColorsInput'), indexHighlightColorButton: $('indexHighlightColorButton'), indexHighlightColorSwatch: $('indexHighlightColorSwatch'), indexColorsInput: $('indexColorsInput'), indexColorsValue: $('indexColorsValue'), channelRButton: $('channelRButton'), channelGButton: $('channelGButton'), channelBButton: $('channelBButton'), channelAButton: $('channelAButton'), paletteDropperButton: $('paletteDropperButton'), indexButton: $('indexButton'), resetIndexButton: $('resetIndexButton'), indexFrameButton: $('indexFrameButton'), indexAllButton: $('indexAllButton'), matchPaletteButton: $('matchPaletteButton'), matchPaletteAllButton: $('matchPaletteAllButton'), referencePaletteToggleButton: $('referencePaletteToggleButton'), selectPaletteColorsButton: $('selectPaletteColorsButton'), mergeSelectedButton: $('mergeSelectedButton'), spriteEditColorButton: $('spriteEditColorButton'), spriteEditControls: $('spriteEditControls'), spriteEditHueInput: $('spriteEditHueInput'), spriteEditHueValue: $('spriteEditHueValue'), spriteEditSaturationInput: $('spriteEditSaturationInput'), spriteEditSaturationValue: $('spriteEditSaturationValue'), spriteEditLightnessInput: $('spriteEditLightnessInput'), spriteEditLightnessValue: $('spriteEditLightnessValue'), spriteEditBrightnessInput: $('spriteEditBrightnessInput'), spriteEditBrightnessValue: $('spriteEditBrightnessValue'), spriteEditContrastInput: $('spriteEditContrastInput'), spriteEditContrastValue: $('spriteEditContrastValue'), spriteEditSharpnessInput: $('spriteEditSharpnessInput'), spriteEditSharpnessValue: $('spriteEditSharpnessValue'), spriteEditResetButton: $('spriteEditResetButton'), editToolSpriteEditResetButton: $('editToolSpriteEditResetButton'), editToolSpriteEditHueInput: $('editToolSpriteEditHueInput'), editToolSpriteEditHueValue: $('editToolSpriteEditHueValue'), editToolSpriteEditSaturationInput: $('editToolSpriteEditSaturationInput'), editToolSpriteEditSaturationValue: $('editToolSpriteEditSaturationValue'), editToolSpriteEditLightnessInput: $('editToolSpriteEditLightnessInput'), editToolSpriteEditLightnessValue: $('editToolSpriteEditLightnessValue'), editToolSpriteEditBrightnessInput: $('editToolSpriteEditBrightnessInput'), editToolSpriteEditBrightnessValue: $('editToolSpriteEditBrightnessValue'), editToolSpriteEditContrastInput: $('editToolSpriteEditContrastInput'), editToolSpriteEditContrastValue: $('editToolSpriteEditContrastValue'), editToolSpriteEditSharpnessInput: $('editToolSpriteEditSharpnessInput'), editToolSpriteEditSharpnessValue: $('editToolSpriteEditSharpnessValue'), editToolClipOutlineInput: $('editToolClipOutlineInput'), editToolClipOutlineWidthInput: $('editToolClipOutlineWidthInput'), editToolClipOutlineColorButton: $('editToolClipOutlineColorButton'), editToolClipOutlineColorSwatch: $('editToolClipOutlineColorSwatch'), paletteLayerSelect: $('paletteLayerSelect'), addPaletteLayerButton: $('addPaletteLayerButton'), removePaletteLayerButton: $('removePaletteLayerButton'), addPaletteLayerColorsButton: $('addPaletteLayerColorsButton'), removePaletteLayerColorsButton: $('removePaletteLayerColorsButton'), paletteAdjustControls: $('paletteAdjustControls'), paletteHueInput: $('paletteHueInput'), paletteHueValue: $('paletteHueValue'), paletteSaturationInput: $('paletteSaturationInput'), paletteSaturationValue: $('paletteSaturationValue'), paletteLightnessInput: $('paletteLightnessInput'), paletteLightnessValue: $('paletteLightnessValue'), loadPaletteButton: $('loadPaletteButton'), savePaletteButton: $('savePaletteButton'), paletteCanvas: $('paletteCanvas'), paletteInfo: $('paletteInfo'), referencePalettePanel: $('referencePalettePanel'), referencePaletteCanvas: $('referencePaletteCanvas'), referencePaletteInfo: $('referencePaletteInfo'), openReferencePaletteButton: $('openReferencePaletteButton'), transferReferencePaletteButton: $('transferReferencePaletteButton'), spriteSheetBuilderProjectInput: $('spriteSheetBuilderProjectInput'), spriteSheetBuilderFileInput: $('spriteSheetBuilderFileInput'), spriteSheetBuilderPaletteInput: $('spriteSheetBuilderPaletteInput'), spriteSheetBuilderSourceRowsInput: $('spriteSheetBuilderSourceRowsInput'), spriteSheetBuilderSourceColsInput: $('spriteSheetBuilderSourceColsInput'), spriteSheetBuilderCageWidthInput: $('spriteSheetBuilderCageWidthInput'), spriteSheetBuilderCageHeightInput: $('spriteSheetBuilderCageHeightInput'), spriteSheetBuilderPivotXInput: $('spriteSheetBuilderPivotXInput'), spriteSheetBuilderPivotYInput: $('spriteSheetBuilderPivotYInput'), spriteSheetBuilderGlobalScaleInput: $('spriteSheetBuilderGlobalScaleInput'), spriteSheetBuilderShowNamesInput: $('spriteSheetBuilderShowNamesInput'), spriteSheetBuilderDropZone: $('spriteSheetBuilderDropZone'), spriteSheetBuilderDropName: $('spriteSheetBuilderDropName'), spriteSheetBuilderNewButton: $('spriteSheetBuilderNewButton'), spriteSheetBuilderLoadButton: $('spriteSheetBuilderLoadButton'), spriteSheetBuilderSaveButton: $('spriteSheetBuilderSaveButton'), spriteSheetBuilderAddRowButton: $('spriteSheetBuilderAddRowButton'), spriteSheetBuilderClearButton: $('spriteSheetBuilderClearButton'), spriteSheetBuilderRowCount: $('spriteSheetBuilderRowCount'), spriteSheetBuilderRowsList: $('spriteSheetBuilderRowsList'), spriteSheetBuilderOpenPaletteButton: $('spriteSheetBuilderOpenPaletteButton'), spriteSheetBuilderClearPaletteButton: $('spriteSheetBuilderClearPaletteButton'), spriteSheetBuilderApplyPaletteInput: $('spriteSheetBuilderApplyPaletteInput'), spriteSheetBuilderPaletteInfo: $('spriteSheetBuilderPaletteInfo'), spriteSheetBuilderExportButton: $('spriteSheetBuilderExportButton'),
+      indexKeepTransparencyInput: $('indexKeepTransparencyInput'), indexHighlightColorsInput: $('indexHighlightColorsInput'), indexHighlightColorButton: $('indexHighlightColorButton'), indexHighlightColorSwatch: $('indexHighlightColorSwatch'), indexColorsInput: $('indexColorsInput'), indexColorsValue: $('indexColorsValue'), channelRButton: $('channelRButton'), channelGButton: $('channelGButton'), channelBButton: $('channelBButton'), channelAButton: $('channelAButton'), paletteDropperButton: $('paletteDropperButton'), indexButton: $('indexButton'), resetIndexButton: $('resetIndexButton'), indexFrameButton: $('indexFrameButton'), indexAllButton: $('indexAllButton'), matchPaletteButton: $('matchPaletteButton'), matchPaletteAllButton: $('matchPaletteAllButton'), referencePaletteToggleButton: $('referencePaletteToggleButton'), selectPaletteColorsButton: $('selectPaletteColorsButton'), mergeSelectedButton: $('mergeSelectedButton'), spriteEditColorButton: $('spriteEditColorButton'), spriteEditControls: $('spriteEditControls'), spriteEditHueInput: $('spriteEditHueInput'), spriteEditHueValue: $('spriteEditHueValue'), spriteEditSaturationInput: $('spriteEditSaturationInput'), spriteEditSaturationValue: $('spriteEditSaturationValue'), spriteEditLightnessInput: $('spriteEditLightnessInput'), spriteEditLightnessValue: $('spriteEditLightnessValue'), spriteEditBrightnessInput: $('spriteEditBrightnessInput'), spriteEditBrightnessValue: $('spriteEditBrightnessValue'), spriteEditContrastInput: $('spriteEditContrastInput'), spriteEditContrastValue: $('spriteEditContrastValue'), spriteEditSharpnessInput: $('spriteEditSharpnessInput'), spriteEditSharpnessValue: $('spriteEditSharpnessValue'), spriteEditResetButton: $('spriteEditResetButton'), editImageSpriteEditResetButton: $('editImageSpriteEditResetButton'), editImageSpriteEditHueInput: $('editImageSpriteEditHueInput'), editImageSpriteEditHueValue: $('editImageSpriteEditHueValue'), editImageSpriteEditSaturationInput: $('editImageSpriteEditSaturationInput'), editImageSpriteEditSaturationValue: $('editImageSpriteEditSaturationValue'), editImageSpriteEditLightnessInput: $('editImageSpriteEditLightnessInput'), editImageSpriteEditLightnessValue: $('editImageSpriteEditLightnessValue'), editImageSpriteEditBrightnessInput: $('editImageSpriteEditBrightnessInput'), editImageSpriteEditBrightnessValue: $('editImageSpriteEditBrightnessValue'), editImageSpriteEditContrastInput: $('editImageSpriteEditContrastInput'), editImageSpriteEditContrastValue: $('editImageSpriteEditContrastValue'), editImageSpriteEditSharpnessInput: $('editImageSpriteEditSharpnessInput'), editImageSpriteEditSharpnessValue: $('editImageSpriteEditSharpnessValue'), editImageClipOutlineInput: $('editImageClipOutlineInput'), editImageClipOutlineWidthInput: $('editImageClipOutlineWidthInput'), editImageClipOutlineColorButton: $('editImageClipOutlineColorButton'), editImageClipOutlineColorSwatch: $('editImageClipOutlineColorSwatch'), paletteLayerSelect: $('paletteLayerSelect'), addPaletteLayerButton: $('addPaletteLayerButton'), removePaletteLayerButton: $('removePaletteLayerButton'), addPaletteLayerColorsButton: $('addPaletteLayerColorsButton'), removePaletteLayerColorsButton: $('removePaletteLayerColorsButton'), paletteAdjustControls: $('paletteAdjustControls'), paletteHueInput: $('paletteHueInput'), paletteHueValue: $('paletteHueValue'), paletteSaturationInput: $('paletteSaturationInput'), paletteSaturationValue: $('paletteSaturationValue'), paletteLightnessInput: $('paletteLightnessInput'), paletteLightnessValue: $('paletteLightnessValue'), loadPaletteButton: $('loadPaletteButton'), savePaletteButton: $('savePaletteButton'), paletteCanvas: $('paletteCanvas'), paletteInfo: $('paletteInfo'), referencePalettePanel: $('referencePalettePanel'), referencePaletteCanvas: $('referencePaletteCanvas'), referencePaletteInfo: $('referencePaletteInfo'), openReferencePaletteButton: $('openReferencePaletteButton'), transferReferencePaletteButton: $('transferReferencePaletteButton'), spriteSheetBuilderProjectInput: $('spriteSheetBuilderProjectInput'), spriteSheetBuilderFileInput: $('spriteSheetBuilderFileInput'), spriteSheetBuilderPaletteInput: $('spriteSheetBuilderPaletteInput'), spriteSheetBuilderSourceRowsInput: $('spriteSheetBuilderSourceRowsInput'), spriteSheetBuilderSourceColsInput: $('spriteSheetBuilderSourceColsInput'), spriteSheetBuilderCageWidthInput: $('spriteSheetBuilderCageWidthInput'), spriteSheetBuilderCageHeightInput: $('spriteSheetBuilderCageHeightInput'), spriteSheetBuilderPivotXInput: $('spriteSheetBuilderPivotXInput'), spriteSheetBuilderPivotYInput: $('spriteSheetBuilderPivotYInput'), spriteSheetBuilderGlobalScaleInput: $('spriteSheetBuilderGlobalScaleInput'), spriteSheetBuilderShowNamesInput: $('spriteSheetBuilderShowNamesInput'), spriteSheetBuilderDropZone: $('spriteSheetBuilderDropZone'), spriteSheetBuilderDropName: $('spriteSheetBuilderDropName'), spriteSheetBuilderNewButton: $('spriteSheetBuilderNewButton'), spriteSheetBuilderLoadButton: $('spriteSheetBuilderLoadButton'), spriteSheetBuilderSaveButton: $('spriteSheetBuilderSaveButton'), spriteSheetBuilderAddRowButton: $('spriteSheetBuilderAddRowButton'), spriteSheetBuilderClearButton: $('spriteSheetBuilderClearButton'), spriteSheetBuilderRowCount: $('spriteSheetBuilderRowCount'), spriteSheetBuilderRowsList: $('spriteSheetBuilderRowsList'), spriteSheetBuilderOpenPaletteButton: $('spriteSheetBuilderOpenPaletteButton'), spriteSheetBuilderClearPaletteButton: $('spriteSheetBuilderClearPaletteButton'), spriteSheetBuilderApplyPaletteInput: $('spriteSheetBuilderApplyPaletteInput'), spriteSheetBuilderPaletteInfo: $('spriteSheetBuilderPaletteInfo'), spriteSheetBuilderExportButton: $('spriteSheetBuilderExportButton'),
       truePixelResolutionInput: $('truePixelResolutionInput'), truePixelResolutionValue: $('truePixelResolutionValue'), truePixelReferenceInput: $('truePixelReferenceInput'), truePixelReferenceDropZone: $('truePixelReferenceDropZone'), truePixelReferenceName: $('truePixelReferenceName'), truePixelDetectButton: $('truePixelDetectButton'), truePixelResizeButton: $('truePixelResizeButton'), truePixelButton: $('truePixelButton'), truePixelAllButton: $('truePixelAllButton'), truePixelResetButton: $('truePixelResetButton'), truePixelPreviewButton: $('truePixelPreviewButton'),
       maskBrushButton: $('maskBrushButton'), restoreBrushButton: $('restoreBrushButton'), magicWandButton: $('magicWandButton'), hideMaskButton: $('hideMaskButton'), resetMaskButton: $('resetMaskButton'), resetAllMasksButton: $('resetAllMasksButton'), bakeAllMasksButton: $('bakeAllMasksButton'),
       playButton: $('playButton'), stopButton: $('stopButton'), prevButton: $('prevButton'), nextButton: $('nextButton'), playbackLoopButton: $('playbackLoopButton'), nudgeLeftButton: $('nudgeLeftButton'), nudgeRightButton: $('nudgeRightButton'), nudgeUpButton: $('nudgeUpButton'), nudgeDownButton: $('nudgeDownButton'),
@@ -2912,42 +2847,6 @@
       closePencilColorContextMenu();
       updateInfo();
     }
-    function renderPencilColorPalette() {
-      const strip = els.pencilColorStrip;
-      if (!strip) return;
-      normalizePencilColorState();
-      const configureButton = (button, index, color) => {
-        button.type = 'button';
-        button.className = `swatch-button pencil-color-button${index === state.activePencilColorIndex ? ' active' : ''}`;
-        button.disabled = !hasFrames();
-        button.dataset.pencilColorIndex = String(index);
-        button.title = index === 0 ? 'Default pencil color' : `Pencil color ${index + 1}`;
-        button.setAttribute('aria-label', button.title);
-        button.setAttribute('aria-pressed', index === state.activePencilColorIndex ? 'true' : 'false');
-        let chip = button.querySelector('.swatch-chip');
-        if (!chip) {
-          chip = document.createElement('span');
-          chip.className = 'swatch-chip';
-          button.appendChild(chip);
-        }
-        const bg = pencilColorSwatchBackground(color);
-        chip.style.backgroundImage = bg.image;
-        chip.style.backgroundSize = bg.size;
-        chip.style.backgroundPosition = bg.position;
-      };
-      if (els.pencilColorButton.parentElement !== strip) strip.appendChild(els.pencilColorButton);
-      configureButton(els.pencilColorButton, 0, state.pencilColors[0]);
-      while (strip.children.length > state.pencilColors.length) strip.lastElementChild?.remove();
-      for (let i = 1; i < state.pencilColors.length; i++) {
-        let button = strip.querySelector(`[data-pencil-color-generated="${i}"]`);
-        if (!button) {
-          button = document.createElement('button');
-          button.dataset.pencilColorGenerated = String(i);
-          strip.appendChild(button);
-        }
-        configureButton(button, i, state.pencilColors[i]);
-      }
-    }
     function normalizePencilBlendMode(layer = {}) {
       return layer.blendMode === 'normal' || layer.normalMode ? 'normal' : 'color';
     }
@@ -3000,11 +2899,6 @@
       frame.pencilLayers = (frame.pencilLayers || []).map((layer, index) => normalizePencilLayer(layer, index, frame, i));
       if (i === state.currentFrame && state.activePencilLayerId && !frame.pencilLayers.some(layer => layer.id === state.activePencilLayerId)) state.activePencilLayerId = '';
       return frame.pencilLayers;
-    }
-    function activePencilLayer(i = state.currentFrame) {
-      const layers = normalizeFramePencilLayers(i);
-      if (!layers.length) return null;
-      return layers.find(layer => layer.id === state.activePencilLayerId) || layers[0] || null;
     }
     function normalizeIndexList(indices = [], length = Infinity) { return [...new Set((indices || []).map(v => Math.round(v)).filter(v => v >= 0 && v < length))].sort((a, b) => a - b); }
     function normalizePaletteAdjust(adjust = {}) {
@@ -4122,11 +4016,11 @@
       return state.maskDirty[i];
     }
     function setButtons(enabled) {
-      [els.saveButton, els.playButton, els.stopButton, els.prevButton, els.nextButton, els.playbackLoopButton, els.nudgeLeftButton, els.nudgeRightButton, els.nudgeUpButton, els.nudgeDownButton, els.gifButton, els.repackButton, els.psdButton, els.batchSpritesButton, els.reverseOrderButton, els.deleteSkippedButton, els.scaleModeButton, els.scaleUnitButton, els.fitCageToSpriteButton, els.centerPivotButton, els.flipSpriteHorizontalButton, els.flipSpriteVerticalButton, els.bakeTransformButton, els.cageVisibilityButton, els.rulerVisibilityButton, els.pivotVisibilityButton, els.pencilButton, els.pencilBrushButton, els.pencilEraserButton, els.paintBucketButton, els.eyedropperButton, els.pencilColorButton, els.pencilPickColorButton, els.addPencilLayerButton, els.mergePencilLayersButton, els.maskBrushButton, els.restoreBrushButton, els.magicWandButton, els.hideMaskButton, els.showHaloButton, els.haloRemoverButton, els.resetMaskButton, els.resetAllMasksButton, els.bakeAllMasksButton, els.rulerVButton, els.rulerHButton, els.displayReferencePreviewButton, els.clearDisplayReferenceButton, els.displayReferenceUnitButton, els.channelRButton, els.channelGButton, els.channelBButton, els.channelAButton, els.paletteDropperButton, els.indexButton, els.resetIndexButton, els.indexFrameButton, els.indexAllButton, els.matchPaletteButton, els.matchPaletteAllButton, els.referencePaletteToggleButton, els.selectPaletteColorsButton, els.indexHighlightColorButton, els.mergeSelectedButton, els.spriteEditColorButton, els.spriteEditResetButton, els.addPaletteLayerButton, els.removePaletteLayerButton, els.addPaletteLayerColorsButton, els.removePaletteLayerColorsButton, els.truePixelResizeButton, els.truePixelButton, els.truePixelAllButton, els.truePixelResetButton, els.truePixelPreviewButton, els.loadPaletteButton, els.savePaletteButton, els.openReferencePaletteButton, els.transferReferencePaletteButton].forEach(b => { if (b) b.disabled = !enabled; });
+      [els.saveButton, els.playButton, els.stopButton, els.prevButton, els.nextButton, els.playbackLoopButton, els.nudgeLeftButton, els.nudgeRightButton, els.nudgeUpButton, els.nudgeDownButton, els.gifButton, els.repackButton, els.psdButton, els.batchSpritesButton, els.reverseOrderButton, els.deleteSkippedButton, els.scaleModeButton, els.scaleUnitButton, els.fitCageToSpriteButton, els.centerPivotButton, els.flipSpriteHorizontalButton, els.flipSpriteVerticalButton, els.bakeTransformButton, els.cageVisibilityButton, els.rulerVisibilityButton, els.pivotVisibilityButton, els.maskBrushButton, els.restoreBrushButton, els.magicWandButton, els.hideMaskButton, els.showHaloButton, els.haloRemoverButton, els.resetMaskButton, els.resetAllMasksButton, els.bakeAllMasksButton, els.rulerVButton, els.rulerHButton, els.displayReferencePreviewButton, els.clearDisplayReferenceButton, els.displayReferenceUnitButton, els.channelRButton, els.channelGButton, els.channelBButton, els.channelAButton, els.paletteDropperButton, els.indexButton, els.resetIndexButton, els.indexFrameButton, els.indexAllButton, els.matchPaletteButton, els.matchPaletteAllButton, els.referencePaletteToggleButton, els.selectPaletteColorsButton, els.indexHighlightColorButton, els.mergeSelectedButton, els.spriteEditColorButton, els.spriteEditResetButton, els.addPaletteLayerButton, els.removePaletteLayerButton, els.addPaletteLayerColorsButton, els.removePaletteLayerColorsButton, els.truePixelResizeButton, els.truePixelButton, els.truePixelAllButton, els.truePixelResetButton, els.truePixelPreviewButton, els.loadPaletteButton, els.savePaletteButton, els.openReferencePaletteButton, els.transferReferencePaletteButton].forEach(b => { if (b) b.disabled = !enabled; });
       const spriteSheetToolsEnabled = spriteSheetBuilderToolSurfaceAvailable();
       if (spriteSheetToolsEnabled) {
-        [els.pencilButton, els.pencilBrushButton, els.pencilEraserButton, els.paintBucketButton, els.eyedropperButton, els.pencilColorButton, els.pencilPickColorButton, els.maskBrushButton, els.restoreBrushButton, els.magicWandButton, els.hideMaskButton, els.resetMaskButton, els.resetAllMasksButton].forEach(b => { if (b) b.disabled = false; });
-        [els.addPencilLayerButton, els.mergePencilLayersButton, els.showHaloButton, els.haloRemoverButton, els.bakeAllMasksButton].forEach(b => { if (b) b.disabled = true; });
+        [els.maskBrushButton, els.restoreBrushButton, els.magicWandButton, els.hideMaskButton, els.resetMaskButton, els.resetAllMasksButton].forEach(b => { if (b) b.disabled = false; });
+        [els.showHaloButton, els.haloRemoverButton, els.bakeAllMasksButton].forEach(b => { if (b) b.disabled = true; });
       }
       if (els.saveButton) els.saveButton.disabled = !projectHasContent();
     }
@@ -4415,6 +4309,10 @@
       state.eyedropperMode = !!s.eyedropperMode;
       restoreAnimationSelectionHistory(s.animationSelectionHistory);
       markFrameBitmapsDirty();
+      els.rowsInput.value = state.rows;
+      els.colsInput.value = state.cols;
+      els.startFrameInput.value = state.startFrame + 1;
+      els.endFrameInput.value = state.endFrame + 1;
       syncAfterDataChange(false);
       state.restoring = false;
     }
@@ -5581,23 +5479,24 @@
     function normalizePencilToolMode(mode) {
       return ['pencil', 'brush', 'eraser'].includes(mode) ? mode : 'pencil';
     }
-    function editToolUsesPixelFootprint() {
+    function builderUsesPixelFootprint() {
       return !!(state.pencilMode && (state.pencilToolMode === 'pencil' || (state.pencilToolMode === 'eraser' && state.pencilEraserPixelMode)));
     }
     function brushHardnessRatio() {
-      if (editToolUsesPixelFootprint()) return 1;
+      if (builderUsesPixelFootprint()) return 1;
       return clamp(Math.round(parseFloat(state.pencilHardness) || 0), 0, 100) / 100;
     }
     function temporaryPencilColorPickerActive(e = null) {
-      return !!(state.pencilMode && !animationPanelActive() && (state.pencilCtrlPickMode || e?.ctrlKey || e?.metaKey));
+      const paintTool = animationPanelActive() ? ['pencil', 'bucket'].includes(state.animationTool) : state.pencilMode || state.paintBucketMode;
+      return !!(paintTool && (state.pencilCtrlPickMode || e?.ctrlKey || e?.metaKey));
     }
     function setPencilCtrlPickMode(active, redraw = true) {
-      const next = !!active && state.pencilMode && !animationPanelActive();
+      const next = !!active && temporaryPencilColorPickerActive({ ctrlKey: true });
       if (state.pencilCtrlPickMode === next) return;
       state.pencilCtrlPickMode = next;
       state.brushCursorVisible = false;
       if (redraw && hasFrames()) drawFrame(state.currentFrame);
-      updateInfo();
+      updateInfo({ deferHiddenPalette: animationPanelActive() });
     }
     function pickPencilColorFromCanvasEvent(e) {
       const p = pointerCagePoint(e);
@@ -5606,7 +5505,7 @@
       state.brushX = p.x; state.brushY = p.y; state.brushCursorVisible = false;
       setPencilColorAt(state.activePencilColorIndex, color, { refresh: false });
       drawFrame(state.currentFrame);
-      updateInfo();
+      updateInfo({ deferHiddenPalette: animationPanelActive() });
       return color;
     }
     function activeRoundBrushMode() {
@@ -5614,14 +5513,11 @@
       if (temporaryPencilColorPickerActive()) return '';
       if (animationPixelBrushActive()) return 'pencil';
       if (state.pencilMode) {
-        if (editToolUsesPixelFootprint()) return 'pencil';
+        if (builderUsesPixelFootprint()) return 'pencil';
         return state.pencilToolMode === 'eraser' ? 'eraser' : 'brush';
       }
       if (state.maskMode && state.brushAction !== 'wand') return state.brushAction === 'restore' ? 'erase-mask' : 'mask';
       return '';
-    }
-    function activePencilTargetIsCageSpace(i = state.currentFrame) {
-      return !!(state.pencilMode && activePencilLayer(i) && pencilLayerIsCageSpace(activePencilLayer(i)));
     }
     function brushCursorGeometry() {
       const size = Math.max(1, Math.round(state.brushSize));
@@ -5638,12 +5534,11 @@
           ry: Math.max(.5, size * sy / 2)
         };
       }
-      const scale = state.pencilMode && !activePencilTargetIsCageSpace(state.currentFrame) ? frameScale(state.currentFrame) : { x: 1, y: 1 };
       return {
         cx: state.brushX + .5,
         cy: state.brushY + .5,
-        rx: Math.max(.5, size * scale.x / 2),
-        ry: Math.max(.5, size * scale.y / 2)
+        rx: size / 2,
+        ry: size / 2
       };
     }
     function strokeCursorEllipse(t, g, rx, ry, unit) {
@@ -5691,14 +5586,10 @@
       t.ellipse(x, y, Math.max(.5, rx), Math.max(.5, ry), 0, 0, Math.PI * 2);
       t.stroke();
     }
-    function pencilCursorFootprint(i) {
-      const frame = state.frames[i], canvas = frame?.canvas;
-      const animationBrush = animationPixelBrushActive();
-      const cageSpace = animationBrush || activePencilTargetIsCageSpace(i);
-      const targetCanvas = cageSpace ? { width: state.cageWidth, height: state.cageHeight } : canvas;
-      const point = cageSpace ? cagePixelPoint(state.brushX, state.brushY) : framePixelPoint(i, state.brushX, state.brushY);
-      if (!targetCanvas || !point) return null;
-      const size = Math.max(1, Math.round(animationBrush ? state.animationBrushSize : state.brushSize));
+    function pencilCursorFootprint() {
+      const point = cagePixelPoint(state.brushX, state.brushY);
+      if (!point) return null;
+      const size = Math.max(1, Math.round(state.animationBrushSize));
       const cx = point.x + .5, cy = point.y + .5;
       const left = Math.floor(cx - size / 2), top = Math.floor(cy - size / 2);
       const centerX = left + size / 2, centerY = top + size / 2;
@@ -5708,28 +5599,14 @@
         for (let x = 0; x < size; x++) {
           const px = left + x + .5, py = top + y + .5;
           const dx = px - centerX, dy = py - centerY;
-          if (!(animationBrush && state.animationTool === 'pencil') && dx * dx + dy * dy > r2) continue;
+          if (state.animationTool === 'eraser' && dx * dx + dy * dy > r2) continue;
           const sx = left + x, sy = top + y;
-          if (sx < 0 || sy < 0 || sx >= targetCanvas.width || sy >= targetCanvas.height) continue;
+          if (sx < 0 || sy < 0 || sx >= state.cageWidth || sy >= state.cageHeight) continue;
           cells.push({ x: sx, y: sy });
           keys.add(`${sx},${sy}`);
         }
       }
-      return cells.length ? { cells, keys, canvas: targetCanvas, cageSpace } : null;
-    }
-    function screenRectForFramePixel(i, canvas, px, py, shellRect, mainRect, zoomX, zoomY, cageSpace = false) {
-      if (cageSpace) {
-        const left = mainRect.left + px * zoomX;
-        const top = mainRect.top + py * zoomY;
-        return { left, top, right: left + zoomX, bottom: top + zoomY };
-      }
-      const p = framePos(i), s = frameScale(i);
-      const sourceX = frameFlipX(i) ? canvas.width - px - 1 : px;
-      const sourceY = frameFlipY(i) ? canvas.height - py - 1 : py;
-      const left = mainRect.left + (p.x + sourceX * s.x) * zoomX;
-      const top = mainRect.top + (p.y + sourceY * s.y) * zoomY;
-      const width = s.x * zoomX, height = s.y * zoomY;
-      return { left, top, right: left + width, bottom: top + height };
+      return cells.length ? { cells, keys } : null;
     }
     function crispCursorLine(v) { return Math.round(v) + .5; }
     function crispCursorPoint(v) { return Math.round(v); }
@@ -5749,10 +5626,9 @@
       t.moveTo(x1, y1);
       t.lineTo(x2, y2);
     }
-    function renderPencilCursorFootprint(t, shellRect, mainRect, zoomX, zoomY) {
-      const i = state.currentFrame, footprint = pencilCursorFootprint(i);
+    function renderPencilCursorFootprint(t, mainRect, zoomX, zoomY) {
+      const footprint = pencilCursorFootprint();
       if (!footprint) return false;
-      const flippedX = footprint.cageSpace ? false : frameFlipX(i), flippedY = footprint.cageSpace ? false : frameFlipY(i);
       t.save();
       t.setLineDash([]);
       t.lineWidth = 1;
@@ -5761,15 +5637,16 @@
       t.strokeStyle = 'rgba(255,255,255,.96)';
       t.beginPath();
       for (const cell of footprint.cells) {
-        const r = screenRectForFramePixel(i, footprint.canvas, cell.x, cell.y, shellRect, mainRect, zoomX, zoomY, footprint.cageSpace);
+        const left = mainRect.left + cell.x * zoomX, top = mainRect.top + cell.y * zoomY;
+        const right = left + zoomX, bottom = top + zoomY;
         const hasLeft = footprint.keys.has(`${cell.x - 1},${cell.y}`);
         const hasRight = footprint.keys.has(`${cell.x + 1},${cell.y}`);
         const hasTop = footprint.keys.has(`${cell.x},${cell.y - 1}`);
         const hasBottom = footprint.keys.has(`${cell.x},${cell.y + 1}`);
-        if (!(flippedY ? hasBottom : hasTop)) strokeScreenPixelSegment(t, r.left, r.top, r.right, r.top);
-        if (!(flippedY ? hasTop : hasBottom)) strokeScreenPixelSegment(t, r.left, r.bottom, r.right, r.bottom);
-        if (!(flippedX ? hasRight : hasLeft)) strokeScreenPixelSegment(t, r.left, r.top, r.left, r.bottom);
-        if (!(flippedX ? hasLeft : hasRight)) strokeScreenPixelSegment(t, r.right, r.top, r.right, r.bottom);
+        if (!hasTop) strokeScreenPixelSegment(t, left, top, right, top);
+        if (!hasBottom) strokeScreenPixelSegment(t, left, bottom, right, bottom);
+        if (!hasLeft) strokeScreenPixelSegment(t, left, top, left, bottom);
+        if (!hasRight) strokeScreenPixelSegment(t, right, top, right, bottom);
       }
       t.stroke();
       t.restore();
@@ -5803,7 +5680,7 @@
       const zoomY = mainRect.height / Math.max(1, frame.height);
       if (mode === 'pencil' && !builderSurface) {
         renderAnimationPaintLinePreview(t, mainRect, zoomX, zoomY);
-        if (!renderPencilCursorFootprint(t, shellRect, mainRect, zoomX, zoomY)) clearBrushCursorOverlay();
+        if (!renderPencilCursorFootprint(t, mainRect, zoomX, zoomY)) clearBrushCursorOverlay();
         t.restore();
         return;
       }
@@ -6546,7 +6423,6 @@
       syncCurrentFrameTransformInputs();
       syncPlaybackUi();
       updateActiveThumb();
-      updatePencilLayerUi();
       syncPixelGridUi();
     }
     function drawCompositorCanvas(opt = {}) {
@@ -6718,240 +6594,6 @@
       });
     }
 
-    function updatePencilLayerUi() {
-      const list = els.pencilLayerList;
-      if (!list) return;
-      list.textContent = '';
-      const layers = hasFrames() ? normalizeFramePencilLayers(state.currentFrame) : [];
-      if (!state.activePencilLayerId && layers.length) state.activePencilLayerId = layers[0].id;
-      if (state.activePencilLayerId && !layers.some(layer => layer.id === state.activePencilLayerId)) state.activePencilLayerId = layers[0]?.id || '';
-      layers.forEach(layer => {
-        const blendMode = normalizePencilBlendMode(layer);
-        const item = document.createElement('div');
-        item.className = 'pencil-layer-item';
-        item.classList.toggle('active', layer.id === state.activePencilLayerId);
-        item.classList.toggle('layer-hidden', layer.visible === false);
-        item.dataset.pencilLayerId = layer.id;
-        item.tabIndex = 0;
-        const name = document.createElement('div');
-        name.className = 'pencil-layer-name';
-        name.textContent = layer.name;
-        name.title = layer.name;
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'lock-button pencil-layer-remove-button';
-        remove.dataset.pencilLayerRemoveId = layer.id;
-        remove.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>';
-        remove.title = 'Remove Layer';
-        remove.setAttribute('aria-label', `Remove ${layer.name}`);
-        const blend = document.createElement('select');
-        blend.className = 'pencil-layer-blend-select';
-        blend.dataset.pencilLayerBlendId = layer.id;
-        blend.title = 'Blending mode';
-        blend.setAttribute('aria-label', `Blending mode for ${layer.name}`);
-        [['color', 'Color'], ['normal', 'Normal']].forEach(([value, text]) => {
-          const option = document.createElement('option');
-          option.value = value;
-          option.textContent = text;
-          option.selected = blendMode === value;
-          blend.appendChild(option);
-        });
-        const mask = document.createElement('button');
-        mask.type = 'button';
-        mask.className = 'secondary pencil-layer-mask-button';
-        mask.classList.toggle('active', layer.useMask !== false);
-        mask.dataset.pencilLayerMaskId = layer.id;
-        mask.title = layer.useMask !== false ? 'Disable layer mask' : 'Use sprite as layer mask';
-        mask.setAttribute('aria-label', `${layer.useMask !== false ? 'Disable' : 'Enable'} sprite mask for ${layer.name}`);
-        mask.setAttribute('aria-pressed', layer.useMask !== false ? 'true' : 'false');
-        mask.innerHTML = '<img class="tool-icon-image" src="icons/square-square.svg" alt="" aria-hidden="true" />';
-        const visible = document.createElement('button');
-        visible.type = 'button';
-        visible.className = 'secondary pencil-layer-visible-button';
-        visible.classList.toggle('active', layer.visible !== false);
-        visible.dataset.pencilLayerVisibleId = layer.id;
-        visible.title = layer.visible !== false ? 'Hide layer' : 'Show layer';
-        visible.setAttribute('aria-label', `${layer.visible !== false ? 'Hide' : 'Show'} ${layer.name}`);
-        visible.setAttribute('aria-pressed', layer.visible !== false ? 'true' : 'false');
-        visible.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-        item.append(name, blend, mask, visible, remove);
-        list.appendChild(item);
-      });
-      if (els.mergePencilLayersButton) els.mergePencilLayersButton.disabled = !hasFrames() || !layers.length;
-    }
-
-    function selectPencilLayer(id) {
-      if (!hasFrames() || !id) return;
-      const layers = normalizeFramePencilLayers(state.currentFrame);
-      if (!layers.some(layer => layer.id === id)) return;
-      if (state.activePencilLayerId === id) return;
-      state.activePencilLayerId = id;
-      updatePencilLayerUi();
-    }
-    function addPencilLayer() {
-      if (!hasFrames()) return;
-      showError('');
-      pushHistory();
-      const frame = state.frames[state.currentFrame], layers = normalizeFramePencilLayers(state.currentFrame);
-      const layer = normalizePencilLayer({
-        id: `pencil-layer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: `Layer ${layers.length + 1}`,
-        visible: true,
-        useMask: true,
-        blendMode: 'color',
-        normalMode: false,
-        space: 'cage',
-        canvas: makeMask(state.cageWidth, state.cageHeight)
-      }, layers.length, frame);
-      frame.pencilLayers.push(layer);
-      state.activePencilLayerId = layer.id;
-      state.pencilMode = true;
-      state.pencilCtrlPickMode = false;
-      state.maskMode = false;
-      state.paintBucketMode = false;
-      state.eyedropperMode = false;
-      state.paletteDropperMode = false;
-      drawFrame(state.currentFrame);
-      updateInfo();
-    }
-    function removePencilLayer(id) {
-      if (!hasFrames() || !id) return;
-      const layers = normalizeFramePencilLayers(state.currentFrame), index = layers.findIndex(layer => layer.id === id);
-      if (index < 0) return;
-      pushHistory();
-      layers.splice(index, 1);
-      state.activePencilLayerId = layers[Math.min(index, layers.length - 1)]?.id || '';
-      clearIndexPreviewCache();
-      clearTruePixelPreviewCache();
-      buildFilmstrip();
-      drawFrame(state.currentFrame);
-      updateInfo();
-    }
-    function setPencilLayerMask(id, checked) {
-      if (!hasFrames() || !id) return;
-      const layer = normalizeFramePencilLayers(state.currentFrame).find(item => item.id === id);
-      if (!layer || layer.useMask === checked) return;
-      pushHistory();
-      layer.useMask = checked;
-      clearIndexPreviewCache();
-      clearTruePixelPreviewCache();
-      buildFilmstrip();
-      drawFrame(state.currentFrame);
-      updateInfo();
-    }
-    function togglePencilLayerMask(id) {
-      if (!hasFrames() || !id) return;
-      const layer = normalizeFramePencilLayers(state.currentFrame).find(item => item.id === id);
-      if (!layer) return;
-      setPencilLayerMask(id, layer.useMask === false);
-    }
-    function setPencilLayerVisibility(id, visible) {
-      if (!hasFrames() || !id) return;
-      const layer = normalizeFramePencilLayers(state.currentFrame).find(item => item.id === id);
-      const next = visible !== false;
-      const current = layer?.visible !== false;
-      if (!layer || current === next) return;
-      pushHistory();
-      layer.visible = next;
-      clearIndexPreviewCache();
-      clearTruePixelPreviewCache();
-      buildFilmstrip();
-      drawFrame(state.currentFrame);
-      updateInfo();
-    }
-    function togglePencilLayerVisibility(id) {
-      if (!hasFrames() || !id) return;
-      const layer = normalizeFramePencilLayers(state.currentFrame).find(item => item.id === id);
-      if (!layer) return;
-      setPencilLayerVisibility(id, layer.visible === false);
-    }
-    function setPencilLayerBlendMode(id, mode) {
-      if (!hasFrames() || !id) return;
-      const next = mode === 'normal' ? 'normal' : 'color';
-      const layer = normalizeFramePencilLayers(state.currentFrame).find(item => item.id === id);
-      if (!layer || normalizePencilBlendMode(layer) === next) return;
-      pushHistory();
-      layer.blendMode = next;
-      layer.normalMode = next === 'normal';
-      clearIndexPreviewCache();
-      clearTruePixelPreviewCache();
-      buildFilmstrip();
-      drawFrame(state.currentFrame);
-      updateInfo();
-    }
-    function setPencilLayerName(id, value) {
-      if (!hasFrames() || !id) return;
-      const layer = normalizeFramePencilLayers(state.currentFrame).find(item => item.id === id);
-      if (!layer) return;
-      const next = String(value || '').trim();
-      if (!next || next === layer.name) {
-        updateInfo();
-        return;
-      }
-      pushHistory();
-      layer.name = next;
-      state.activePencilLayerId = id;
-      updateInfo();
-    }
-    function beginPencilLayerRename(id) {
-      const layers = normalizeFramePencilLayers(state.currentFrame);
-      const layer = layers.find(item => item.id === id);
-      const list = els.pencilLayerList;
-      if (!layer || !list) return;
-      state.activePencilLayerId = id;
-      updatePencilLayerUi();
-      const item = [...list.querySelectorAll('[data-pencil-layer-id]')].find(el => el.dataset.pencilLayerId === id);
-      const nameEl = item?.querySelector('.pencil-layer-name');
-      if (!nameEl) return;
-      const input = document.createElement('input');
-      input.className = 'pencil-layer-rename-input';
-      input.type = 'text';
-      input.value = layer.name || 'Layer';
-      input.dataset.pencilLayerRenameId = id;
-      input.setAttribute('aria-label', 'Pencil layer name');
-      nameEl.replaceWith(input);
-      input.focus();
-      input.select();
-      let finished = false;
-      const finish = commit => {
-        if (finished) return;
-        finished = true;
-        if (commit) setPencilLayerName(id, input.value);
-        else updateInfo();
-      };
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(true); }
-        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
-      });
-      input.addEventListener('blur', () => finish(true));
-    }
-    function mergePencilLayersToSprite() {
-      if (!hasFrames()) return;
-      const frame = state.frames[state.currentFrame], layers = normalizeFramePencilLayers(state.currentFrame).filter(layer => layer?.canvas && layer.visible !== false);
-      if (!frame || !layers.length) return;
-      pushHistory();
-      const merged = canvasClone(frame.canvas), mc = merged.getContext('2d', { alpha: true });
-      layers.forEach(layer => {
-        const source = pencilLayerSourceCanvas(state.currentFrame, layer);
-        if (!source) return;
-        mc.save();
-        mc.imageSmoothingEnabled = false;
-        mc.globalCompositeOperation = pencilLayerCompositeOperation(layer);
-        if (pencilLayerIsCageSpace(layer)) drawCageLayerIntoSource(mc, source, state.currentFrame);
-        else mc.drawImage(source, 0, 0);
-        mc.restore();
-      });
-      frame.canvas = merged;
-      frame.sourceCanvas = canvasClone(merged);
-      frame.pencilLayers = [];
-      state.activePencilLayerId = '';
-      state.indexedFrames[state.currentFrame] = null;
-      markFrameBitmapsDirty();
-      buildFilmstrip();
-      drawFrame(state.currentFrame);
-      updateInfo();
-    }
-
     function updateInfo({ deferHiddenPalette = false } = {}) {
       // Preserve palette editing state when it is in use, even with its panel closed.
       const refreshPalette = !deferHiddenPalette
@@ -6968,8 +6610,7 @@
       setVal(els.rowsInput, state.rows); setVal(els.colsInput, state.cols); setVal(els.startFrameInput, hasFrames() ? state.startFrame+1 : 1); setVal(els.endFrameInput, hasFrames() ? state.endFrame+1 : 0); setVal(els.importFrameSkipInput, state.importFrameSkip);
       if (els.importFrameSkipValue) els.importFrameSkipValue.textContent = state.importFrameSkip;
       if (els.importVideoInfo) { const stats = videoTimelineStats(); els.importVideoInfo.textContent = `Video: ${stats.count} frames, ${stats.fpsText} (${stats.durationText})`; }
-      setVal(els.speedInput, state.fps); setVal(els.backgroundInput, state.background); setVal(els.scanlineOpacityInput, state.scanlineOpacity); setVal(els.referenceShadowHeightInput, state.referenceShadowHeight); setVal(els.referenceShadowOffsetYInput, state.referenceShadowOffsetY); setVal(els.brushSizeInput, state.brushSize); setVal(els.maskBrushSizeInput, state.brushSize); setVal(els.pencilHardnessInput, state.pencilHardness); setVal(els.maskBrushHardnessInput, state.pencilHardness); setVal(els.magicToleranceInput, state.magicTolerance); setVal(els.haloToleranceInput, state.haloTolerance); setVal(els.indexColorsInput, state.indexColors); setVal(els.truePixelResolutionInput, state.truePixelResolution);
-      if (els.pencilEraserPixelModeInput) els.pencilEraserPixelModeInput.checked = !!state.pencilEraserPixelMode;
+      setVal(els.speedInput, state.fps); setVal(els.backgroundInput, state.background); setVal(els.scanlineOpacityInput, state.scanlineOpacity); setVal(els.referenceShadowHeightInput, state.referenceShadowHeight); setVal(els.referenceShadowOffsetYInput, state.referenceShadowOffsetY); setVal(els.maskBrushSizeInput, state.brushSize); setVal(els.maskBrushHardnessInput, state.pencilHardness); setVal(els.magicToleranceInput, state.magicTolerance); setVal(els.haloToleranceInput, state.haloTolerance); setVal(els.indexColorsInput, state.indexColors); setVal(els.truePixelResolutionInput, state.truePixelResolution);
       const currentScale = frameScale(state.currentFrame), globalScale = allFrameScale();
       setVal(els.cageWidthInput, Math.round(state.cageWidth)); setVal(els.cageHeightInput, Math.round(state.cageHeight)); setVal(els.scaleFrameXInput, scaleInputValue('x', currentScale)); setVal(els.scaleFrameYInput, scaleInputValue('y', currentScale)); setVal(els.scaleXInput, scaleInputValue('x', globalScale)); setVal(els.scaleYInput, scaleInputValue('y', globalScale));
       setVal(els.offsetXAllInput, Math.round(state.offsetXAll || 0)); setVal(els.offsetYAllInput, Math.round(state.offsetYAll || 0)); setVal(els.pivotOnlyXInput, pivotXValue()); setVal(els.pivotOnlyYInput, Math.round(state.pivotY)); setVal(els.offsetXInput, Math.round(o.x)); setVal(els.offsetYInput, Math.round(o.y));
@@ -7017,7 +6658,7 @@
       if (els.referenceCompositorClipOffsetYInput) els.referenceCompositorClipOffsetYInput.disabled = !state.referenceCompositorVisible || !activeCompositorPositionClip;
       if (els.referenceCompositorClipScaleInput) els.referenceCompositorClipScaleInput.disabled = !state.referenceCompositorVisible || !activeCompositorScaleClip;
       if (els.referenceCompositorClipSpeedInput) els.referenceCompositorClipSpeedInput.disabled = !state.referenceCompositorVisible || !activeCompositorSpeedClip;
-      els.speedValue.textContent = state.fps; els.scanlineOpacityValue.textContent = state.scanlineOpacity; els.referenceShadowHeightValue.textContent = state.referenceShadowHeight; els.brushSizeValue.textContent = state.brushSize; els.maskBrushSizeValue.textContent = state.brushSize; els.pencilHardnessValue.textContent = state.pencilHardness; els.maskBrushHardnessValue.textContent = state.pencilHardness; els.magicToleranceValue.textContent = state.magicTolerance; els.haloToleranceValue.textContent = state.haloTolerance; els.indexColorsValue.textContent = state.indexColors; els.truePixelResolutionValue.textContent = state.truePixelResolution;
+      els.speedValue.textContent = state.fps; els.scanlineOpacityValue.textContent = state.scanlineOpacity; els.referenceShadowHeightValue.textContent = state.referenceShadowHeight; els.maskBrushSizeValue.textContent = state.brushSize; els.maskBrushHardnessValue.textContent = state.pencilHardness; els.magicToleranceValue.textContent = state.magicTolerance; els.haloToleranceValue.textContent = state.haloTolerance; els.indexColorsValue.textContent = state.indexColors; els.truePixelResolutionValue.textContent = state.truePixelResolution;
       els.truePixelReferenceName.textContent = state.truePixelReferenceName ? `${state.truePixelReferenceName} (${state.truePixelReferenceSize?.width || 0} x ${state.truePixelReferenceSize?.height || 0})` : 'Click here or drag image file';
       els.truePixelDetectButton.disabled = !state.truePixelReferenceCanvas;
       const referenceCount = (state.displayReferenceLayers || []).length;
@@ -7085,18 +6726,12 @@
       syncSpriteFlipButtons();
       const tempPencilPicker = temporaryPencilColorPickerActive();
       const spriteSheetToolSurface = spriteSheetBuilderToolSurfaceAvailable();
-      const canvasToolSurfaceReady = hasFrames() || spriteSheetToolSurface;
-      if (els.pencilHardnessInput) els.pencilHardnessInput.disabled = !canvasToolSurfaceReady || editToolUsesPixelFootprint();
-      const eraserPixelModeVisible = !!(state.pencilMode && state.pencilToolMode === 'eraser' && !tempPencilPicker);
-      if (els.pencilEraserPixelModeField) els.pencilEraserPixelModeField.hidden = !eraserPixelModeVisible;
-      if (els.pencilEraserPixelModeInput) els.pencilEraserPixelModeInput.disabled = !canvasToolSurfaceReady || !eraserPixelModeVisible;
-      els.scaleLockButton.classList.toggle('active', state.scaleLocked); setScaleLockIcon(); setDisplayVisibilityButtons(); els.pencilButton.classList.toggle('active', state.pencilMode && state.pencilToolMode === 'pencil' && !tempPencilPicker); els.pencilBrushButton.classList.toggle('active', state.pencilMode && state.pencilToolMode === 'brush' && !tempPencilPicker); els.pencilEraserButton.classList.toggle('active', state.pencilMode && state.pencilToolMode === 'eraser' && !tempPencilPicker); els.paintBucketButton.classList.toggle('active', state.paintBucketMode); els.eyedropperButton.classList.toggle('active', state.eyedropperMode || tempPencilPicker); els.paletteDropperButton.classList.toggle('active', state.paletteDropperMode); els.maskBrushButton.classList.toggle('active', state.maskMode && state.brushAction === 'mask'); els.restoreBrushButton.classList.toggle('active', state.maskMode && state.brushAction === 'restore'); els.magicWandButton.classList.toggle('active', state.maskMode && state.brushAction === 'wand'); els.hideMaskButton.classList.toggle('active', state.hideMask); els.showHaloButton.classList.toggle('active', state.showHalo); els.indexFrameButton.classList.toggle('active', state.indexPreviewVisible); els.truePixelPreviewButton.classList.toggle('active', state.truePixelPreviewVisible); els.rulerVButton.classList.remove('active'); els.rulerHButton.classList.remove('active');
+      els.scaleLockButton.classList.toggle('active', state.scaleLocked); setScaleLockIcon(); setDisplayVisibilityButtons(); els.paletteDropperButton.classList.toggle('active', state.paletteDropperMode); els.maskBrushButton.classList.toggle('active', state.maskMode && state.brushAction === 'mask'); els.restoreBrushButton.classList.toggle('active', state.maskMode && state.brushAction === 'restore'); els.magicWandButton.classList.toggle('active', state.maskMode && state.brushAction === 'wand'); els.hideMaskButton.classList.toggle('active', state.hideMask); els.showHaloButton.classList.toggle('active', state.showHalo); els.indexFrameButton.classList.toggle('active', state.indexPreviewVisible); els.truePixelPreviewButton.classList.toggle('active', state.truePixelPreviewVisible); els.rulerVButton.classList.remove('active'); els.rulerHButton.classList.remove('active');
       setMaskControlVisibility();
       [['r', els.channelRButton], ['g', els.channelGButton], ['b', els.channelBButton], ['a', els.channelAButton]].forEach(([mode, button]) => { button.classList.toggle('active', state.indexChannelMode === mode); button.setAttribute('aria-pressed', state.indexChannelMode === mode ? 'true' : 'false'); });
       const playLabel = playbackControlsActive() ? '⏸' : '▶';
       if (els.playButton.textContent !== playLabel) els.playButton.textContent = playLabel;
       setPlaybackLoopButton();
-      renderPencilColorPalette();
       els.rulerColorSwatch.style.background = colorToCss(activeRulerColor());
       els.indexHighlightColorSwatch.style.background = colorToCss(state.indexHighlightColor || DEFAULT_INDEX_HIGHLIGHT_COLOR);
       els.referenceShadowColorSwatch.style.background = colorToCss(state.referenceShadowColor);
@@ -7120,6 +6755,7 @@
       els.canvasShell.classList.toggle('animation-lasso-cursor', animationPanelActive() && state.animationTool === 'lasso' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-rectangle-cursor', animationPanelActive() && state.animationTool === 'rectangle' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-wand-cursor', animationPanelActive() && state.animationTool === 'wand' && !colorPicker.pickMode);
+      els.canvasShell.classList.toggle('animation-bucket-cursor', animationPanelActive() && state.animationTool === 'bucket' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-dropper-cursor', animationPanelActive() && (state.animationTool === 'dropper' || tempPencilPicker) && !colorPicker.pickMode);
       if (refreshPalette) updateIndexPreview();
       setButtons(hasFrames());
@@ -7157,7 +6793,6 @@
       els.resetMaskButton.disabled = spriteSheetToolSurface ? !builderMaskFrame?.maskDirty : !hasCurrentMask;
       els.resetAllMasksButton.disabled = spriteSheetToolSurface ? !builderHasMasks : (!hasFrames() || !hasUnbakedMasks);
       els.bakeAllMasksButton.disabled = !hasFrames() || !hasUnbakedMasks;
-      updatePencilLayerUi();
       if (refreshPalette) {
         updateReferencePaletteUi();
         syncPaletteSelectionUi();
@@ -7165,7 +6800,7 @@
       syncPaletteMatchUi();
       syncSpriteSheetBuilderUi();
       syncSpriteEditUi();
-      syncEditToolClipOutlineUi();
+      syncEditImageClipOutlineUi();
       syncPixelGridUi();
       updateReferenceCompositorUi();
       updateMaskBakeIndicator();
@@ -7923,12 +7558,12 @@
         ['b', els.spriteEditBrightnessInput, els.spriteEditBrightnessValue],
         ['c', els.spriteEditContrastInput, els.spriteEditContrastValue],
         ['sharp', els.spriteEditSharpnessInput, els.spriteEditSharpnessValue],
-        ['h', els.editToolSpriteEditHueInput, els.editToolSpriteEditHueValue],
-        ['s', els.editToolSpriteEditSaturationInput, els.editToolSpriteEditSaturationValue],
-        ['l', els.editToolSpriteEditLightnessInput, els.editToolSpriteEditLightnessValue],
-        ['b', els.editToolSpriteEditBrightnessInput, els.editToolSpriteEditBrightnessValue],
-        ['c', els.editToolSpriteEditContrastInput, els.editToolSpriteEditContrastValue],
-        ['sharp', els.editToolSpriteEditSharpnessInput, els.editToolSpriteEditSharpnessValue]
+        ['h', els.editImageSpriteEditHueInput, els.editImageSpriteEditHueValue],
+        ['s', els.editImageSpriteEditSaturationInput, els.editImageSpriteEditSaturationValue],
+        ['l', els.editImageSpriteEditLightnessInput, els.editImageSpriteEditLightnessValue],
+        ['b', els.editImageSpriteEditBrightnessInput, els.editImageSpriteEditBrightnessValue],
+        ['c', els.editImageSpriteEditContrastInput, els.editImageSpriteEditContrastValue],
+        ['sharp', els.editImageSpriteEditSharpnessInput, els.editImageSpriteEditSharpnessValue]
       ];
     }
     function spriteEditControls() {
@@ -7936,15 +7571,15 @@
         ...spriteEditControlGroups().flatMap(([, slider, number]) => [slider, number])
       ].filter(Boolean);
     }
-    function editToolSpriteEditControls() {
+    function editImageSpriteEditControls() {
       return [
         ...[
-          ['h', els.editToolSpriteEditHueInput, els.editToolSpriteEditHueValue],
-          ['s', els.editToolSpriteEditSaturationInput, els.editToolSpriteEditSaturationValue],
-          ['l', els.editToolSpriteEditLightnessInput, els.editToolSpriteEditLightnessValue],
-          ['b', els.editToolSpriteEditBrightnessInput, els.editToolSpriteEditBrightnessValue],
-          ['c', els.editToolSpriteEditContrastInput, els.editToolSpriteEditContrastValue],
-          ['sharp', els.editToolSpriteEditSharpnessInput, els.editToolSpriteEditSharpnessValue]
+          ['h', els.editImageSpriteEditHueInput, els.editImageSpriteEditHueValue],
+          ['s', els.editImageSpriteEditSaturationInput, els.editImageSpriteEditSaturationValue],
+          ['l', els.editImageSpriteEditLightnessInput, els.editImageSpriteEditLightnessValue],
+          ['b', els.editImageSpriteEditBrightnessInput, els.editImageSpriteEditBrightnessValue],
+          ['c', els.editImageSpriteEditContrastInput, els.editImageSpriteEditContrastValue],
+          ['sharp', els.editImageSpriteEditSharpnessInput, els.editImageSpriteEditSharpnessValue]
         ].flatMap(([, slider, number]) => [slider, number])
       ].filter(Boolean);
     }
@@ -7979,14 +7614,14 @@
     }
     function syncSpriteEditUi() {
       const enabled = hasFrames() && state.spriteEditMode;
-      const editToolEnabled = hasFrames();
-      const editToolControls = new Set(editToolSpriteEditControls());
+      const editImageEnabled = hasFrames() && !spriteSheetBuilderPanelActive();
+      const editImageControls = new Set(editImageSpriteEditControls());
       const paletteLayerMode = spriteEditUsesPaletteLayer();
       els.spriteEditColorButton.classList.toggle('active', !!state.spriteEditMode);
       els.spriteEditControls.hidden = !state.spriteEditMode;
       spriteEditControlGroups().forEach(([axis, slider, number]) => {
         [slider, number].filter(Boolean).forEach(input => {
-          const disabled = editToolControls.has(input) ? !editToolEnabled : !enabled;
+          const disabled = editImageControls.has(input) ? !editImageEnabled : !enabled;
           input.disabled = disabled;
         });
       });
@@ -7994,7 +7629,7 @@
         ? (paletteLayerEditIsNeutral() && !state.spriteEditBaseFrames && spriteEditIsNeutral())
         : (!state.spriteEditBaseFrames && spriteEditIsNeutral());
       els.spriteEditResetButton.disabled = !enabled || resetDisabled;
-      if (els.editToolSpriteEditResetButton) els.editToolSpriteEditResetButton.disabled = !editToolEnabled || resetDisabled;
+      if (els.editImageSpriteEditResetButton) els.editImageSpriteEditResetButton.disabled = !editImageEnabled || resetDisabled;
       syncSpriteEditInputs();
     }
     function syncPaletteSelectionUi() {
@@ -10686,7 +10321,7 @@
     }
     function spriteSheetBuilderToolSurfaceAvailable() {
       const panel = activeInspectorPanelName();
-      return spriteSheetBuilderEditingAvailable() && (panel === 'Edit Tools' || panel === 'Mask');
+      return spriteSheetBuilderEditingAvailable() && (panel === 'Edit Image' || panel === 'Mask');
     }
     function spriteSheetBuilderToolModeActive(e = null) {
       return spriteSheetBuilderToolSurfaceAvailable() && (
@@ -10918,9 +10553,11 @@
         const color = sampleSpriteSheetBuilderFrameColor(point.frame, point.x, point.y, { allowTransparent: true });
         state.brushX = point.guideX; state.brushY = point.guideY; state.brushCursorVisible = false;
         if (color) setPencilColorAt(state.activePencilColorIndex, color, { refresh: false });
-        state.eyedropperMode = false;
-        state.pencilMode = true;
-        state.pencilCtrlPickMode = false;
+        if (state.eyedropperMode) {
+          state.eyedropperMode = false;
+          state.pencilMode = true;
+          state.pencilToolMode = 'pencil';
+        }
         refreshSpriteSheetBuilderToolPreview();
         updateInfo();
         return true;
@@ -13466,7 +13103,7 @@
         const savedReferenceCompositorFontAssets = await restoreSerializedReferenceCompositorFontAssets(s.referenceCompositorFontAssets || []);
         const savedFontCanvas = s.fontData ? await canvasFromDataURL(s.fontData) : null;
         const savedAnimationLayers = await restoreAnimationLayers(s.animationLayers);
-        Object.assign(state,{ sheetImage:sheetImages[0]?.image || null, sheetImages, imageName:project.imageName||file.name||'spritesheet', frames, importedId:project.importedId||0, rows:clamp(parseInt(s.rows,10)||1,1,100), cols:clamp(parseInt(s.cols,10)||1,1,100), currentFrame:Number.isFinite(savedCurrent)?savedCurrent:0, startFrame:Number.isFinite(savedStart)?savedStart:0, endFrame:Number.isFinite(savedEnd)?savedEnd:Math.max(0,frames.length-1), importFrameSkip:clamp(parseInt(s.importFrameSkip,10)||0,0,Math.max(1,parseInt(s.importFrameSkipMax,10)||60)), importFrameSkipMax:Math.max(1,parseInt(s.importFrameSkipMax,10)||60), fps:clamp(parseInt(s.fps,10)||12,1,60), pingPongAnimation:!!s.pingPongAnimation, loopPlayback:s.loopPlayback!==false, oneRowPack:s.oneRowPack!==undefined?!!s.oneRowPack:!!s.recommendedRepack, playbackDirection:1, referenceAnimationPlaying:false, referenceAnimationTime:0, referenceAnimationLastTick:0, frameWidth:s.frameWidth||0, frameHeight:s.frameHeight||0, cageWidth:clamp(Math.round(s.cageWidth||frames[0]?.canvas.width||1),1,8192), cageHeight:clamp(Math.round(s.cageHeight||frames[0]?.canvas.height||1),1,8192), cageCustom:!!s.cageCustom, scaleX:clamp(parseFloat(s.scaleX)||1,.01,100), scaleY:clamp(parseFloat(s.scaleY)||1,.01,100), scaleLocked:s.scaleLocked!==false, scaleUnit:s.scaleUnit==='px'?'px':'percent', displayReferenceUnit:s.displayReferenceUnit==='px'?'px':'percent', offsetXAll:Math.round(s.offsetXAll||0), offsetYAll:Math.round(s.offsetYAll||0), pivotX:Number.isFinite(parseFloat(s.pivotX))?Math.round(parseFloat(s.pivotX)):null, pivotY:Math.round(s.pivotY||0), rulersV:Array.isArray(s.rulersV)?s.rulersV:[], rulersH:Array.isArray(s.rulersH)?s.rulersH:[], rulersBeyondCage:!!s.rulersBeyondCage, rulerColor:cloneColor(s.rulerColor || DEFAULT_RULER_COLOR), showCageOverlay:s.showCageOverlay!==undefined?s.showCageOverlay!==false:s.showGuideOverlay!==false, showRulerOverlay:s.showRulerOverlay!==undefined?s.showRulerOverlay!==false:s.showGuideOverlay!==false, showPivotOverlay:s.showPivotOverlay!==false, pivotDark:!!s.pivotDark, background:['checker','dark','light','transparent','custom'].includes(s.background)?s.background:'checker', backgroundCustomColor:cloneColor(s.backgroundCustomColor || { r: 32, g: 40, b: 52, a: 255 }), frameOffsets:project.frames.map(f=>({x:Math.round(f.offset?.x||0),y:Math.round(f.offset?.y||0)})), frameMasks:masks.map(m=>m||makeMask()), maskDirty:project.frames.map(f=>!!f.mask), indexedFrames, maskMode:!!s.maskMode, hideMask:!!s.hideMask, pencilMode:!!s.pencilMode, pencilCtrlPickMode:false, eyedropperMode:!!s.eyedropperMode, brushAction:['mask','restore','wand'].includes(s.brushAction)?s.brushAction:'mask', brushSize:clamp(parseInt(s.brushSize,10)||18,1,120), pencilToolMode:normalizePencilToolMode(s.pencilToolMode), pencilEraserPixelMode:!!s.pencilEraserPixelMode, pencilHardness:clamp(Math.round(Number.isFinite(parseFloat(s.pencilHardness))?parseFloat(s.pencilHardness):100),0,100), pencilColor:cloneColor(s.pencilColor || { r: 182, g: 192, b: 207, a: 255 }), activePencilLayerId:s.activePencilLayerId || '', magicTolerance:clamp(Number.isFinite(savedMagicTolerance)?savedMagicTolerance:32,0,255), magicAntialias:s.magicAntialias!==false, magicContiguous:s.magicContiguous!==false, haloTolerance:clamp(parseInt(s.haloTolerance,10)||12,0,30), showHalo:false, indexColors:clamp(parseInt(s.indexColors,10)||256,3,256), indexKeepTransparency:s.indexKeepTransparency!==false, indexHighlightColors:s.indexHighlightColors!==false, indexHighlightColor:cloneColor(s.indexHighlightColor || DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible:false, indexResetPendingAll:false, indexChannelMode:['r','g','b','a'].includes(s.indexChannelMode)?s.indexChannelMode:'none', frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, uploadedPaletteKey:'', uploadedPaletteInfo:null, truePixelResolution:normalizeTruePixelResolution(s.truePixelResolution || 128), truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, zoom:clamp(parseFloat(s.zoom)||1,CANVAS_ZOOM_MIN,CANVAS_ZOOM_MAX), panX:parseFloat(s.panX)||0, panY:parseFloat(s.panY)||0, undoStack:[], redoStack:[], restoring:false });
+        Object.assign(state,{ sheetImage:sheetImages[0]?.image || null, sheetImages, imageName:project.imageName||file.name||'spritesheet', frames, importedId:project.importedId||0, rows:clamp(parseInt(s.rows,10)||1,1,100), cols:clamp(parseInt(s.cols,10)||1,1,100), currentFrame:Number.isFinite(savedCurrent)?savedCurrent:0, startFrame:Number.isFinite(savedStart)?savedStart:0, endFrame:Number.isFinite(savedEnd)?savedEnd:Math.max(0,frames.length-1), importFrameSkip:clamp(parseInt(s.importFrameSkip,10)||0,0,Math.max(1,parseInt(s.importFrameSkipMax,10)||60)), importFrameSkipMax:Math.max(1,parseInt(s.importFrameSkipMax,10)||60), fps:clamp(parseInt(s.fps,10)||12,1,60), pingPongAnimation:!!s.pingPongAnimation, loopPlayback:s.loopPlayback!==false, oneRowPack:s.oneRowPack!==undefined?!!s.oneRowPack:!!s.recommendedRepack, playbackDirection:1, referenceAnimationPlaying:false, referenceAnimationTime:0, referenceAnimationLastTick:0, frameWidth:s.frameWidth||0, frameHeight:s.frameHeight||0, cageWidth:clamp(Math.round(s.cageWidth||frames[0]?.canvas.width||1),1,8192), cageHeight:clamp(Math.round(s.cageHeight||frames[0]?.canvas.height||1),1,8192), cageCustom:!!s.cageCustom, scaleX:clamp(parseFloat(s.scaleX)||1,.01,100), scaleY:clamp(parseFloat(s.scaleY)||1,.01,100), scaleLocked:s.scaleLocked!==false, scaleUnit:s.scaleUnit==='px'?'px':'percent', displayReferenceUnit:s.displayReferenceUnit==='px'?'px':'percent', offsetXAll:Math.round(s.offsetXAll||0), offsetYAll:Math.round(s.offsetYAll||0), pivotX:Number.isFinite(parseFloat(s.pivotX))?Math.round(parseFloat(s.pivotX)):null, pivotY:Math.round(s.pivotY||0), rulersV:Array.isArray(s.rulersV)?s.rulersV:[], rulersH:Array.isArray(s.rulersH)?s.rulersH:[], rulersBeyondCage:!!s.rulersBeyondCage, rulerColor:cloneColor(s.rulerColor || DEFAULT_RULER_COLOR), showCageOverlay:s.showCageOverlay!==undefined?s.showCageOverlay!==false:s.showGuideOverlay!==false, showRulerOverlay:s.showRulerOverlay!==undefined?s.showRulerOverlay!==false:s.showGuideOverlay!==false, showPivotOverlay:s.showPivotOverlay!==false, pivotDark:!!s.pivotDark, background:['checker','dark','light','transparent','custom'].includes(s.background)?s.background:'checker', backgroundCustomColor:cloneColor(s.backgroundCustomColor || { r: 32, g: 40, b: 52, a: 255 }), frameOffsets:project.frames.map(f=>({x:Math.round(f.offset?.x||0),y:Math.round(f.offset?.y||0)})), frameMasks:masks.map(m=>m||makeMask()), maskDirty:project.frames.map(f=>!!f.mask), indexedFrames, maskMode:!!s.maskMode, hideMask:!!s.hideMask, pencilMode:false, pencilCtrlPickMode:false, eyedropperMode:false, brushAction:['mask','restore','wand'].includes(s.brushAction)?s.brushAction:'mask', brushSize:clamp(parseInt(s.brushSize,10)||18,1,120), pencilToolMode:normalizePencilToolMode(s.pencilToolMode), pencilEraserPixelMode:!!s.pencilEraserPixelMode, pencilHardness:clamp(Math.round(Number.isFinite(parseFloat(s.pencilHardness))?parseFloat(s.pencilHardness):100),0,100), pencilColor:cloneColor(s.pencilColor || { r: 182, g: 192, b: 207, a: 255 }), activePencilLayerId:s.activePencilLayerId || '', magicTolerance:clamp(Number.isFinite(savedMagicTolerance)?savedMagicTolerance:32,0,255), magicAntialias:s.magicAntialias!==false, magicContiguous:s.magicContiguous!==false, haloTolerance:clamp(parseInt(s.haloTolerance,10)||12,0,30), showHalo:false, indexColors:clamp(parseInt(s.indexColors,10)||256,3,256), indexKeepTransparency:s.indexKeepTransparency!==false, indexHighlightColors:s.indexHighlightColors!==false, indexHighlightColor:cloneColor(s.indexHighlightColor || DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible:false, indexResetPendingAll:false, indexChannelMode:['r','g','b','a'].includes(s.indexChannelMode)?s.indexChannelMode:'none', frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, uploadedPaletteKey:'', uploadedPaletteInfo:null, truePixelResolution:normalizeTruePixelResolution(s.truePixelResolution || 128), truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, zoom:clamp(parseFloat(s.zoom)||1,CANVAS_ZOOM_MIN,CANVAS_ZOOM_MAX), panX:parseFloat(s.panX)||0, panY:parseFloat(s.panY)||0, undoStack:[], redoStack:[], restoring:false });
         state.animationLayers = savedAnimationLayers;
         state.activeAnimationLayerId = s.activeAnimationLayerId || "";
         state.selectedAnimationLayerIds=[...(s.selectedAnimationLayerIds || [state.activeAnimationLayerId].filter(Boolean))];
@@ -13613,10 +13250,10 @@
         state.paletteAdjustHistoryPushed = false;
         state.offsetXAllHistoryPushed = false;
         state.offsetYAllHistoryPushed = false;
-        state.paintBucketMode = !!s.paintBucketMode;
+        state.paintBucketMode = false;
         markFrameBitmapsDirty();
         if (state.paletteLayers.length) reanchorGeneratedPaletteState(uploadedPaletteSourceKey(state.currentFrame));
-        els.rowsInput.value=state.rows; els.colsInput.value=state.cols; els.startFrameInput.value=state.startFrame+1; els.endFrameInput.value=state.endFrame+1; els.importFrameSkipInput.max=state.importFrameSkipMax; els.importFrameSkipInput.value=state.importFrameSkip; els.speedInput.value=state.fps; els.pingPongInput.checked=state.pingPongAnimation; els.oneRowPackInput.checked=state.oneRowPack; els.brushSizeInput.value=state.brushSize; els.pencilHardnessInput.value=state.pencilHardness; els.pencilEraserPixelModeInput.checked=!!state.pencilEraserPixelMode; els.magicToleranceInput.value=state.magicTolerance; els.magicAntialiasInput.checked=state.magicAntialias; els.magicContiguousInput.checked=state.magicContiguous; els.haloToleranceInput.value=state.haloTolerance; els.indexColorsInput.value=state.indexColors; els.indexKeepTransparencyInput.checked=state.indexKeepTransparency; els.indexHighlightColorsInput.checked=state.indexHighlightColors !== false; els.truePixelResolutionInput.value=state.truePixelResolution; els.backgroundInput.value=state.background;
+        els.rowsInput.value=state.rows; els.colsInput.value=state.cols; els.startFrameInput.value=state.startFrame+1; els.endFrameInput.value=state.endFrame+1; els.importFrameSkipInput.max=state.importFrameSkipMax; els.importFrameSkipInput.value=state.importFrameSkip; els.speedInput.value=state.fps; els.pingPongInput.checked=state.pingPongAnimation; els.oneRowPackInput.checked=state.oneRowPack; els.magicToleranceInput.value=state.magicTolerance; els.magicAntialiasInput.checked=state.magicAntialias; els.magicContiguousInput.checked=state.magicContiguous; els.haloToleranceInput.value=state.haloTolerance; els.indexColorsInput.value=state.indexColors; els.indexKeepTransparencyInput.checked=state.indexKeepTransparency; els.indexHighlightColorsInput.checked=state.indexHighlightColors !== false; els.truePixelResolutionInput.value=state.truePixelResolution; els.backgroundInput.value=state.background;
         syncAfterDataChange(false);
       } catch(e) { showError(e.message || 'Could not load that project file.'); }
     }
@@ -15390,7 +15027,7 @@
       const color = referenceClipOutlineModalColor || clip?.outlineColor || DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR;
       openColorPicker({ type: 'reference-clip-outline', clipId: clip?.id || '' }, color, 'Outline Color');
     }
-    function editToolReferenceClips() {
+    function editImageReferenceClips() {
       const ids = selectedReferenceCompositorClipIdsForAction(state.activeReferenceCompositorClipId);
       const clips = ids
         .map(id => (state.referenceCompositorClips || []).find(clip => clip.id === id && clip.kind === 'reference'))
@@ -15399,33 +15036,33 @@
       const active = (state.referenceCompositorClips || []).find(clip => clip.id === state.activeReferenceCompositorClipId && clip.kind === 'reference');
       return active ? [active] : [];
     }
-    function syncEditToolClipOutlineColor(color) {
+    function syncEditImageClipOutlineColor(color) {
       const safe = normalizeReferenceClipOutlineColor(color);
-      if (els.editToolClipOutlineColorSwatch) els.editToolClipOutlineColorSwatch.style.background = colorToCss(safe);
+      if (els.editImageClipOutlineColorSwatch) els.editImageClipOutlineColorSwatch.style.background = colorToCss(safe);
     }
-    function syncEditToolClipOutlineUi() {
-      const clips = editToolReferenceClips();
+    function syncEditImageClipOutlineUi() {
+      const clips = editImageReferenceClips();
       const primary = clips[0] || null;
       const hasClips = !!primary;
       const hasTarget = hasClips || hasFrames();
       const outlineEnabled = !!primary?.outline;
       const spriteOutlineEnabled = !!state.spriteOutline;
       const activeOutlineEnabled = hasClips ? outlineEnabled : spriteOutlineEnabled;
-      if (els.editToolClipOutlineInput) {
-        els.editToolClipOutlineInput.disabled = !hasTarget;
-        els.editToolClipOutlineInput.checked = activeOutlineEnabled;
-        els.editToolClipOutlineInput.indeterminate = hasClips && clips.length > 1 && clips.some(clip => !!clip.outline !== outlineEnabled);
+      if (els.editImageClipOutlineInput) {
+        els.editImageClipOutlineInput.disabled = !hasTarget;
+        els.editImageClipOutlineInput.checked = activeOutlineEnabled;
+        els.editImageClipOutlineInput.indeterminate = hasClips && clips.length > 1 && clips.some(clip => !!clip.outline !== outlineEnabled);
       }
-      if (els.editToolClipOutlineWidthInput) {
-        setVal(els.editToolClipOutlineWidthInput, normalizeReferenceClipOutlineWidth(hasClips ? primary?.outlineWidth : state.spriteOutlineWidth));
-        els.editToolClipOutlineWidthInput.disabled = !hasTarget || !activeOutlineEnabled;
-        els.editToolClipOutlineWidthInput.closest('.field')?.classList.toggle('disabled', !hasTarget || !activeOutlineEnabled);
+      if (els.editImageClipOutlineWidthInput) {
+        setVal(els.editImageClipOutlineWidthInput, normalizeReferenceClipOutlineWidth(hasClips ? primary?.outlineWidth : state.spriteOutlineWidth));
+        els.editImageClipOutlineWidthInput.disabled = !hasTarget || !activeOutlineEnabled;
+        els.editImageClipOutlineWidthInput.closest('.field')?.classList.toggle('disabled', !hasTarget || !activeOutlineEnabled);
       }
-      syncEditToolClipOutlineColor(hasClips ? (primary?.outlineColor || DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR) : (state.spriteOutlineColor || DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR));
-      if (els.editToolClipOutlineColorButton) els.editToolClipOutlineColorButton.disabled = !hasTarget || !activeOutlineEnabled;
+      syncEditImageClipOutlineColor(hasClips ? (primary?.outlineColor || DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR) : (state.spriteOutlineColor || DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR));
+      if (els.editImageClipOutlineColorButton) els.editImageClipOutlineColorButton.disabled = !hasTarget || !activeOutlineEnabled;
     }
-    function setEditToolClipOutlineValues(values = {}) {
-      const clips = editToolReferenceClips();
+    function setEditImageClipOutlineValues(values = {}) {
+      const clips = editImageReferenceClips();
       const next = {
         outline: values.outline,
         outlineWidth: values.outlineWidth,
@@ -15469,13 +15106,13 @@
       updateReferenceCompositorUi();
       updateInfo();
     }
-    function openEditToolClipOutlineColorPicker() {
-      const clip = editToolReferenceClips()[0];
+    function openEditImageClipOutlineColorPicker() {
+      const clip = editImageReferenceClips()[0];
       const color = clip?.outlineColor || state.spriteOutlineColor || DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR;
-      openColorPicker({ type: 'edit-tool-clip-outline', clipId: clip?.id || '' }, color, 'Outline Color');
+      openColorPicker({ type: 'edit-image-clip-outline', clipId: clip?.id || '' }, color, 'Outline Color');
     }
-    function commitEditToolClipOutlineColor(color) {
-      setEditToolClipOutlineValues({ outlineColor: normalizeReferenceClipOutlineColor(color) });
+    function commitEditImageClipOutlineColor(color) {
+      setEditImageClipOutlineValues({ outlineColor: normalizeReferenceClipOutlineColor(color) });
     }
     function commitReferenceClipShadowColor(color) {
       referenceClipShadowModalColor = cloneColor(color || DEFAULT_REFERENCE_SHADOW_COLOR);
@@ -16378,149 +16015,6 @@
         clearIndexPreviewCache();
       }
     }
-    function directPaintNeedsCagePromotion(i) {
-      const frame = state.frames[i];
-      if (!frame?.canvas) return false;
-      const layout = frameLayoutForCage(i, state.cageWidth, state.cageHeight);
-      return frame.canvas.width !== state.cageWidth
-        || frame.canvas.height !== state.cageHeight
-        || Math.round(layout.x) !== 0
-        || Math.round(layout.y) !== 0
-        || Math.round(layout.width) !== Math.round(state.cageWidth)
-        || Math.round(layout.height) !== Math.round(state.cageHeight)
-        || frameFlipX(i)
-        || frameFlipY(i);
-    }
-    function renderDirectPaintCageCanvas(i) {
-      const canvas = makeMask(state.cageWidth, state.cageHeight);
-      const ctx2d = canvas.getContext('2d', { alpha: true });
-      ctx2d.imageSmoothingEnabled = false;
-      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      ctx2d.save();
-      ctx2d.beginPath();
-      ctx2d.rect(0, 0, state.cageWidth, state.cageHeight);
-      ctx2d.clip();
-      drawSpritePixels(ctx2d, i, 0, 0, { skipSheetContinuation: false });
-      ctx2d.restore();
-      return canvas;
-    }
-    function promoteFrameForDirectCagePaint(i) {
-      const frame = state.frames[i];
-      if (!frame?.canvas || !directPaintNeedsCagePromotion(i)) return false;
-      const oldLayouts = captureFrameMaskLayouts();
-      const baked = renderDirectPaintCageCanvas(i);
-      const allScale = allFrameScale();
-      frame.canvas = baked;
-      frame.sourceCanvas = canvasClone(baked);
-      frame.sheetSlice = null;
-      frame.sheetCrop = null;
-      state.frameOffsets[i] = { x: 0, y: 0 };
-      state.frameScales[i] = {
-        x: clamp(1 / Math.max(.01, allScale.x), .01, 100),
-        y: clamp(1 / Math.max(.01, allScale.y), .01, 100)
-      };
-      state.frameFlips[i] = false;
-      state.frameFlipYs[i] = false;
-      state.indexedFrames[i] = null;
-      ensureArrays(oldLayouts);
-      return true;
-    }
-    function paintPencilLine(i,x1,y1,x2,y2) {
-      const frame = state.frames[i];
-      if (!frame) return;
-      const size = Math.max(1, Math.round(state.brushSize)), dx = x2 - x1, dy = y2 - y1;
-      const erasing = state.pencilToolMode === 'eraser';
-      const layer = activePencilLayer(i);
-      const cageSpace = !!(layer?.canvas && pencilLayerIsCageSpace(layer));
-      if (!layer?.canvas) promoteFrameForDirectCagePaint(i);
-      const fs = frameScale(i), dist = Math.hypot(dx, dy);
-      const stepScale = cageSpace ? 1 : Math.min(fs.x, fs.y);
-      const steps = Math.max(1, Math.ceil(dist / Math.max(1, stepScale * Math.max(1, size * .25))));
-      const paintOn = (canvas, useCageSpace = false) => {
-        const c = canvas.getContext('2d', { alpha: true });
-        c.save();
-        if (erasing) c.globalCompositeOperation = 'destination-out';
-        for (let k = 0; k <= steps; k++) {
-          const t = k / steps;
-          const point = useCageSpace ? cagePixelPoint(x1 + dx * t, y1 + dy * t) : framePixelPoint(i, x1 + dx * t, y1 + dy * t);
-          if (!point) continue;
-          const color = erasing ? { r: 0, g: 0, b: 0, a: 255 } : state.pencilColor;
-          if (state.pencilToolMode === 'brush' || (erasing && !state.pencilEraserPixelMode)) {
-            stampRoundBrush(c, point.x + .5, point.y + .5, Math.max(.5, size / 2), color);
-          } else {
-            stampHardPencil(c, point.x + .5, point.y + .5, size, color);
-          }
-        }
-        c.restore();
-      };
-      if (layer?.canvas) {
-        paintOn(layer.canvas, cageSpace);
-        clearIndexPreviewCache();
-        clearTruePixelPreviewCache();
-        markFrameBitmapsDirty();
-        return;
-      }
-      paintOn(frame.sourceCanvas || frame.canvas);
-      paintOn(frame.canvas);
-      state.indexedFrames[i] = null;
-      clearIndexPreviewCache();
-      clearTruePixelPreviewCache();
-      markFrameBitmapsDirty();
-    }
-    function paintBucketFill(i, cx, cy) {
-      readMagicOptions();
-      const frame = state.frames[i], layer = activePencilLayer(i), cageSpace = !!(layer?.canvas && pencilLayerIsCageSpace(layer));
-      if (!layer?.canvas) promoteFrameForDirectCagePaint(i);
-      const point = cageSpace ? cagePixelPoint(cx, cy) : framePixelPoint(i, cx, cy);
-      if (!frame || !point) return false;
-      const canvas = cageSpace ? layer.canvas : frame.canvas, ctx2d = canvas.getContext('2d', { alpha: true }), img = ctx2d.getImageData(0, 0, canvas.width, canvas.height), data = img.data, w = img.width, h = img.height;
-      const start = point.y * w + point.x, sp = start * 4, target = { r: data[sp], g: data[sp + 1], b: data[sp + 2], a: data[sp + 3] };
-      const fill = cloneColor(state.pencilColor), tol = clamp(Math.round(state.magicTolerance) || 0, 0, 255);
-      const matches = (id) => {
-        const p = id * 4;
-        return Math.max(Math.abs(data[p] - target.r), Math.abs(data[p + 1] - target.g), Math.abs(data[p + 2] - target.b), Math.abs(data[p + 3] - target.a)) <= tol;
-      };
-      const selected = new Uint8Array(w * h);
-      let count = 0;
-      if (state.magicContiguous) {
-        const q = new Int32Array(w * h), seen = new Uint8Array(w * h); let head = 0, tail = 0;
-        const enqueue = (x, y) => {
-          if (x < 0 || y < 0 || x >= w || y >= h) return;
-          const id = y * w + x;
-          if (seen[id]) return;
-          seen[id] = 1;
-          if (!matches(id)) return;
-          selected[id] = 1;
-          q[tail++] = id;
-          count++;
-        };
-        enqueue(point.x, point.y);
-        while (head < tail) {
-          const id = q[head++], x = id % w, y = Math.floor(id / w);
-          enqueue(x + 1, y); enqueue(x - 1, y); enqueue(x, y + 1); enqueue(x, y - 1);
-        }
-      } else {
-        for (let id = 0; id < selected.length; id++) if (matches(id)) { selected[id] = 1; count++; }
-      }
-      if (!count) return false;
-      const applyTo = (targetCanvas) => {
-        const c = targetCanvas.getContext('2d', { alpha: true }), out = c.getImageData(0, 0, targetCanvas.width, targetCanvas.height), outData = out.data;
-        for (let id = 0; id < selected.length; id++) {
-          if (!selected[id]) continue;
-          const p = id * 4;
-          outData[p] = fill.r; outData[p + 1] = fill.g; outData[p + 2] = fill.b; outData[p + 3] = fill.a;
-        }
-        c.putImageData(out, 0, 0);
-      };
-      if (cageSpace) applyTo(layer.canvas);
-      else {
-        applyTo(frame.sourceCanvas || canvas);
-        applyTo(canvas);
-        state.indexedFrames[i] = null;
-      }
-      markFrameBitmapsDirty();
-      return true;
-    }
     function recolorFramePaletteSlot(i, paletteIndex, color) {
       const info = state.indexedFrames[i], target = info?.palette?.[paletteIndex];
       if (!target) return false;
@@ -16557,11 +16051,12 @@
       state.indexPreviewResult = result;
       return true;
     }
-    function magicWandAlpha(image, x, y, settings) {
+    function magicWandAlpha(image, x, y, settings, canVisit = null) {
       const { width, height, data } = image;
       const tolerance = clamp(Math.round(settings.tolerance) || 0, 0, 255);
       const sample = (y * width + x) * 4;
       const delta = id => {
+        if (canVisit && !canVisit(id)) return Infinity;
         const p = id * 4;
         return Math.max(Math.abs(data[p] - data[sample]), Math.abs(data[p + 1] - data[sample + 1]),
           Math.abs(data[p + 2] - data[sample + 2]), Math.abs(data[p + 3] - data[sample + 3]));
@@ -16711,7 +16206,6 @@
     }
     function activeBrushLineMode() {
       if (state.maskMode && state.brushAction !== 'wand') return `mask:${state.brushAction}`;
-      if (state.pencilMode && !state.pencilCtrlPickMode) return `pencil:${state.pencilToolMode}:${state.activePencilLayerId || ''}`;
       return '';
     }
     function clearBrushLineAnchor() {
@@ -16725,26 +16219,6 @@
     function currentBrushLineAnchor(mode = activeBrushLineMode()) {
       const a = state.brushLineAnchor;
       return a && a.frame === state.currentFrame && a.mode === mode ? a : null;
-    }
-    function paintActiveBrushLineSegment(x1, y1, x2, y2, mode = activeBrushLineMode()) {
-      if (!mode) return false;
-      if (mode.startsWith('mask:')) {
-        paintMaskLine(state.currentFrame, x1, y1, x2, y2);
-        return true;
-      }
-      if (mode.startsWith('pencil:')) {
-        paintPencilLine(state.currentFrame, x1, y1, x2, y2);
-        return true;
-      }
-      return false;
-    }
-    function finishActiveBrushLineStroke(mode = activeBrushLineMode()) {
-      if (mode.startsWith('mask:')) {
-        settleEditedMask(state.currentFrame);
-        updateMaskEditThumbs(state.currentFrame);
-      } else if (!updateFrameThumb(state.currentFrame)) buildFilmstrip();
-      drawFrame(state.currentFrame);
-      updateInfo({ deferHiddenPalette: mode.startsWith('pencil:') });
     }
     function settleEditedMask(i) {
       const layer = selectedAnimationMaskLayer();
@@ -16762,10 +16236,12 @@
       state.brushX = p.x;
       state.brushY = p.y;
       state.brushCursorVisible = true;
-      if (paintActiveBrushLineSegment(anchor.x, anchor.y, p.x, p.y, mode)) {
-        setBrushLineAnchor(p, mode);
-        finishActiveBrushLineStroke(mode);
-      }
+      paintMaskLine(state.currentFrame, anchor.x, anchor.y, p.x, p.y);
+      setBrushLineAnchor(p, mode);
+      settleEditedMask(state.currentFrame);
+      updateMaskEditThumbs(state.currentFrame);
+      drawFrame(state.currentFrame);
+      updateInfo();
       return true;
     }
     function rulerHit(e) {
@@ -16820,24 +16296,25 @@
     function toggleMagicWand() { clearBrushLineAnchor(); state.maskMode=!(state.maskMode&&state.brushAction==='wand'); state.pencilMode=false; state.pencilCtrlPickMode=false; state.paintBucketMode=false; state.eyedropperMode=false; state.paletteDropperMode=false; state.brushAction='wand'; state.brushCursorVisible=false; refreshVisiblePreviews(); }
     function toggleHideMask() { if(!hasFrames() && !spriteSheetBuilderEditingAvailable())return; state.hideMask=!state.hideMask; refreshVisiblePreviews(); }
     function toggleShowHalo() { if(!hasFrames())return; state.showHalo=!state.showHalo; if(state.showHalo){state.maskMode=true; state.pencilMode=false; state.pencilCtrlPickMode=false; state.paintBucketMode=false; state.eyedropperMode=false; state.paletteDropperMode=false;} refreshVisiblePreviews(); }
-    function togglePencilTool(mode = 'pencil') {
-      clearBrushLineAnchor();
-      const nextMode = normalizePencilToolMode(mode);
-      const wasActive = state.pencilMode && state.pencilToolMode === nextMode;
-      state.pencilToolMode = nextMode;
-      state.pencilMode = !wasActive;
-      state.pencilCtrlPickMode = false;
-      if (state.pencilMode) {
-        state.maskMode = false;
-        state.paintBucketMode = false;
-        state.eyedropperMode = false;
-        state.paletteDropperMode = false;
-      }
-      else state.brushCursorVisible = false;
-      refreshVisiblePreviews();
+    function spriteSheetBuilderPaintTool() {
+      if (state.paintBucketMode) return 'bucket';
+      if (state.eyedropperMode) return 'dropper';
+      return state.pencilMode ? state.pencilToolMode : 'move';
     }
-    function togglePaintBucketTool() { clearBrushLineAnchor(); state.paintBucketMode = !state.paintBucketMode; if (state.paintBucketMode) { state.maskMode = false; state.pencilMode = false; state.pencilCtrlPickMode = false; state.eyedropperMode = false; state.paletteDropperMode = false; state.brushCursorVisible = false; } refreshVisiblePreviews(); }
-    function toggleEyedropperTool() { clearBrushLineAnchor(); state.eyedropperMode = !state.eyedropperMode; if (state.eyedropperMode) { state.maskMode = false; state.pencilMode = false; state.pencilCtrlPickMode = false; state.paintBucketMode = false; state.paletteDropperMode = false; state.brushCursorVisible = false; } refreshVisiblePreviews(); }
+    function setSpriteSheetBuilderPaintTool(tool) {
+      if (!animationBuilderCompanionActive() || !spriteSheetBuilderEditingAvailable()) return;
+      const next = spriteSheetBuilderPaintTool() === tool ? 'move' : tool;
+      state.pencilMode = ['pencil', 'brush', 'eraser'].includes(next);
+      if (state.pencilMode) state.pencilToolMode = next;
+      state.pencilCtrlPickMode = false;
+      state.paintBucketMode = next === 'bucket';
+      state.eyedropperMode = next === 'dropper';
+      state.maskMode = false;
+      state.paletteDropperMode = false;
+      state.brushCursorVisible = false;
+      refreshSpriteSheetBuilderToolPreview();
+      updateInfo({ deferHiddenPalette: true });
+    }
     function activeInspectorPanelName() {
       const group = document.querySelector('.side-panels .group.inspector-active.sprite-sheet-builder-tool-panel')
         || document.querySelector('.side-panels .group.inspector-active');
@@ -17179,8 +16656,8 @@
         commitReferenceClipOutlineColor(currentPickerColor());
       } else if (colorPicker.target?.type === 'reference-clip-shadow') {
         commitReferenceClipShadowColor(currentPickerColor());
-      } else if (colorPicker.target?.type === 'edit-tool-clip-outline') {
-        syncEditToolClipOutlineColor(currentPickerColor());
+      } else if (colorPicker.target?.type === 'edit-image-clip-outline') {
+        syncEditImageClipOutlineColor(currentPickerColor());
         renderDisplayReferenceLayers();
         renderCompositorFadeOverlay();
       } else if (colorPicker.target?.type === 'reference-text-color') {
@@ -17238,8 +16715,8 @@
         const clip = referenceClipModalClip();
         referenceClipShadowModalColor = cloneColor(clip?.shadowColor || referenceClipShadowModalColor || DEFAULT_REFERENCE_SHADOW_COLOR);
         syncReferenceClipShadowColor(referenceClipShadowModalColor);
-      } else if (targetType === 'edit-tool-clip-outline') {
-        syncEditToolClipOutlineUi();
+      } else if (targetType === 'edit-image-clip-outline') {
+        syncEditImageClipOutlineUi();
       } else if (targetType === 'reference-text-color') {
         const clip = referenceTextModalClip();
         referenceTextModalColor = normalizeReferenceTextColor(clip?.textColor, DEFAULT_FONT_COLOR);
@@ -17387,8 +16864,8 @@
         commitReferenceClipOutlineColor(color);
       } else if (target.type === 'reference-clip-shadow') {
         commitReferenceClipShadowColor(color);
-      } else if (target.type === 'edit-tool-clip-outline') {
-        commitEditToolClipOutlineColor(color);
+      } else if (target.type === 'edit-image-clip-outline') {
+        commitEditImageClipOutlineColor(color);
       } else if (target.type === 'reference-text-color') {
         commitReferenceTextColor(color);
       } else if (target.type === 'reference-text-shadow') {
@@ -17957,7 +17434,7 @@
     function scrubTimeline(e) { if(!hasFrames() && !spriteSheetBuilderTimelineAvailable())return; setTimelineScrubFrame(frameFromTimelinePointer(e)); }
     function adjustBrushSize(delta) {
       if (animationPixelBrushActive()) { setAnimationBrushSize((state.animationBrushSize || 1) + delta); return; }
-      state.brushSize = clamp(state.brushSize + delta, 1, 120); els.brushSizeInput.value = state.brushSize; if(hasFrames())drawFrame(state.currentFrame); updateInfo();
+      state.brushSize = clamp(state.brushSize + delta, 1, 120); if(hasFrames())drawFrame(state.currentFrame); updateInfo();
     }
     function oneRowPackLayout() {
       const cols = Math.max(1, exportSpriteFrameIndices().length), rows = 1;
@@ -19147,60 +18624,7 @@
       if (e.key === 'Enter') { e.preventDefault(); confirmPaletteLayerName(); }
       else if (e.key === 'Escape') { e.preventDefault(); closePaletteLayerModal(); }
     });
-    els.pencilColorStrip.addEventListener('click', e => {
-      const button = e.target.closest('[data-pencil-color-index]');
-      if (!button || button.disabled) return;
-      const index = parseInt(button.dataset.pencilColorIndex, 10);
-      if (index === state.activePencilColorIndex) openColorPicker({ type: 'pencil', index }, state.pencilColors[index] || state.pencilColor, 'Pencil Color');
-      else selectPencilColor(index);
-    });
-    els.pencilColorStrip.addEventListener('contextmenu', e => {
-      const button = e.target.closest('[data-pencil-color-index]');
-      if (!button || button.disabled) return;
-      e.preventDefault();
-      openPencilColorContextMenu(parseInt(button.dataset.pencilColorIndex, 10), e.clientX, e.clientY);
-    });
     els.removePencilColorMenuButton.addEventListener('click', () => removePencilColor(state.pencilColorContextIndex));
-    els.pencilPickColorButton.addEventListener('click', () => { openColorPicker({ type: 'pencil-add', applyOnPick: true }, state.pencilColor, 'Pencil Color'); beginColorPickerCanvasPick(); });
-    els.addPencilLayerButton.addEventListener('click', addPencilLayer);
-    els.mergePencilLayersButton.addEventListener('click', mergePencilLayersToSprite);
-    els.pencilLayerList.addEventListener('click', e => {
-      const remove = e.target.closest('[data-pencil-layer-remove-id]');
-      if (remove) { e.preventDefault(); removePencilLayer(remove.dataset.pencilLayerRemoveId); return; }
-      const visible = e.target.closest('[data-pencil-layer-visible-id]');
-      if (visible) { e.preventDefault(); togglePencilLayerVisibility(visible.dataset.pencilLayerVisibleId); return; }
-      const mask = e.target.closest('[data-pencil-layer-mask-id]');
-      if (mask) { e.preventDefault(); togglePencilLayerMask(mask.dataset.pencilLayerMaskId); return; }
-      if (e.target.closest('select, input, button')) return;
-      if (e.detail > 1) return;
-      const item = e.target.closest('[data-pencil-layer-id]');
-      if (item) selectPencilLayer(item.dataset.pencilLayerId);
-    });
-    els.pencilLayerList.addEventListener('dblclick', e => {
-      if (e.target.closest('button, input, select, label')) return;
-      const item = e.target.closest('[data-pencil-layer-id]');
-      if (!item) return;
-      e.preventDefault();
-      e.stopPropagation();
-      beginPencilLayerRename(item.dataset.pencilLayerId);
-    });
-    els.pencilLayerList.addEventListener('change', e => {
-      const blend = e.target.closest('[data-pencil-layer-blend-id]');
-      if (blend) setPencilLayerBlendMode(blend.dataset.pencilLayerBlendId, blend.value);
-    });
-    els.pencilLayerList.addEventListener('keydown', e => {
-      if (e.target.closest('input, select, button')) return;
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      const item = e.target.closest('[data-pencil-layer-id]');
-      if (!item) return;
-      e.preventDefault();
-      selectPencilLayer(item.dataset.pencilLayerId);
-    });
-    els.pencilButton.addEventListener('click', () => togglePencilTool('pencil'));
-    els.pencilBrushButton.addEventListener('click', () => togglePencilTool('brush'));
-    els.pencilEraserButton.addEventListener('click', () => togglePencilTool('eraser'));
-    els.paintBucketButton.addEventListener('click', togglePaintBucketTool);
-    els.eyedropperButton.addEventListener('click', toggleEyedropperTool);
     els.loadPaletteButton.addEventListener('click', () => els.paletteFileInput.click());
     els.savePaletteButton.addEventListener('click', savePalette);
     els.referencePaletteToggleButton.addEventListener('click', toggleReferencePalettePanel);
@@ -19908,6 +19332,7 @@
     els.rowsInput.addEventListener('input',()=>{
       const nextRows = clamp(parseInt(els.rowsInput.value,10)||1,1,100);
       const nextCols = clamp(parseInt(els.colsInput.value,10)||1,1,100);
+      if (resliceAnimationGrid(nextRows, nextCols)) return;
       const sheets = sheetSources();
       if(sheets.length){
         if (nextRows === state.rows && nextCols === state.cols) return;
@@ -20154,9 +19579,8 @@
     els.cageVisibilityButton.addEventListener('click',toggleCageVisibility); els.rulerVisibilityButton.addEventListener('click',toggleRulerVisibility); els.pivotVisibilityButton.addEventListener('click',togglePivotVisibility);
     els.rulerVButton.addEventListener('click',()=>addRuler('v')); els.rulerHButton.addEventListener('click',()=>addRuler('h'));
     els.offsetXAllInput.addEventListener('input',()=>applyOffsetXAll(false)); els.offsetXAllInput.addEventListener('change',finishOffsetXAll); els.offsetYAllInput.addEventListener('input',()=>applyOffsetYAll(false)); els.offsetYAllInput.addEventListener('change',finishOffsetYAll); els.pivotOnlyXInput.addEventListener('input',applyPivotOnlyX); els.pivotOnlyYInput.addEventListener('input',applyPivotOnlyY); [els.offsetXInput,els.offsetYInput].forEach(el=>el.addEventListener('input',applyOffset));
-    [els.brushSizeInput, els.maskBrushSizeInput].forEach(input => input.addEventListener('input',()=>{state.brushSize=clamp(parseInt(input.value,10)||1,1,120); if(hasFrames())drawFrame(state.currentFrame); updateInfo()}));
-    [els.pencilHardnessInput, els.maskBrushHardnessInput].forEach(input => input.addEventListener('input',()=>{state.pencilHardness=clamp(parseInt(input.value,10)||0,0,100); if(hasFrames())drawFrame(state.currentFrame); updateInfo()}));
-    els.pencilEraserPixelModeInput.addEventListener('change', () => { state.pencilEraserPixelMode = !!els.pencilEraserPixelModeInput.checked; if (hasFrames()) drawFrame(state.currentFrame); updateInfo(); });
+    els.maskBrushSizeInput.addEventListener('input',()=>{state.brushSize=clamp(parseInt(els.maskBrushSizeInput.value,10)||1,1,120); if(hasFrames())drawFrame(state.currentFrame); updateInfo()});
+    els.maskBrushHardnessInput.addEventListener('input',()=>{state.pencilHardness=clamp(parseInt(els.maskBrushHardnessInput.value,10)||0,0,100); if(hasFrames())drawFrame(state.currentFrame); updateInfo()});
     els.magicToleranceInput.addEventListener('input',()=>{state.magicTolerance=clamp(parseInt(els.magicToleranceInput.value,10)||0,0,255);updateInfo()});
     [els.magicAntialiasInput, els.magicContiguousInput].forEach(input => {
       input.addEventListener('input',()=>{readMagicOptions();updateInfo()});
@@ -20204,13 +19628,13 @@
     window.addEventListener('resize',positionPaletteOrderMenu);
     els.spriteEditColorButton.addEventListener('click', toggleSpriteColorEdit);
     els.spriteEditResetButton.addEventListener('click', resetSpriteColorEdit);
-    els.editToolSpriteEditResetButton?.addEventListener('click', resetSpriteColorEdit);
+    els.editImageSpriteEditResetButton?.addEventListener('click', resetSpriteColorEdit);
     spriteEditControlGroups().forEach(([axis, slider, number]) => {
       [slider, number].forEach(input => input.addEventListener('input', () => setSpriteEditAdjust(axis, input.value)));
     });
-    els.editToolClipOutlineInput?.addEventListener('change', () => setEditToolClipOutlineValues({ outline: els.editToolClipOutlineInput.checked }));
-    els.editToolClipOutlineWidthInput?.addEventListener('input', () => setEditToolClipOutlineValues({ outlineWidth: els.editToolClipOutlineWidthInput.value }));
-    els.editToolClipOutlineColorButton?.addEventListener('click', openEditToolClipOutlineColorPicker);
+    els.editImageClipOutlineInput?.addEventListener('change', () => setEditImageClipOutlineValues({ outline: els.editImageClipOutlineInput.checked }));
+    els.editImageClipOutlineWidthInput?.addEventListener('input', () => setEditImageClipOutlineValues({ outlineWidth: els.editImageClipOutlineWidthInput.value }));
+    els.editImageClipOutlineColorButton?.addEventListener('click', openEditImageClipOutlineColorPicker);
     $('applyPixelGridButton').addEventListener('click', applyPixelGrid);
     els.truePixelButton.addEventListener('click',truePixelCurrentFrame); els.truePixelAllButton.addEventListener('click',truePixelAllFrames); els.truePixelResizeButton.addEventListener('click',resizeToTruePixelResolution); els.truePixelResetButton.addEventListener('click',resetTruePixelCurrentFrame); els.truePixelPreviewButton.addEventListener('click',toggleTruePixelPreview);
     els.prevButton.addEventListener('click',()=>step(-1)); els.playButton.addEventListener('click',()=>playbackControlsActive()?pause(true):play()); els.stopButton.addEventListener('click',stop); els.nextButton.addEventListener('click',()=>step(1)); els.playbackLoopButton.addEventListener('click',togglePlaybackLoop);
@@ -20265,6 +19689,14 @@
           state.spriteSheetBuilderReplaceTarget = { rowId: addHit.rowId, frameIndex: addHit.insertIndex, insert: true };
           els.spriteSheetBuilderFileInput?.click();
           syncSpriteSheetBuilderCanvasPreview();
+          return;
+        }
+        if (colorPicker.pickMode) {
+          const point = spriteSheetBuilderFramePointFromEvent(e);
+          if (point) {
+            const color = sampleSpriteSheetBuilderFrameColor(point.frame, point.x, point.y, { allowTransparent: true });
+            if (color) finishColorPickerCanvasPick(color);
+          }
           return;
         }
         if (startSpriteSheetBuilderToolStroke(e)) return;
@@ -20322,10 +19754,6 @@
       state.dragLastX=e.clientX; state.dragLastY=e.clientY; state.dragStartX=e.clientX; state.dragStartY=e.clientY;
       state.dragStartPanX=state.panX; state.dragStartPanY=state.panY;
       state.dragStartOffsetX=Math.round(dragStartOffset.x||0); state.dragStartOffsetY=Math.round(dragStartOffset.y||0);
-      if(temporaryPencilColorPickerActive(e)){
-        pickPencilColorFromCanvasEvent(e);
-        return;
-      }
       if(state.paletteDropperMode){
         const mergePending = !!state.paletteMergeTargetIndices?.length, p=pointerCagePoint(e);
         if (!p) { hideBrushCursor(); return; }
@@ -20346,23 +19774,8 @@
         else { showError('Click an opaque sprite pixel to select a palette color.'); drawFrame(state.currentFrame); updateInfo(); }
         return;
       }
-      if(state.eyedropperMode){
-        const p=pointerCagePoint(e);
-        if (!p) { hideBrushCursor(); return; }
-        const color=sampleVisibleFrameColor(state.currentFrame,p.x,p.y);
-        state.brushX=p.x; state.brushY=p.y; state.brushCursorVisible=false;
-        if(color){setPencilColorAt(state.activePencilColorIndex, color, { refresh: false }); state.eyedropperMode=false; state.pencilMode=true; state.pencilCtrlPickMode=false; state.paintBucketMode=false;}
-        drawFrame(state.currentFrame); updateInfo(); return;
-      }
-      if(state.paintBucketMode){
-        const p=pointerCagePoint(e);
-        if (!p) { hideBrushCursor(); return; }
-        pushHistory();
-        paintBucketFill(state.currentFrame,p.x,p.y);
-        buildFilmstrip(); drawFrame(state.currentFrame); updateInfo(); return;
-      }
-      if ((state.maskMode || state.pencilMode) && !pointerCagePoint(e)) { hideBrushCursor(); return; }
-      if (((state.maskMode && state.brushAction !== 'wand') || state.pencilMode) && shiftPaintActiveBrushLine(e)) return;
+      if (state.maskMode && !pointerCagePoint(e)) { hideBrushCursor(); return; }
+      if (state.maskMode && state.brushAction !== 'wand' && shiftPaintActiveBrushLine(e)) return;
       if(pivotHit(e)){
         pushHistory();
         state.pivotDark = !state.pivotDark;
@@ -20383,10 +19796,9 @@
       state.dragging=true; state.dragPointerId=e.pointerId; pushHistory();
       if(hit)state.dragMode=hit;
       else if(state.maskMode){state.dragMode='mask';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;paintMaskLine(state.currentFrame,p.x,p.y,p.x,p.y);setBrushLineAnchor(p);drawFrame(state.currentFrame,{fast:true,skipThumb:true,skipIndexPreview:true})}
-      else if(state.pencilMode){state.dragMode='pencil';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;paintPencilLine(state.currentFrame,p.x,p.y,p.x,p.y);setBrushLineAnchor(p);drawFrame(state.currentFrame,{fast:true,skipThumb:true,skipIndexPreview:true})}
       else state.dragMode='offset';
       els.canvasShell.classList.add('dragging');
-      if (state.dragMode !== 'pencil') els.canvasShell.setPointerCapture(e.pointerId);
+      els.canvasShell.setPointerCapture(e.pointerId);
     });
     els.canvasShell.addEventListener('pointermove', e => {
       if (eventInsideReferenceCompositor(e)) return;
@@ -20405,13 +19817,9 @@
           const p = pointerCagePoint(e);
           if (p) { state.brushX = p.x; state.brushY = p.y; }
           hideBrushCursor(false);
-        } else if (state.maskMode && state.brushAction !== 'wand') {
+        } else if ((state.maskMode && state.brushAction !== 'wand') || animationPixelBrushActive()) {
           syncBrushCursorFromEvent(e);
-        } else if (state.pencilMode) {
-          syncBrushCursorFromEvent(e);
-        } else if (state.paintBucketMode || state.eyedropperMode || state.paletteDropperMode) {
-          hideBrushCursor(false);
-        }
+        } else if (state.paletteDropperMode) hideBrushCursor(false);
         return;
       }
       if (state.dragMode.startsWith?.('animation-')) { moveAnimationCanvasDrag(e); return; }
@@ -20447,17 +19855,6 @@
         drawFrame(state.currentFrame, { fast: true, skipThumb: true, skipIndexPreview: true });
         return;
       }
-      if (state.dragMode === 'pencil') {
-        const p = pointerCagePoint(e);
-        if (!p) { state.maskLastX = null; state.maskLastY = null; hideBrushCursor(); return; }
-        state.brushX = p.x; state.brushY = p.y; state.brushCursorVisible = true;
-        if (state.maskLastX === null || state.maskLastY === null) { state.maskLastX = p.x; state.maskLastY = p.y; }
-        paintPencilLine(state.currentFrame, state.maskLastX, state.maskLastY, p.x, p.y);
-        state.maskLastX = p.x; state.maskLastY = p.y;
-        setBrushLineAnchor(p);
-        drawFrame(state.currentFrame, { fast: true, skipThumb: true, skipIndexPreview: true });
-        return;
-      }
       const d = pointerDelta(e, state.dragStartX, state.dragStartY);
       if (Array.isArray(state.dragStartOffsets) && state.dragStartOffsets.length) {
         state.dragStartOffsets.forEach(record => setOffset(record.frame, record.x + d.dx, record.y + d.dy));
@@ -20470,7 +19867,7 @@
     function endDrag(e){
       if(!state.dragging)return;
       if (state.dragMode.startsWith?.('animation-')) { finishAnimationCanvasDrag(e); return; }
-      const mode=state.dragMode, redrawCurrent=mode==='offset'||mode==='mask'||mode==='pencil'||mode==='sprite-sheet-mask'||mode==='sprite-sheet-pencil';
+      const mode=state.dragMode, redrawCurrent=mode==='offset'||mode==='mask'||mode==='sprite-sheet-mask'||mode==='sprite-sheet-pencil';
       const offsetDragCount = Array.isArray(state.dragStartOffsets) ? state.dragStartOffsets.length : 0;
       state.dragging=false; state.dragMode='offset'; state.dragPointerId=null; els.canvasShell.classList.remove('dragging','panning');
       if(e.pointerId!==undefined&&els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId);
@@ -20491,7 +19888,7 @@
       state.dragStartOffsets = [];
       state.dragStartClipOffsets = [];
       if (mode === 'pan') syncBrushCursorFromEvent(e);
-      updateInfo({ deferHiddenPalette: mode === 'pencil' });
+      updateInfo();
     }
     els.canvasShell.addEventListener('pointerup',endDrag); els.canvasShell.addEventListener('pointercancel',endDrag); els.canvasShell.addEventListener('pointerleave',e=>{hideSpriteSheetBuilderCellActions();if(state.dragging)endDrag(e); else if(!syncBrushCursorFromEvent(e) && state.brushCursorVisible)hideBrushCursor(false);});
     document.addEventListener('pointermove', e => {
@@ -20736,6 +20133,11 @@
         return;
       }
       if (!canvasContentAvailable()) return;
+      if ((e.key === 'Control' || e.key === 'Meta') && !typing && temporaryPencilColorPickerActive(e)) { setPencilCtrlPickMode(true); return; }
+      if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && animationBuilderCompanionActive()) {
+        const tool = { m: 'move', p: 'pencil', b: 'brush', e: 'eraser', g: 'bucket', d: 'dropper' }[k];
+        if (tool) { e.preventDefault(); setSpriteSheetBuilderPaintTool(tool); return; }
+      }
       if (!hasFrames()) {
         if (!typing && (e.key === 'Delete' || e.key === 'Backspace') && state.referenceCompositorVisible && state.activeReferenceCompositorClipId) {
           e.preventDefault();
@@ -20748,17 +20150,12 @@
         }
         return;
       }
-      if ((e.key === 'Control' || e.key === 'Meta') && !typing && state.pencilMode && !animationPanelActive()) { setPencilCtrlPickMode(true); return; }
       if (typing) return;
       if (handleAnimationKeyDown(e)) return;
       if (e.key === 'Escape' && (state.eyedropperMode || state.paletteDropperMode)) { e.preventDefault(); state.eyedropperMode = false; state.paletteDropperMode = false; state.paletteMergeTargetIndices = []; state.brushCursorVisible = false; drawFrame(state.currentFrame); updateInfo(); return; }
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (k === 'b') { e.preventDefault(); activeInspectorPanelName() === 'Mask' ? toggleMaskBrush() : togglePencilTool('brush'); return; }
-        if (k === 'e') { e.preventDefault(); togglePencilTool('eraser'); return; }
-        if (k === 'g') { e.preventDefault(); togglePaintBucketTool(); return; }
+        if (k === 'b') { e.preventDefault(); toggleMaskBrush(); return; }
         if (k === 'w') { e.preventDefault(); toggleMagicWand(); return; }
-        if (k === 'p') { e.preventDefault(); togglePencilTool('pencil'); return; }
-        if (k === 'd') { e.preventDefault(); toggleEyedropperTool(); return; }
         if (k === 'h') { e.preventDefault(); toggleHideMask(); return; }
         if (k === 'f') { e.preventDefault(); resetView(true); return; }
         if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -20779,7 +20176,7 @@
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishSpriteSheetBuilderInputHistory();
       if (e.key.toLowerCase() === 'r') state.spriteSheetBuilderReferenceKeyDown = false;
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') flushDeferredFrameInfoUpdate();
-      if ((e.key === 'Control' || e.key === 'Meta') && state.pencilCtrlPickMode) setPencilCtrlPickMode(false);
+      if ((e.key === 'Control' || e.key === 'Meta') && state.pencilCtrlPickMode) setPencilCtrlPickMode(e.ctrlKey || e.metaKey);
     });
     window.addEventListener('blur', () => {
       setAnimationPaintShiftHeld(false);
@@ -20866,6 +20263,12 @@
       if (displayIndex > transformIndex && transformIndex >= 0) {
         floatingGroups.splice(transformIndex, 0, floatingGroups.splice(displayIndex, 1)[0]);
       }
+      const editImageIndex = floatingGroups.findIndex(group => group.id === 'animationGroup');
+      const transformGroup = floatingGroups.find(group => floatingLabel(group) === 'Transform');
+      if (editImageIndex >= 0 && transformGroup) {
+        const [editImageGroup] = floatingGroups.splice(editImageIndex, 1);
+        floatingGroups.splice(floatingGroups.indexOf(transformGroup) + 1, 0, editImageGroup);
+      }
       const spriteSheetIndex = floatingGroups.findIndex(group => floatingLabel(group) === 'Sprite Sheet');
       const fontIndex = floatingGroups.findIndex(group => floatingLabel(group) === 'Font');
       if (spriteSheetIndex >= 0 && fontIndex >= 0 && spriteSheetIndex !== fontIndex + 1) {
@@ -20874,7 +20277,7 @@
         floatingGroups.splice(nextFontIndex + 1, 0, spriteSheetGroup);
       }
       const spriteSheetGroup = floatingGroups.find(group => floatingLabel(group) === 'Sprite Sheet') || null;
-      const spriteSheetToolLabels = new Set(['Edit Tools', 'Mask']);
+      const spriteSheetToolLabels = new Set(['Edit Image', 'Mask']);
       const clearSpriteSheetCompanionGroup = (options = {}) => {
         floatingGroups.forEach(item => item.classList.remove('sprite-sheet-builder-tool-panel'));
         if (!options.keepCollapsed) spriteSheetGroup?.classList.remove('collapsed');
@@ -20908,6 +20311,7 @@
         stageCard?.classList.toggle('inspector-open', isOpen);
         setDisplayVisibilityButtons();
         syncPixelGridUi();
+        updateAnimationUi();
         if (group?.contains(els.paletteCanvas)) updateInfo();
         requestAnimationFrame(() => {
           if (syncSpriteSheetBuilderCanvasPreview()) return;
@@ -21041,7 +20445,7 @@
     }
 
   </script>
-  <script src="animation.js"></script>
+  <script src="animation.js?v=1.6.5"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

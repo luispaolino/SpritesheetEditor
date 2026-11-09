@@ -1,6 +1,6 @@
 .side-panels .reference-layer-controls.animation-layer-controls {
   grid-column: 2; grid-row: 2;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
 }
 .animation-offset-field { display: grid; grid-template-columns: 12px minmax(0, 1fr); align-items: center; gap: 4px; min-width: 0; color: var(--muted); font-size: 11px; }
 .animation-offset-field .reference-offset-input { min-width: 0; }
@@ -12,7 +12,9 @@
 .animation-inherited-hidden { opacity: .6; }
 .animation-layer-add-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .animation-layer-add-actions button { width: 100%; min-width: 0; min-height: 38px; white-space: nowrap; }
-.animation-layer-export-button { grid-column: 1 / -1; }
+.edit-image-effects { display: grid; gap: 8px; margin-top: 10px; }
+.edit-image-effects #animationExportLayerButton { width: 100%; }
+.animation-group.sprite-sheet-builder-tool-panel :is(.group-title-actions, #animationDropZone, .animation-selection-tool, #animationSplitButton, #animationLayerList, .animation-layer-add-actions, .edit-image-effects) { display: none; }
 .side-panels .reference-layer-item.animation-layer-item {
   width: calc(100% - var(--animation-layer-depth, 0) * 14px);
   grid-template-columns: 26px minmax(0, 1fr) 32px; grid-template-rows: 32px 32px;
@@ -62,9 +64,10 @@
 .animation-wand-tolerance input { width: 42px; min-width: 0; min-height: 32px; padding: 0 3px; text-align: center; }
 .animation-selection-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .animation-selection-actions .small-button { flex: 1; }
-.side-panels #animationColorStrip { flex: 0 0 auto; display: flex; gap: 6px; padding: 0; }
+.side-panels #animationColorStrip { flex: 0 0 auto; max-width: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; }
 .side-panels #animationColorStrip .swatch-button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; display: grid; place-items: center; }
 .side-panels #animationColorStrip .swatch-chip { width: 22px; height: 22px; }
+.side-panels #animationAddColorButton { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; font-size: 20px; }
 .animation-group [hidden] { display: none !important; }
 .animation-clipboard-button .tool-icon-image { width: 16px; height: 16px; }
 .canvas-shell.animation-move-cursor,
@@ -73,7 +76,8 @@
 .canvas-shell.animation-lasso-cursor.dragging { cursor: url('icons/cursor-lasso.svg') 7 23, crosshair; }
 .canvas-shell.animation-rectangle-cursor,
 .canvas-shell.animation-rectangle-cursor.dragging { cursor: crosshair; }
-.canvas-shell.animation-wand-cursor { cursor: crosshair; }
+.canvas-shell.animation-wand-cursor,
+.canvas-shell.animation-bucket-cursor { cursor: crosshair; }
 .canvas-shell.animation-dropper-cursor { cursor: url('icons/cursor-dropper.svg') 3 28, crosshair; }
 .canvas-shell.animation-selection-moving.dragging { cursor: move; }
 .canvas-shell.panning.dragging { cursor: grabbing; }

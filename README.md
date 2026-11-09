@@ -77,7 +77,7 @@ Rulers align with sprite pixel cells at every zoom level. Drag from anywhere on 
 
 ### Mask cleanup and pixel editing
 
-Clean sprite backgrounds with mask brush, mask eraser, magic wand, halo cleanup, mask baking, and mask reset tools. Edit sprites with pencil, brush, eraser, paint bucket, eyedropper, color swatches, and editable pixel layers.
+Clean sprite backgrounds with mask brush, mask eraser, magic wand, halo cleanup, mask baking, and mask reset tools. In **Edit Image**, edit sprites with Pencil, Eraser, Paint Bucket, Dropper, color swatches, and layers.
 
 ### Indexed color and palette tools
 
@@ -89,17 +89,21 @@ Re-Order opens a menu with Original index order, Color similarity, Light → dar
 
 Load multiple reference layers with offset, scale, transparency, flip, visibility, shadow, reload, and compositor-linking controls. References are preserved when loading a new spritesheet and reset only on New Project.
 
-### Animation layers
+### Edit Image
 
-Use the Animation panel to load sprites as layers while keeping the existing canvas and frame timeline. Drag layer names to reorder them; the top layer renders in front. Position, visibility, and horizontal/vertical flips are stored per frame. Select pixels with the lasso or rectangle tool and use Split to cut them into a new cropped layer without moving the artwork. Pencil, eraser, and the shared pencil colors edit the active layer. Layer artwork and order are included in project saving, undo/redo, frame duplication, and standard sprite exports.
+Use **Edit Image**, next to **Transform**, to load sprites as layers on the canvas and timeline. Drag layer names to reorder them. The top layer renders in front. Position, visibility, and flips are stored per frame. Select pixels and use Split to cut them into a cropped layer without moving the artwork. Edit Colors, Outline, and Pixel Grid are above **Export Layer to 8-Bits PNG**.
 
 Selections use a translucent fill and animated black-and-white borders. Selection masks use hard pixel edges without anti-aliasing. Section buttons use the full width above the floating panel and wrap when needed on smaller windows.
 
 With Lasso or Rectangle selected, hold Shift while selecting to add an area, or Alt to subtract an area. Drag inside an existing selection to move its outline, or use the arrow keys for one-pixel movement and Shift+Arrows for ten pixels. These actions move the selection without changing the artwork. Undo and Redo restore previous selections, including added/subtracted areas, outline movement, and clearing. The selection stays in place when switching layers or tools within the same frame. Delete or Backspace erases the selected pixels on the active layer and keeps the outline; Undo restores the artwork. Split layers appear in the layer list only on frames that contain their artwork.
 
-Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or Eraser size, just like Edit Tools. Rectangle selection uses a crosshair; Lasso uses a contrasting lasso cursor with a precise selection point.
+Hold Shift and use the mouse wheel over the canvas to adjust Pencil or Eraser size. Rectangle selection uses a crosshair, and Lasso uses a contrasting cursor with a precise selection point.
 
-Ctrl/Cmd-click a sprite on the canvas to select its topmost visible Animation layer. Use Dropper (D) to sample a color. Hold the selection button to switch between Lasso and Rectangle. Magic Wand (W) masks the active layer and shows Anti-aliasing, Contiguous, and Tolerance controls beneath the toolbar.
+Hold the selection button to switch between Lasso, Rectangle, and Magic Wand (W). The wand selects matching pixels on the active layer and shows Anti-aliasing, Contiguous, and Tolerance below the toolbar. Paint Bucket (G) fills connected pixels of the same color on the active layer. Ctrl/Cmd-click with Pencil or Paint Bucket to sample a color, or use Dropper (D). With other tools, Ctrl/Cmd-click the canvas to select the topmost visible layer.
+
+Set **O** beside **X** and **Y** to change a layer or group's opacity from 0% to 100% across its frames.
+
+Static images loaded in Edit Image use the Spritesheet Grid's Rows and Columns. Cells appear in the timeline from left to right, top to bottom. Changing the grid slices the original sheet again. Undo restores the previous grid and its edits. Animated GIF and WebP files use their decoded frames.
 
 New Layer creates an empty layer above the selected layer, with independent artwork in each frame. Ctrl/Cmd-click layer names to select several, or Shift-click a range, then click Group. Groups have green borders; double-click a group to expand or collapse its children. Children remain individually selectable and editable. Move, offsets, flips, and per-frame visibility work on the whole group, while drawing and selection tools operate only on individual layers. Drag a layer onto the middle of a group to put it inside, or above/below the group to move it outside. Press F2 to rename a layer or group. Groups and their contents are preserved by project saving and undo/redo.
 
@@ -155,6 +159,10 @@ https://github.com/luispaolino/SpritesheetEditor/
 ## Release Notes
 
 For the full release history, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+### v1.6.5 - 2026-11-09
+
+- Combined the image-editing controls in **Edit Image**, immediately after Transform. Edit Colors, Outline, and Pixel Grid sit above the indexed layer PNG export.
 
 ### v1.6.0 - 2026-10-29
 

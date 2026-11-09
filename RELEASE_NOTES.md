@@ -1,13 +1,14 @@
 # Release Notes
 
+## v1.6.5 - 2026-11-09
+
+- Renamed Animation to **Edit Image** and moved its tab next to Transform.
+- Moved Edit Colors, Outline, and Pixel Grid above **Export Layer to 8-Bits PNG** and removed the separate Edit Tools panel.
+
 ## v1.6.0 - 2026-10-29
 
 ### New Features
 
-- Added horizontal and vertical compositor gradations, mirrored directions, per-clip positions, and matching preview/export rendering.
-
-- Added Make it First to the timeline context menu, rotating the frame sequence around the selected sprite while preserving each frame's edits.
-- Added icon-only Undo and Redo buttons to the upper-right canvas toolbar, sharing history with the keyboard shortcuts.
 - Added the Animation floating panel with Load Sprite support for images, GIFs, and WebP files.
 - Added sprite layers with names, visibility, removal, per-frame X/Y offsets, and horizontal/vertical flips.
 - Added drag ordering for sprite layers; the top layer renders in front.
@@ -38,9 +39,6 @@
 
 ### Bug Fixes
 
-- Improved Animation painting and erasing by batching redraws, clipping selections by pixel runs, and refreshing only the edited frame thumbnail.
-
-- Kept the Animation pencil and its cursor preview square at every brush size.
 - Fixed Animation Hide/Show affecting every frame. Visibility now belongs to the current frame, including spritesheet imports, and survives saving, undo/redo, frame duplication, and export.
 - Fixed split and pasted layers appearing in other frames' layer lists when those frames have no cel for the layer.
 - Removed skipped-frame timing from preview playback so remaining frames keep the configured FPS, including loop boundaries, ping-pong reversals, and one-shot endings.

@@ -112,7 +112,7 @@ function sourceFunction(name) {
   return html.slice(start,html.indexOf('\n    function ',start+1));
 }
 
-test('Ctrl/Cmd picks color in Edit Tools and is available for layer picking in Animation',()=>{
+test('Ctrl/Cmd picks color during cell painting and is available for layer picking in Edit Image',()=>{
   const app=editor();app.state.pencilMode=true;
   vm.runInContext(sourceFunction('temporaryPencilColorPickerActive')+'\n'+sourceFunction('setPencilCtrlPickMode'),app);
   assert.equal(app.temporaryPencilColorPickerActive({ctrlKey:true}),true);
@@ -438,7 +438,7 @@ function wheelEditor(tool, animationActive = true) {
   return app;
 }
 
-test('Shift + Wheel sizes either Animation brush without zooming or changing Edit Tools size', () => {
+test('Shift + Wheel sizes either Edit Image brush without zooming or changing the shared brush size', () => {
   for (const tool of ['pencil', 'eraser']) {
     const app = wheelEditor(tool);
     app.scroll(-200);
@@ -454,7 +454,7 @@ test('Shift + Wheel sizes either Animation brush without zooming or changing Edi
   }
 });
 
-test('Edit Tools sizing and normal canvas zoom keep their existing behavior', () => {
+test('Shared brush sizing and normal canvas zoom keep their existing behavior', () => {
   const edit = wheelEditor('pencil', false);
   edit.state.pencilMode = true;
   edit.scroll(-100);

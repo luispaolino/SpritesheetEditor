@@ -46,13 +46,10 @@ The app is currently implemented primarily as a single HTML file with inline CSS
   - flip horizontal / vertical
   - pivot controls
 
-### Edit Tools
+### Edit Image
 
-- Pencil, brush, eraser, paint bucket, and eyedropper tools.
-- Brush/Pencil Size and Hardness controls.
-- Pixel Mode appears only when the eraser tool is selected.
-- Pencil color strip and color picking.
-- Pencil layers with add, merge, visibility, mask, blend, rename, and remove controls.
+- The tab follows Transform. It contains Pencil, Eraser, Paint Bucket, Dropper, and the grouped selection tools.
+- Sprite layers, color swatches, and layer editing share this panel. Projects with older pencil layers still render their saved artwork.
 - Edit Colors section includes:
   - Hue
   - Saturation
@@ -65,7 +62,7 @@ The app is currently implemented primarily as a single HTML file with inline CSS
   - outline enable
   - outline color
   - outline width
-- Edit Colors and Outline are collapsible.
+- Edit Colors, Outline, and Pixel Grid are collapsible and sit above Export Layer to 8-Bits PNG.
 
 ### Mask
 
@@ -194,6 +191,7 @@ Current release notes are split into:
 - `v1.4.0 - 2026-06-09`
 - `v1.5.0 - 2026-06-12`
 - `v1.6.0 - 2026-10-29`
+- `v1.6.5 - 2026-11-09`
 
 Major features:
 
@@ -201,7 +199,7 @@ Major features:
 - Compositor is documented under `v1.5.0`.
 - Animation layers are documented under `v1.6.0`; their logic and styling live in `animation.js` and `animation.css`.
 
-Current `v1.6.0` notes include sprite layers with per-frame transforms, drag ordering, selection/splitting and pixel editing, project persistence, and the compact Animation panel layout.
+Version 1.6.5 combines layer and image editing in the Edit Image panel.
 
 Animation visibility is stored in each frame's `animationVisibility` map, with the layer's old visibility used as the default for compatibility. Keep this map when cloning, saving, restoring, or reordering frames. Selection masks are binary pixel rasters; the translucent fill and animated black-and-white border render on a separate noninteractive overlay canvas so they never appear in exports. The section bar uses the full stage width, and a ResizeObserver updates the floating panel's top offset when the section buttons wrap.
 
