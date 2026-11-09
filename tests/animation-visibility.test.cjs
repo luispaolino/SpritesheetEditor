@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 
 function editor() {
-  const element = { addEventListener() {}, querySelectorAll() { return []; }, classList: { contains() { return false; } } };
+  const element = { hidden: true, addEventListener() {}, setAttribute() {}, querySelectorAll() { return []; }, classList: { contains() { return false; } } };
   const context = {
     state: { frames: [{ id: 'frame-a', canvas: {width:64,height:64} }, { id: 'frame-b', canvas: {width:64,height:64} }], currentFrame: 0, imageName: 'Imported sheet', cageWidth:64,cageHeight:64,frameOffsets:[{x:0,y:0},{x:0,y:0}],frameFlips:[false,false],frameFlipYs:[false,false] },
     $() { return element; }, document: { addEventListener() {} },
@@ -112,15 +112,15 @@ function sourceFunction(name) {
   return html.slice(start,html.indexOf('\n    function ',start+1));
 }
 
-test('Ctrl/Cmd temporarily picks color for Animation Pencil and Eraser and restores either tool',()=>{
-  for(const tool of ['pencil','eraser']) {
-    const app=editor();app.state.animationTool=tool;app.animationPanelActive=()=>true;
-    vm.runInContext(sourceFunction('temporaryPencilColorPickerActive')+'\n'+sourceFunction('setPencilCtrlPickMode'),app);
-    assert.equal(app.temporaryPencilColorPickerActive({ctrlKey:true}),true);
-    app.setPencilCtrlPickMode(true);assert.equal(app.temporaryPencilColorPickerActive(),true);
-    app.setPencilCtrlPickMode(false);assert.equal(app.temporaryPencilColorPickerActive(),false);assert.equal(app.state.animationTool,tool);
-    app.state.animationTool='lasso';assert.equal(app.temporaryPencilColorPickerActive({ctrlKey:true}),false);
-  }
+test('Ctrl/Cmd picks color in Edit Tools and is available for layer picking in Animation',()=>{
+  const app=editor();app.state.pencilMode=true;
+  vm.runInContext(sourceFunction('temporaryPencilColorPickerActive')+'\n'+sourceFunction('setPencilCtrlPickMode'),app);
+  assert.equal(app.temporaryPencilColorPickerActive({ctrlKey:true}),true);
+  app.setPencilCtrlPickMode(true);assert.equal(app.temporaryPencilColorPickerActive(),true);
+  app.setPencilCtrlPickMode(false);assert.equal(app.temporaryPencilColorPickerActive(),false);
+  app.animationPanelActive=()=>true;
+  assert.equal(app.temporaryPencilColorPickerActive({ctrlKey:true}),false);
+  app.setPencilCtrlPickMode(true);assert.equal(app.state.pencilCtrlPickMode,false);
 });
 
 test('brush preview hides over menus and outside the canvas and returns on the canvas',()=>{

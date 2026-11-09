@@ -31,7 +31,7 @@
 - Stacked visibility/removal on the left and horizontal/vertical flips on the right of each layer.
 - Matched layer name height to the offset inputs and aligned the name with the X input.
 - Centered the Animation toolbar, including the pencil color beside Eraser.
-- Placed Dropper before Pencil and added Ctrl/Cmd temporary color picking for Animation Pencil/Eraser with a contrasting pipette cursor.
+- Placed Dropper before Pencil and added Ctrl/Cmd-click to pick the topmost visible Animation layer on the canvas.
 - Added animated black-and-white selection borders with a translucent fill and hard pixel selection edges.
 - Allowed section buttons to use the full canvas width above the floating menu, with the menu following wrapped rows on smaller windows.
 - Added basic arithmetic in numeric fields, including parentheses, with Enter/blur calculation and existing range and step constraints.

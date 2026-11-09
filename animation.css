@@ -36,6 +36,29 @@
 .animation-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin-bottom: 12px; }
 .side-panels .animation-tools .tool-icon-button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; }
 .animation-tools .tool-button.active { color: #071018; background: var(--warning); border-color: transparent; }
+.animation-selection-tool { position: relative; }
+#animationSelectionToolButton { position: relative; touch-action: manipulation; }
+#animationSelectionToolButton::after {
+  content: ''; position: absolute; right: 4px; bottom: 4px;
+  border: 3px solid transparent; border-bottom-color: currentColor; border-right-color: currentColor;
+}
+.animation-selection-tool-menu {
+  position: absolute; top: calc(100% + 5px); left: 0; z-index: 5;
+  display: grid; gap: 4px; padding: 5px; min-width: 124px;
+  border: 1px solid var(--border); border-radius: 12px; background: #171c28; box-shadow: var(--shadow);
+}
+.animation-selection-tool-menu button {
+  display: flex; align-items: center; gap: 8px; padding: 6px 9px; text-align: left;
+}
+.animation-selection-tool-menu .tool-icon-image { width: 16px; height: 16px; }
+.animation-wand-settings {
+  display: grid; grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: center; gap: 5px; margin-bottom: 10px;
+}
+.animation-wand-settings .check-field,
+.animation-wand-tolerance { min-height: 32px; padding: 0 5px; gap: 4px; font-size: 11px; white-space: nowrap; }
+.animation-wand-tolerance { display: flex; align-items: center; justify-content: flex-end; color: var(--muted); }
+.animation-wand-tolerance input { width: 42px; min-width: 0; min-height: 32px; padding: 0 3px; text-align: center; }
 .animation-selection-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .animation-selection-actions .small-button { flex: 1; }
 .side-panels #animationColorStrip { flex: 0 0 auto; display: flex; gap: 6px; padding: 0; }
@@ -49,6 +72,7 @@
 .canvas-shell.animation-lasso-cursor.dragging { cursor: url('icons/cursor-lasso.svg') 7 23, crosshair; }
 .canvas-shell.animation-rectangle-cursor,
 .canvas-shell.animation-rectangle-cursor.dragging { cursor: crosshair; }
+.canvas-shell.animation-wand-cursor { cursor: crosshair; }
 .canvas-shell.animation-dropper-cursor { cursor: url('icons/cursor-dropper.svg') 3 28, crosshair; }
 .canvas-shell.animation-selection-moving.dragging { cursor: move; }
 .canvas-shell.panning.dragging { cursor: grabbing; }

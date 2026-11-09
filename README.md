@@ -99,7 +99,7 @@ With Lasso or Rectangle selected, hold Shift while selecting to add an area, or 
 
 Hold Shift and use the mouse wheel over the canvas to adjust Animation Pencil or Eraser size, just like Edit Tools. Rectangle selection uses a crosshair; Lasso uses a contrasting lasso cursor with a precise selection point.
 
-Hold Ctrl/Cmd while using Animation Pencil or Eraser to sample a color temporarily; releasing it restores the selected tool. Dropper has a pipette cursor and sits immediately before Pencil. Brush previews stay within the canvas and off floating menus.
+Ctrl/Cmd-click a sprite on the canvas to select its topmost visible Animation layer. Use Dropper (D) to sample a color. Hold the selection button to switch between Lasso and Rectangle. Magic Wand (W) masks the active layer and shows Anti-aliasing, Contiguous, and Tolerance controls beneath the toolbar.
 
 New Layer creates an empty layer above the selected layer, with independent artwork in each frame. Ctrl/Cmd-click layer names to select several, or Shift-click a range, then click Group. Groups have green borders; double-click a group to expand or collapse its children. Children remain individually selectable and editable. Move, offsets, flips, and per-frame visibility work on the whole group, while drawing and selection tools operate only on individual layers. Drag a layer onto the middle of a group to put it inside, or above/below the group to move it outside. Press F2 to rename a layer or group. Groups and their contents are preserved by project saving and undo/redo.
 

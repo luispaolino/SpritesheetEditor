@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.6.0-3" />
+  <link rel="stylesheet" href="animation.css?v=1.6.0-4" />
   <style>
     :root {
       --bg: #10131b;
@@ -193,7 +193,7 @@
     .floating-tool-tabs {
       position: absolute; z-index: 4; top: var(--floating-menu-gutter); left: var(--floating-menu-gutter); right: var(--floating-menu-gutter);
       display: flex; flex-wrap: wrap; gap: 8px; align-items: center; align-content: flex-start; pointer-events: auto;
-      min-height: 38px; padding-right: 92px;
+      min-height: 38px; padding-right: 176px;
       overflow: visible; transition: right 180ms ease;
     }
     .floating-tool-tabs:empty { display: none; }
@@ -215,6 +215,8 @@
       backdrop-filter: blur(14px) saturate(1.08);
       -webkit-backdrop-filter: blur(14px) saturate(1.08);
     }
+    .floating-tool-tabs #canvasExpandButton { width: 76px; min-width: 76px; }
+    #canvasExpandButton.active { color: #071018; background: var(--warning); border-color: transparent; }
     .stage-card.preview-bg-light .inspector-tab-button:not(.active),
     .stage-card.preview-bg-light .floating-tool-tabs .floating-overlay-button:not(.active) {
       color: var(--text);
@@ -229,7 +231,8 @@
       box-shadow: 0 10px 22px rgba(7,10,18,.16);
     }
     .side-panels {
-      position: absolute; z-index: 3; top: calc(var(--floating-menu-gutter) + var(--floating-toolbar-height) + 12px); right: var(--floating-menu-gutter); bottom: var(--floating-menu-gutter);
+      position: absolute; z-index: 3; top: calc(var(--floating-menu-gutter) + var(--floating-toolbar-height) + 12px); right: var(--floating-menu-gutter);
+      max-height: calc(100% - var(--floating-toolbar-height) - 2 * var(--floating-menu-gutter) - 12px);
       width: min(var(--floating-menu-width), calc(100% - (var(--floating-menu-gutter) * 2)));
       display: block; min-width: 0; overflow: visible; scrollbar-width: thin; pointer-events: auto;
       opacity: 1; visibility: visible; transform: translateX(0);
@@ -1269,6 +1272,35 @@
       .stage-wrap { inset: 12px; }
       .canvas-shell { min-height: min(86vh, 880px); }
     }
+    .app.canvas-expanded {
+      position: fixed; inset: 0; width: auto; margin: 0; padding: 8px; gap: 8px;
+      grid-template-columns: clamp(140px, 22vw, 320px) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "left center" "timeline timeline";
+    }
+    .app.canvas-expanded.compositor-mode {
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "left center";
+    }
+    .app.canvas-expanded .left-panel {
+      height: 100%; min-height: 0; max-height: 100%; min-width: 0;
+      padding-inline: clamp(8px, 1.5vw, 24px); overflow: auto; scrollbar-width: thin;
+    }
+    .app.canvas-expanded .stage-card {
+      --floating-menu-gutter: 12px;
+      height: 100%; min-height: 0; max-height: none; padding: 0;
+    }
+    .app.canvas-expanded .stage-wrap { inset: 0; }
+    .app.canvas-expanded .canvas-shell { min-height: 0; }
+    .app.canvas-expanded .side-panels { overflow: auto; }
+    .app.canvas-expanded .timeline-card { min-width: 0; max-height: 45vh; overflow: auto; scrollbar-width: thin; }
+    .app.canvas-expanded .timeline-toolbar { flex-flow: row wrap; align-items: center; gap: 8px; padding: 8px 12px; }
+    .app.canvas-expanded .timeline-slider-wrap { flex: 1 1 160px; }
+    .app.canvas-expanded .timeline-slider-wrap input[type="range"] { min-width: 0; }
+    .app.canvas-expanded .filmstrip { padding: 6px 12px; }
+    @media (max-width: 680px) {
+      .app.canvas-expanded .floating-tool-tabs { padding: 46px 0 0; }
+    }
   </style>
 </head>
 <body>
@@ -1421,7 +1453,8 @@
       </div>
 
       <div class="floating-tool-tabs" id="floatingToolTabs" aria-label="Canvas tools">
-        <div class="canvas-history-buttons" id="canvasHistoryButtons" role="group" aria-label="Edit history">
+        <div class="canvas-history-buttons" id="canvasHistoryButtons" role="group" aria-label="Canvas view and edit history">
+          <button id="canvasExpandButton" class="secondary floating-overlay-button" type="button" aria-pressed="false" title="Expand canvas to fit the browser">Expand</button>
           <button id="canvasUndoButton" class="secondary floating-overlay-button" type="button" disabled aria-label="Undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
           <button id="canvasRedoButton" class="secondary floating-overlay-button" type="button" disabled aria-label="Redo" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5m5 5H9a5 5 0 0 0 0 10h3"/></svg></button>
         </div>
@@ -1930,13 +1963,24 @@
             </label>
             <div class="animation-tools" aria-label="Animation edit tools">
               <button id="animationMoveButton" class="tool-button icon-button tool-icon-button active" type="button" data-animation-tool="move" title="Move sprite (M)" aria-label="Move sprite (M)"><img class="tool-icon-image" src="icons/move.svg" alt="" /></button>
-              <button id="animationLassoButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="lasso" title="Lasso selection (L)" aria-label="Lasso selection (L)"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" /></button>
-              <button id="animationRectangleButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="rectangle" title="Rectangle selection (R)" aria-label="Rectangle selection (R)"><img class="tool-icon-image" src="icons/selection-rectangle.svg" alt="" /></button>
+              <div class="animation-selection-tool">
+                <button id="animationSelectionToolButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="lasso" title="Lasso selection (L). Hold to change selection tool." aria-label="Lasso selection (L)" aria-expanded="false" aria-controls="animationSelectionToolMenu"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" draggable="false" /></button>
+                <div id="animationSelectionToolMenu" class="animation-selection-tool-menu" role="group" aria-label="Selection tools" hidden>
+                  <button class="secondary" type="button" data-animation-selection-tool="lasso"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" /> Lasso</button>
+                  <button class="secondary" type="button" data-animation-selection-tool="rectangle"><img class="tool-icon-image" src="icons/selection-rectangle.svg" alt="" /> Rectangle</button>
+                </div>
+              </div>
+              <button id="animationWandButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="wand" title="Magic Wand (W)" aria-label="Animation Magic Wand (W)"><img class="tool-icon-image" src="icons/wand.svg" alt="" /></button>
               <button id="animationSplitButton" class="secondary icon-button tool-icon-button" type="button" title="Split selection into a new layer" aria-label="Split selection into a new layer" disabled><img class="tool-icon-image" src="icons/split.svg" alt="" /></button>
               <button id="animationDropperButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="dropper" title="Dropper (D)" aria-label="Animation dropper (D)"><img class="tool-icon-image" src="icons/pipette.svg" alt="" /></button>
-              <button id="animationPencilButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="pencil" title="Pencil (P); hold Ctrl/Cmd for Dropper" aria-label="Animation pencil (P)"><img class="tool-icon-image" src="icons/pencil.svg" alt="" /></button>
+              <button id="animationPencilButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="pencil" title="Pencil (P)" aria-label="Animation pencil (P)"><img class="tool-icon-image" src="icons/pencil.svg" alt="" /></button>
               <button id="animationEraserButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="eraser" title="Eraser (E)" aria-label="Animation eraser (E)"><img class="tool-icon-image" src="icons/eraser.svg" alt="" /></button>
               <div id="animationColorStrip" class="pencil-color-strip" aria-label="Animation pencil colors"></div>
+            </div>
+            <div class="animation-wand-settings" id="animationWandSettings" role="group" aria-label="Magic Wand settings" hidden>
+              <label class="check-field"><input id="animationWandAntialias" type="checkbox" /> Anti-aliasing</label>
+              <label class="check-field"><input id="animationWandContiguous" type="checkbox" checked /> Contiguous</label>
+              <label class="animation-wand-tolerance">Tolerance <input id="animationWandTolerance" type="number" min="0" max="255" step="1" value="32" /></label>
             </div>
             <div class="field" id="animationBrushSizeField" hidden>
               <div class="line"><label for="animationBrushSizeInput">Pencil / Eraser Size</label><span class="value-pill"><span id="animationBrushSizeValue">1</span> px</span></div>
@@ -2157,14 +2201,14 @@
         <div><kbd>G</kbd><span>Paint Bucket tool</span></div>
         <div><kbd>W</kbd><span>Magic Wand tool</span></div>
         <div><kbd>D</kbd><span>Dropper tool</span></div>
-        <div><kbd>Ctrl/Cmd</kbd><span>Temporary color picker while using Pencil tools or Animation Pencil/Eraser</span></div>
+        <div><kbd>Ctrl/Cmd</kbd><span>Temporary color picker while using Pencil tools in Edit Tools</span></div>
         <div><kbd>H</kbd><span>Hide Mask on/off</span></div>
         <div><kbd>F</kbd><span>Reset view, or fit the Compositor timeline when hovering it</span></div>
         <div><kbd>Mouse Wheel</kbd><span>Zoom preview canvas</span></div>
         <div><kbd>Shift + Wheel</kbd><span>Adjust active brush, pencil, or eraser size</span></div>
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
         <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Animation</span></div>
-        <div><kbd>Ctrl/Cmd + Click</kbd><span>Select multiple Animation layers</span></div>
+        <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick the topmost visible Animation layer on the canvas, or select multiple layers in the list</span></div>
         <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy / paste Animation layers or groups in the current frame</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from an Animation lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to an Animation lasso or rectangle selection</span></div>
@@ -2180,7 +2224,7 @@
         <div><kbd>Ctrl/Cmd + Shift + Z</kbd><span>Redo</span></div>
         <div><kbd>Ctrl/Cmd + Y</kbd><span>Redo</span></div>
         <div><kbd>Escape</kbd><span>Close modal/menu or cancel the active picker</span></div>
-        <div><kbd>Shift + Click</kbd><span>Select a range of frames, Animation layers, or Compositor clips</span></div>
+        <div><kbd>Shift + Click</kbd><span>Draw a straight line from the last Pencil or Eraser stroke, or select a range of frames, layers, or clips</span></div>
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Toggle frame or Compositor clip selection</span></div>
       </div>
     </div>
@@ -2521,7 +2565,7 @@
     const $ = (id) => document.getElementById(id);
     const els = {
       referenceFadeMirrorInput: $('referenceFadeMirrorInput'),
-      canvasHistoryButtons: $('canvasHistoryButtons'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'),
+      canvasHistoryButtons: $('canvasHistoryButtons'), canvasExpandButton: $('canvasExpandButton'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'),
       fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), referencePaletteFileInput: $('referencePaletteFileInput'), dropZone: $('dropZone'), importFrameSkipInput: $('importFrameSkipInput'), importFrameSkipValue: $('importFrameSkipValue'), importVideoInfo: $('importVideoInfo'),
       rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'), pingPongInput: $('pingPongInput'), oneRowPackInput: $('oneRowPackInput'),
       frameInput: $('frameInput'), frameValue: $('frameValue'), totalFramesValue: $('totalFramesValue'), reverseOrderButton: $('reverseOrderButton'), showSkippedFramesInput: $('showSkippedFramesInput'), deleteSkippedButton: $('deleteSkippedButton'), backgroundInput: $('backgroundInput'), scanlinesInput: $('scanlinesInput'), scanlineOpacityInput: $('scanlineOpacityInput'), scanlineOpacityValue: $('scanlineOpacityValue'), rulersBeyondCageInput: $('rulersBeyondCageInput'), rulerColorButton: $('rulerColorButton'), rulerColorSwatch: $('rulerColorSwatch'), referenceShadowInput: $('referenceShadowInput'), referenceShadowColorButton: $('referenceShadowColorButton'), referenceShadowColorSwatch: $('referenceShadowColorSwatch'), referenceShadowHeightInput: $('referenceShadowHeightInput'), referenceShadowHeightValue: $('referenceShadowHeightValue'), referenceShadowOffsetYInput: $('referenceShadowOffsetYInput'),
@@ -4149,7 +4193,7 @@
 
     function snapshot() {
       return {
-        animationLayers: cloneAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationSelectionHistory: animationSelectionHistoryState(),
+        animationLayers: cloneAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationWandSettings: animationWandSettings(), animationSelectionHistory: animationSelectionHistoryState(),
         sheetImage: state.sheetImage,
         sheetImages: sheetSources().map(sheet => ({ image: sheet.image, name: sheet.name || 'spritesheet' })),
         frames: state.frames.map(f => ({ ...f, skipped: !!f.skipped, canvas: canvasClone(f.canvas), sourceCanvas: canvasClone(f.sourceCanvas || f.canvas), sheetSlice: cloneSheetRect(f.sheetSlice), sheetCrop: cloneSheetRect(f.sheetCrop), pencilLayers: clonePencilLayers(f.pencilLayers || []), animationCels: cloneAnimationCels(f.animationCels), animationVisibility: cloneAnimationVisibility(f.animationVisibility) })), rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, selectedFrameIndices: [...state.selectedFrameIndices], selectionAnchorFrame: state.selectionAnchorFrame, importFrameSkip: state.importFrameSkip, importFrameSkipMax: state.importFrameSkipMax, loopPlayback: state.loopPlayback !== false,
@@ -4939,6 +4983,9 @@
     function drawMaskOverlay(t, i, x = 0, y = 0) {
       const mask = state.frameMasks[i];
       if (!state.maskDirty[i] || !mask) return;
+      drawMaskCanvasOverlay(t, mask, x, y);
+    }
+    function drawMaskCanvasOverlay(t, mask, x, y) {
       const rev = maskVersion(mask);
       let cached = maskOverlayCache.get(mask);
       if (!cached || cached.rev !== rev || cached.width !== mask.width || cached.height !== mask.height) {
@@ -5531,10 +5578,10 @@
       return clamp(Math.round(parseFloat(state.pencilHardness) || 0), 0, 100) / 100;
     }
     function temporaryPencilColorPickerActive(e = null) {
-      return !!((state.pencilMode || animationPixelBrushActive()) && (state.pencilCtrlPickMode || e?.ctrlKey || e?.metaKey));
+      return !!(state.pencilMode && !animationPanelActive() && (state.pencilCtrlPickMode || e?.ctrlKey || e?.metaKey));
     }
     function setPencilCtrlPickMode(active, redraw = true) {
-      const next = !!active && (state.pencilMode || animationPixelBrushActive());
+      const next = !!active && state.pencilMode && !animationPanelActive();
       if (state.pencilCtrlPickMode === next) return;
       state.pencilCtrlPickMode = next;
       state.brushCursorVisible = false;
@@ -5744,6 +5791,7 @@
       const zoomX = mainRect.width / Math.max(1, frame.width);
       const zoomY = mainRect.height / Math.max(1, frame.height);
       if (mode === 'pencil' && !builderSurface) {
+        renderAnimationPaintLinePreview(t, mainRect, zoomX, zoomY);
         if (!renderPencilCursorFootprint(t, shellRect, mainRect, zoomX, zoomY)) clearBrushCursorOverlay();
         t.restore();
         return;
@@ -6416,7 +6464,9 @@
     function updateMaskBakeIndicator() {
       const el = els.maskBakeIndicator;
       if (!el) return;
-      const visible = hasFrames() && activeInspectorPanelName() === 'Mask' && !!state.maskDirty[state.currentFrame];
+      const layer = selectedAnimationMaskLayer();
+      const dirty = layer ? !!animationCel(layer)?.mask : !!state.maskDirty[state.currentFrame];
+      const visible = hasFrames() && activeInspectorPanelName() === 'Mask' && dirty;
       el.classList.toggle('show', visible);
       if (!visible) return;
       const shell = els.canvasShell.getBoundingClientRect();
@@ -7032,6 +7082,7 @@
       els.canvasShell.classList.toggle('animation-move-cursor', animationPanelActive() && (state.animationTool || 'move') === 'move' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-lasso-cursor', animationPanelActive() && state.animationTool === 'lasso' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-rectangle-cursor', animationPanelActive() && state.animationTool === 'rectangle' && !colorPicker.pickMode);
+      els.canvasShell.classList.toggle('animation-wand-cursor', animationPanelActive() && state.animationTool === 'wand' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-dropper-cursor', animationPanelActive() && (state.animationTool === 'dropper' || tempPencilPicker) && !colorPicker.pickMode);
       updateIndexPreview();
       setButtons(hasFrames());
@@ -7061,10 +7112,12 @@
       els.clearDisplayReferenceButton.classList.toggle('active', !!state.referenceCompositorVisible);
       els.reverseOrderButton.disabled = state.frames.length < 2;
       els.deleteSkippedButton.disabled = !hasFrames() || !hasSkippedFrames();
-      const hasUnbakedMasks = state.maskDirty.some(Boolean);
+      const maskLayer = selectedAnimationMaskLayer();
+      const hasCurrentMask = maskLayer ? !!animationCel(maskLayer)?.mask : !!state.maskDirty[state.currentFrame];
+      const hasUnbakedMasks = state.maskDirty.some(Boolean) || animationMaskedCels().length > 0;
       const builderMaskFrame = spriteSheetToolSurface ? activeSpriteSheetBuilderFrameRecord()?.frame : null;
       const builderHasMasks = spriteSheetToolSurface && spriteSheetBuilderRowsWithFrames().some(row => (row.frames || []).some(frame => frame?.maskDirty));
-      els.resetMaskButton.disabled = spriteSheetToolSurface ? !builderMaskFrame?.maskDirty : (!hasFrames() || !state.maskDirty[state.currentFrame]);
+      els.resetMaskButton.disabled = spriteSheetToolSurface ? !builderMaskFrame?.maskDirty : !hasCurrentMask;
       els.resetAllMasksButton.disabled = spriteSheetToolSurface ? !builderHasMasks : (!hasFrames() || !hasUnbakedMasks);
       els.bakeAllMasksButton.disabled = !hasFrames() || !hasUnbakedMasks;
       updatePencilLayerUi();
@@ -13165,7 +13218,7 @@
       return {
         format: 'spritesheet-editor-project', version: 1, imageName: state.imageName, importedId: state.importedId, sheetImage, sheetImages,
         settings: {
-          animationLayers: serializeAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, importFrameSkip: state.importFrameSkip, importFrameSkipMax: state.importFrameSkipMax, fps: state.fps, pingPongAnimation: state.pingPongAnimation, loopPlayback: state.loopPlayback !== false, oneRowPack: state.oneRowPack,
+          animationLayers: serializeAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationWandSettings: animationWandSettings(), rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, importFrameSkip: state.importFrameSkip, importFrameSkipMax: state.importFrameSkipMax, fps: state.fps, pingPongAnimation: state.pingPongAnimation, loopPlayback: state.loopPlayback !== false, oneRowPack: state.oneRowPack,
           frameWidth: state.frameWidth, frameHeight: state.frameHeight, cageWidth: state.cageWidth, cageHeight: state.cageHeight, cageCustom: state.cageCustom,
           scaleX: state.scaleX, scaleY: state.scaleY, scaleLocked: state.scaleLocked, scaleAll: state.scaleAll, scaleControls: 'split', scaleUnit: state.scaleUnit, frameScales: state.frameScales.map(scale => ({ ...scale })), frameFlips: state.frameFlips.map(Boolean), frameFlipYs: state.frameFlipYs.map(Boolean), offsetXAll: state.offsetXAll, offsetYAll: state.offsetYAll, pivotX: state.pivotX, pivotY: state.pivotY, rulersV: [...state.rulersV], rulersH: [...state.rulersH], rulersBeyondCage: !!state.rulersBeyondCage, rulerColor: cloneColor(state.rulerColor), showCageOverlay: state.showCageOverlay !== false, showRulerOverlay: state.showRulerOverlay !== false, showPivotOverlay: state.showPivotOverlay, pivotDark: state.pivotDark,
           showSkippedFrames: state.showSkippedFrames !== false, scanlinesVisible: state.scanlinesVisible, scanlineOpacity: state.scanlineOpacity, referenceCastShadow: state.referenceCastShadow, referenceShadowColor: cloneColor(state.referenceShadowColor), referenceShadowHeight: state.referenceShadowHeight, referenceShadowOffsetY: state.referenceShadowOffsetY, spriteOutline: !!state.spriteOutline, spriteOutlineWidth: normalizeReferenceClipOutlineWidth(state.spriteOutlineWidth), spriteOutlineColor: normalizeReferenceClipOutlineColor(state.spriteOutlineColor), displayReferenceUnit: referenceTransformUnit(), displayReferenceLayers: serializedDisplayReferenceLayers(), activeDisplayReferenceId: state.activeDisplayReferenceId, displayReferenceLayerCounter: state.displayReferenceLayerCounter, referenceCompositorVisible: !!state.referenceCompositorVisible, referenceCompositorWidth: compositorFrameSize().width, referenceCompositorHeight: compositorFrameSize().height, referenceCompositorMaskOutsideCage: !!state.referenceCompositorMaskOutsideCage, referenceCompositorAssets: serializedReferenceLayerList(state.referenceCompositorAssets || []), referenceCompositorAudioAssets: serializedReferenceCompositorAudioAssets(), referenceCompositorFontAssets: serializedReferenceCompositorFontAssets(), referenceCompositorTracks: serializedReferenceCompositorTracks(), referenceCompositorClips: serializedReferenceCompositorClips(), activeReferenceCompositorClipId: state.activeReferenceCompositorClipId, activeReferenceCompositorTrackId: state.activeReferenceCompositorTrackId, referenceCompositorCursorFrame: state.referenceCompositorCursorFrame || 0, referenceCompositorStartFrame: state.referenceCompositorStartFrame || 0, referenceCompositorEndFrame: state.referenceCompositorEndFrame ?? (REFERENCE_COMPOSITOR_DEFAULT_LENGTH - 1), referenceCompositorPxPerFrame: referenceCompositorPxPerFrame(), referenceCompositorLoop: state.referenceCompositorLoop !== false, referenceCompositorExportAudio: state.referenceCompositorExportAudio !== false, referenceCompositorVideoQuality: normalizeReferenceCompositorVideoQuality(state.referenceCompositorVideoQuality), referenceCompositorVideoBitrate: normalizeReferenceCompositorVideoBitrate(state.referenceCompositorVideoBitrate), referenceCompositorAudioBitrate: normalizeReferenceCompositorAudioBitrate(state.referenceCompositorAudioBitrate), fontData: state.fontCanvas ? state.fontCanvas.toDataURL('image/png') : null, fontName: state.fontName, fontConfigSpritesheetName: state.fontConfigSpritesheetName, fontRows: state.fontRows, fontCols: state.fontCols, fontColsAuto: state.fontColsAuto !== false, fontOrder: state.fontOrder, fontLetterGap: state.fontLetterGap, fontSpace: state.fontSpace, fontRowGap: state.fontRowGap, fontAlign: state.fontAlign, fontForceUppercase: !!state.fontForceUppercase, fontCastShadow: !!state.fontCastShadow, fontShadowColor: cloneColor(state.fontShadowColor || DEFAULT_FONT_SHADOW_COLOR), fontShadowOffsetX: state.fontShadowOffsetX, fontShadowOffsetY: state.fontShadowOffsetY, fontLetterOffsets: normalizeFontLetterOffsets(state.fontLetterOffsets, state.fontOrder), fontLetterGaps: normalizeFontLetterGaps(state.fontLetterGaps, state.fontOrder), activeFontLetter: state.activeFontLetter, fontColor: cloneColor(state.fontColor || DEFAULT_FONT_COLOR), fontText: state.fontText, fontRevision: state.fontRevision,
@@ -13340,6 +13393,7 @@
         state.selectedAnimationLayerIds=[...(s.selectedAnimationLayerIds || [state.activeAnimationLayerId].filter(Boolean))];
         state.animationSelectionAnchorId=state.activeAnimationLayerId;
         state.animationBrushSize = clamp(Number(s.animationBrushSize) || 1, 1, 120);
+        state.animationWandSettings = animationWandSettings(s.animationWandSettings || {});
         resetAnimationTools();
         state.spriteSheetBuilderRows = [];
         state.spriteSheetBuilderRowCounter = 0;
@@ -16032,6 +16086,15 @@
         return;
       }
       if (!hasFrames()) return;
+      const layer = selectedAnimationMaskLayer();
+      if (layer) {
+        const cel = animationCel(layer);
+        if (!cel?.mask) return;
+        pushHistory();
+        delete cel.mask;
+        animationChanged();
+        return;
+      }
       pushHistory(); resetMask(state.currentFrame); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
     }
     function resetAllMasks() {
@@ -16045,7 +16108,10 @@
         return;
       }
       if (!hasFrames()) return;
-      pushHistory(); state.frames.forEach((_,i)=>resetMask(i)); buildFilmstrip(); drawFrame(state.currentFrame); updateInfo();
+      pushHistory();
+      state.frames.forEach((_, i) => resetMask(i));
+      animationMaskedCels().forEach(cel => { delete cel.mask; });
+      animationChanged();
     }
     function maskHasPixels(m) { const d = m.getContext('2d').getImageData(0,0,m.width,m.height).data; for (let i=3;i<d.length;i+=4) if (d[i]) return true; return false; }
     function applyMaskCanvasToCanvas(canvas, mask) {
@@ -16097,17 +16163,17 @@
     }
     function bakeAllMasks() {
       if (!hasFrames()) return;
-      const hasUnbakedMasks = state.maskDirty.some(Boolean);
+      const cels = animationMaskedCels();
+      const hasUnbakedMasks = state.maskDirty.some(Boolean) || cels.length > 0;
       if (!hasUnbakedMasks) return;
       pushHistory();
       const changed = bakeDirtyFrameMasksIntoSources();
-      if (changed) {
-        clearIndexPreviewCache();
-        clearTruePixelPreviewCache();
-        buildFilmstrip();
-        drawFrame(state.currentFrame);
+      for (const cel of cels) {
+        applyMaskCanvasToCanvas(cel.canvas, cel.mask);
+        delete cel.mask;
       }
-      updateInfo();
+      if (changed || cels.length) animationChanged();
+      else updateInfo();
     }
     function brushColorWithAlpha(color, alpha) {
       return `rgba(${color.r}, ${color.g}, ${color.b}, ${clamp(alpha, 0, 1)})`;
@@ -16132,6 +16198,10 @@
       const bounds = Math.ceil(radius + 1);
       c.fillRect(Math.floor(cx - bounds), Math.floor(cy - bounds), bounds * 2, bounds * 2);
     }
+    function hardPencilRowInset(size, row) {
+      const radius = size / 2, dy = row + .5 - radius;
+      return Math.ceil(radius - .5 - Math.sqrt(radius * radius - dy * dy));
+    }
     function stampHardPencil(c, cx, cy, size, color, square = false) {
       const safeColor = cloneColor(color), alpha = clamp(Math.round(safeColor.a ?? 255), 0, 255) / 255;
       if (!alpha) return;
@@ -16145,16 +16215,22 @@
         c.fillRect(left, top, size, size);
         return;
       }
-      const radius = size / 2, r2 = radius * radius, center = radius - .5;
       for (let y = 0; y < size; y++) {
-        const dy = y + .5 - radius;
-        const span = Math.sqrt(r2 - dy * dy);
-        const first = Math.ceil(center - span), last = Math.floor(center + span);
-        c.fillRect(left + first, top + y, last - first + 1, 1);
+        const inset = hardPencilRowInset(size, y);
+        c.fillRect(left + inset, top + y, size - 2 * inset, 1);
       }
     }
     function paintMaskLine(i,x1,y1,x2,y2) {
-      const m = state.frameMasks[i], wasDirty = !!state.maskDirty[i];
+      const layer = selectedAnimationMaskLayer(), cel = animationCel(layer, i);
+      if (layer && (!cel || !animationLayerVisible(layer, i))) return;
+      const wasDirty = cel ? !!cel.mask : !!state.maskDirty[i];
+      if (cel) {
+        if (!wasDirty && state.brushAction === 'restore') return;
+        cel.mask ||= makeMask(cel.canvas.width, cel.canvas.height);
+        const start = animationCelPixel(cel, x1, y1), end = animationCelPixel(cel, x2, y2);
+        x1 = start.x; y1 = start.y; x2 = end.x; y2 = end.y;
+      }
+      const m = cel ? cel.mask : state.frameMasks[i];
       if (!m || (state.brushAction === 'restore' && !wasDirty)) return;
       const mc = m.getContext('2d'), size = Math.max(1,Math.round(state.brushSize)), radius = Math.max(.5, size / 2);
       const dx=x2-x1, dy=y2-y1, dist=Math.hypot(dx,dy), steps=Math.max(1,Math.ceil(dist/Math.max(1,size*.25)));
@@ -16167,6 +16243,7 @@
       mc.restore();
       const rev = touchMask(m);
       patchMaskOverlayLine(m, rev, state.brushAction, x1, y1, x2, y2);
+      if (cel) { markFrameBitmapsDirty(); return; }
       if (state.brushAction === 'mask' || wasDirty) {
         state.maskDirty[i] = true;
         state.indexedFrames[i] = null;
@@ -16352,16 +16429,94 @@
       state.indexPreviewResult = result;
       return true;
     }
-    function applyMagicWand(i,x,y) {
-      readMagicOptions();
-      ensureArrays(); const w=state.cageWidth,h=state.cageHeight,tmp=makeMask(w,h),tc=tmp.getContext('2d',{alpha:true}); tc.clearRect(0,0,w,h); drawSprite(tc,i,0,0,{applyMask:false});
-      const img=tc.getImageData(0,0,w,h),d=img.data,tol=clamp(Math.round(state.magicTolerance)||0,0,255),start=y*w+x,sp=start*4,tr=d[sp],tg=d[sp+1],tb=d[sp+2],ta=d[sp+3],sel=new Uint8ClampedArray(w*h);
-      const deltaAt=p=>Math.max(Math.abs(d[p]-tr),Math.abs(d[p+1]-tg),Math.abs(d[p+2]-tb),Math.abs(d[p+3]-ta));
-      const match=id=>deltaAt(id*4)<=tol; let count=0;
-      if(state.magicContiguous){const q=new Int32Array(w*h),seen=new Uint8Array(w*h);let head=0,tail=0;const en=(nx,ny)=>{if(nx<0||ny<0||nx>=w||ny>=h)return;const id=ny*w+nx;if(seen[id])return;seen[id]=1;if(!match(id))return;sel[id]=255;q[tail++]=id;count++;};en(x,y);while(head<tail){const id=q[head++],nx=id%w,ny=Math.floor(id/w);en(nx+1,ny);en(nx-1,ny);en(nx,ny+1);en(nx,ny-1);}} else {for(let id=0;id<sel.length;id++)if(match(id)){sel[id]=255;count++;}}
-      if(!count)return false;
-      if(state.magicAntialias){const band=Math.max(8,Math.round(32-tol/16));for(let yy=0;yy<h;yy++)for(let xx=0;xx<w;xx++){const id=yy*w+xx;if(sel[id])continue;const touch=(xx>0&&sel[id-1]===255)||(xx<w-1&&sel[id+1]===255)||(yy>0&&sel[id-w]===255)||(yy<h-1&&sel[id+w]===255);if(!touch)continue;const diff=deltaAt(id*4);if(diff>tol&&diff<=tol+band)sel[id]=Math.round(255*(1-(diff-tol)/band));}}
-      const m=state.frameMasks[i],mc=m.getContext('2d'),md=mc.getImageData(0,0,w,h),mp=md.data; for(let id=0;id<sel.length;id++){const a=sel[id]; if(!a)continue; const p=id*4; mp[p]=0;mp[p+1]=0;mp[p+2]=0;mp[p+3]=Math.max(mp[p+3],a);} mc.putImageData(md,0,0); markMaskContentChanged(i, true); return true;
+    function magicWandAlpha(image, x, y, settings) {
+      const { width, height, data } = image;
+      const tolerance = clamp(Math.round(settings.tolerance) || 0, 0, 255);
+      const sample = (y * width + x) * 4;
+      const delta = id => {
+        const p = id * 4;
+        return Math.max(Math.abs(data[p] - data[sample]), Math.abs(data[p + 1] - data[sample + 1]),
+          Math.abs(data[p + 2] - data[sample + 2]), Math.abs(data[p + 3] - data[sample + 3]));
+      };
+      const alpha = new Uint8ClampedArray(width * height);
+      if (settings.contiguous) {
+        const queue = new Int32Array(alpha.length), seen = new Uint8Array(alpha.length);
+        let head = 0, tail = 0;
+        const enqueue = (nx, ny) => {
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) return;
+          const id = ny * width + nx;
+          if (seen[id]) return;
+          seen[id] = 1;
+          if (delta(id) > tolerance) return;
+          alpha[id] = 255;
+          queue[tail++] = id;
+        };
+        enqueue(x, y);
+        while (head < tail) {
+          const id = queue[head++], nx = id % width, ny = Math.floor(id / width);
+          enqueue(nx + 1, ny); enqueue(nx - 1, ny); enqueue(nx, ny + 1); enqueue(nx, ny - 1);
+        }
+      } else {
+        for (let id = 0; id < alpha.length; id++) if (delta(id) <= tolerance) alpha[id] = 255;
+      }
+      if (settings.antialias) {
+        const band = Math.max(8, Math.round(32 - tolerance / 16));
+        for (let yy = 0; yy < height; yy++) for (let xx = 0; xx < width; xx++) {
+          const id = yy * width + xx;
+          if (alpha[id]) continue;
+          const touches = (xx > 0 && alpha[id - 1] === 255) || (xx < width - 1 && alpha[id + 1] === 255)
+            || (yy > 0 && alpha[id - width] === 255) || (yy < height - 1 && alpha[id + width] === 255);
+          if (!touches) continue;
+          const diff = delta(id);
+          if (diff > tolerance && diff <= tolerance + band) alpha[id] = Math.round(255 * (1 - (diff - tolerance) / band));
+        }
+      }
+      return alpha;
+    }
+    function applyMagicWand(i, x, y, settings = null, layer = selectedAnimationMaskLayer()) {
+      if (!settings) {
+        readMagicOptions();
+        settings = { tolerance: state.magicTolerance, contiguous: state.magicContiguous, antialias: state.magicAntialias };
+      }
+      const base = animationLayerUsesBaseFrame(layer);
+      const cel = base ? null : animationCel(layer, i);
+      if (layer && ((!base && !cel) || !animationLayerVisible(layer, i))) {
+        showError('Select a visible Animation layer in this frame.');
+        return false;
+      }
+      let source, mask;
+      if (cel) {
+        source = cel.canvas;
+        ({ x, y } = animationCelPixel(cel, x, y));
+        mask = cel.mask || makeMask(source.width, source.height);
+      } else {
+        ensureArrays();
+        mask = state.frameMasks[i];
+        source = makeMask();
+        drawBaseSprite(source.getContext('2d'), i, 0, 0, { applyMask: false });
+      }
+      const { width, height } = source;
+      if (x < 0 || y < 0 || x >= width || y >= height) return false;
+      const alpha = magicWandAlpha(source.getContext('2d').getImageData(0, 0, width, height), x, y, settings);
+      const context = mask.getContext('2d'), pixels = context.getImageData(0, 0, width, height);
+      let changed = false;
+      for (let id = 0; id < alpha.length; id++) {
+        const p = id * 4;
+        if (alpha[id] <= pixels.data[p + 3]) continue;
+        pixels.data[p] = pixels.data[p + 1] = pixels.data[p + 2] = 0;
+        pixels.data[p + 3] = alpha[id];
+        changed = true;
+      }
+      if (!changed) return false;
+      pushHistory();
+      context.putImageData(pixels, 0, 0);
+      if (cel) {
+        cel.mask = mask;
+        touchMask(mask);
+        markFrameBitmapsDirty();
+      } else markMaskContentChanged(i, true);
+      showError('');
+      return true;
     }
     function canvasContentAvailable() {
       if (state.referenceCompositorVisible) return true;
@@ -16405,6 +16560,7 @@
       else clearBrushCursorOverlay();
     }
     function updateBrushCursorFromEvent(e) {
+      setAnimationPaintShiftHeld(!!e.shiftKey, false);
       const surface=document.elementFromPoint(e.clientX,e.clientY);
       if (!surface || !els.canvasShell.contains(surface) || surface.closest('button, input, select, textarea, a, .canvas-info-row, .sprite-sheet-builder-cell-actions')) { hideBrushCursor(false); return null; }
       const p = pointerCagePoint(e);
@@ -16455,10 +16611,21 @@
       return false;
     }
     function finishActiveBrushLineStroke(mode = activeBrushLineMode()) {
-      if (mode.startsWith('mask:')) settleMaskDirty(state.currentFrame);
-      if (!updateFrameThumb(state.currentFrame)) buildFilmstrip();
+      if (mode.startsWith('mask:')) {
+        settleEditedMask(state.currentFrame);
+        updateMaskEditThumbs(state.currentFrame);
+      } else if (!updateFrameThumb(state.currentFrame)) buildFilmstrip();
       drawFrame(state.currentFrame);
       updateInfo();
+    }
+    function settleEditedMask(i) {
+      const layer = selectedAnimationMaskLayer();
+      if (!layer) { settleMaskDirty(i); return; }
+      const cel = animationCel(layer, i);
+      if (cel?.mask && !maskHasPixels(cel.mask)) delete cel.mask;
+    }
+    function updateMaskEditThumbs(i, layer = selectedAnimationMaskLayer()) {
+      if (layer?.sharedCel || !updateFrameThumb(i)) buildFilmstrip();
     }
     function shiftPaintActiveBrushLine(e) {
       const mode = activeBrushLineMode(), anchor = currentBrushLineAnchor(mode), p = pointerCagePoint(e);
@@ -18901,6 +19068,15 @@
     els.duplicateFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); addFrameNext(i); });
     els.addFrameNextMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); addFrameNext(i); });
     els.makeFrameFirstMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame; closeFrameContextMenu(); makeFrameFirst(i); });
+    els.canvasExpandButton.addEventListener('click', () => {
+      const app = els.canvasExpandButton.closest('.app');
+      const expanded = app.classList.toggle('canvas-expanded');
+      els.canvasExpandButton.classList.toggle('active', expanded);
+      els.canvasExpandButton.setAttribute('aria-pressed', String(expanded));
+      els.canvasExpandButton.title = expanded ? 'Restore the normal canvas layout' : 'Expand canvas to fit the browser';
+      if (!expanded) syncStageHeightToOpenLeftPanel();
+      requestAnimationFrame(updateCanvasZoom);
+    });
     els.canvasUndoButton.addEventListener('click', undo);
     els.canvasRedoButton.addEventListener('click', redo);
     els.ghostFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame, targets = frameActionIndices(i); closeFrameContextMenu(); toggleFrameGhost(targets); });
@@ -19984,7 +20160,7 @@
       }
       ensureArrays();
       const dragTargets = offsetFrameTargets();
-      if (startAnimationCanvasDrag(e)) return;
+      if (!(state.maskMode && state.brushAction === 'wand') && startAnimationCanvasDrag(e)) return;
       const dragStartOffset = state.frameOffsets[state.currentFrame] || { x: 0, y: 0 };
       state.dragStartOffsets = dragTargets.map(frame => {
         const offset = state.frameOffsets[frame] || { x: 0, y: 0 };
@@ -20039,9 +20215,20 @@
         state.pivotDark = !state.pivotDark;
         drawFrame(state.currentFrame); updateInfo(); return;
       }
-      state.dragging=true; state.dragPointerId=e.pointerId; pushHistory(); const hit=rulerHit(e);
+      const hit = rulerHit(e);
+      if (!hit && state.maskMode && state.brushAction === 'wand') {
+        const point = pointerPoint(e);
+        state.brushCursorVisible = false;
+        state.dragStartOffsets = [];
+        if (applyMagicWand(state.currentFrame, point.x, point.y)) {
+          updateMaskEditThumbs(state.currentFrame);
+          drawFrame(state.currentFrame);
+          updateInfo();
+        }
+        return;
+      }
+      state.dragging=true; state.dragPointerId=e.pointerId; pushHistory();
       if(hit)state.dragMode=hit;
-      else if(state.maskMode&&state.brushAction==='wand'){state.dragMode='wand';const p=pointerPoint(e);state.brushCursorVisible=false;applyMagicWand(state.currentFrame,p.x,p.y);drawFrame(state.currentFrame)}
       else if(state.maskMode){state.dragMode='mask';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;paintMaskLine(state.currentFrame,p.x,p.y,p.x,p.y);setBrushLineAnchor(p);drawFrame(state.currentFrame,{fast:true,skipThumb:true,skipIndexPreview:true})}
       else if(state.pencilMode){state.dragMode='pencil';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;paintPencilLine(state.currentFrame,p.x,p.y,p.x,p.y);setBrushLineAnchor(p);drawFrame(state.currentFrame,{fast:true,skipThumb:true,skipIndexPreview:true})}
       else state.dragMode='offset';
@@ -20074,7 +20261,6 @@
         }
         return;
       }
-      if (state.dragMode === 'wand') return;
       if (state.dragMode.startsWith?.('animation-')) { moveAnimationCanvasDrag(e); return; }
       if (state.dragMode === 'pan') {
         state.panX = state.dragStartPanX + e.clientX - state.dragStartX;
@@ -20131,11 +20317,11 @@
     function endDrag(e){
       if(!state.dragging)return;
       if (state.dragMode.startsWith?.('animation-')) { finishAnimationCanvasDrag(e); return; }
-      const mode=state.dragMode, redrawCurrent=mode==='offset'||mode==='mask'||mode==='wand'||mode==='pencil'||mode==='sprite-sheet-mask'||mode==='sprite-sheet-pencil';
+      const mode=state.dragMode, redrawCurrent=mode==='offset'||mode==='mask'||mode==='pencil'||mode==='sprite-sheet-mask'||mode==='sprite-sheet-pencil';
       const offsetDragCount = Array.isArray(state.dragStartOffsets) ? state.dragStartOffsets.length : 0;
       state.dragging=false; state.dragMode='offset'; state.dragPointerId=null; els.canvasShell.classList.remove('dragging','panning');
       if(e.pointerId!==undefined&&els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId);
-      if(mode==='mask')settleMaskDirty(state.currentFrame);
+      if(mode==='mask')settleEditedMask(state.currentFrame);
       if(mode==='sprite-sheet-mask'||mode==='sprite-sheet-pencil')finishSpriteSheetBuilderToolStroke(mode);
       if((mode==='offset'||mode==='mask')&&state.indexPreviewVisible)clearIndexPreviewCache();
       if(mode==='reference-compositor-offset'){
@@ -20145,6 +20331,7 @@
       }
       if(redrawCurrent && mode !== 'sprite-sheet-mask' && mode !== 'sprite-sheet-pencil'){
         if(mode === 'offset' && offsetDragCount > 1) buildFilmstrip();
+        else if (mode === 'mask') updateMaskEditThumbs(state.currentFrame);
         else if(!updateFrameThumb(state.currentFrame))buildFilmstrip();
         drawFrame(state.currentFrame);
       }
@@ -20300,6 +20487,7 @@
     document.addEventListener('pointerup', e => endReferenceCompositorTrackDrag(e, true));
     document.addEventListener('pointercancel', e => endReferenceCompositorTrackDrag(e, false));
     document.addEventListener('keydown', e => {
+      if (e.key === 'Shift') setAnimationPaintShiftHeld(true);
       const k = e.key.toLowerCase();
       if($('paletteOrderMenu').classList.contains('show')) {
         if(e.key==='Escape') {e.preventDefault();closePaletteOrderMenu(true);}
@@ -20407,7 +20595,7 @@
         }
         return;
       }
-      if ((e.key === 'Control' || e.key === 'Meta') && !typing && (state.pencilMode || animationPixelBrushActive())) { setPencilCtrlPickMode(true); return; }
+      if ((e.key === 'Control' || e.key === 'Meta') && !typing && state.pencilMode && !animationPanelActive()) { setPencilCtrlPickMode(true); return; }
       if (typing) return;
       if (handleAnimationKeyDown(e)) return;
       if (e.key === 'Escape' && (state.eyedropperMode || state.paletteDropperMode)) { e.preventDefault(); state.eyedropperMode = false; state.paletteDropperMode = false; state.paletteMergeTargetIndices = []; state.brushCursorVisible = false; drawFrame(state.currentFrame); updateInfo(); return; }
@@ -20432,6 +20620,7 @@
       if (e.key === 'ArrowRight') { e.preventDefault(); step(1, { fast: true }); }
     });
     document.addEventListener('keyup', e => {
+      if (e.key === 'Shift') setAnimationPaintShiftHeld(false);
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishReferenceCompositorKeyboardNudge();
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishKeyboardNudge();
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishSpriteSheetBuilderInputHistory();
@@ -20440,6 +20629,7 @@
       if ((e.key === 'Control' || e.key === 'Meta') && state.pencilCtrlPickMode) setPencilCtrlPickMode(false);
     });
     window.addEventListener('blur', () => {
+      setAnimationPaintShiftHeld(false);
       finishReferenceCompositorKeyboardNudge();
       finishKeyboardNudge();
       finishSpriteSheetBuilderInputHistory();
@@ -20669,7 +20859,7 @@
       const app = document.querySelector('.app');
       const leftPanel = document.querySelector('.left-panel');
       const stageCard = document.querySelector('.stage-card');
-      if (!leftPanel || !stageCard || !app) return;
+      if (!leftPanel || !stageCard || !app || app.classList.contains('canvas-expanded')) return;
       const clone = leftPanel.cloneNode(true);
       clone.querySelectorAll('.group').forEach(group => group.classList.remove('collapsed'));
       Object.assign(clone.style, {
