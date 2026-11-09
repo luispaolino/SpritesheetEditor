@@ -1763,6 +1763,16 @@
               </div>
             </div>
           </details>
+          <details class="edit-tool-section">
+            <summary>Pixel Grid</summary>
+            <div class="edit-tool-section-body">
+              <div class="field">
+                <label for="pixelGridSizeInput">Cell Size (px)</label>
+                <input id="pixelGridSizeInput" type="number" min="1" max="8192" step="1" value="1" disabled />
+              </div>
+              <button id="applyPixelGridButton" class="secondary small-button standalone-button" type="button" disabled>Apply Pixel Grid</button>
+            </div>
+          </details>
         </div>
         <div class="group">
           <p class="group-title">Mask</p>
@@ -5968,6 +5978,25 @@
       t.drawImage(shadow, bounds.minX, bounds.minY, sourceW, sourceH, x + bounds.minX, shadowY, sourceW, shadowHeight);
     }
     function drawSprite(t, i, x = 0, y = 0, opt = {}) {
+      const size = state.frames[i]?.pixelGridSize || 1;
+      if (size === 1 || opt.maskOverlay || opt.haloPreview) {
+        drawSpriteContent(t, i, x, y, opt);
+        return;
+      }
+      const canvas = makeMask();
+      const grid = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+      drawSpriteContent(grid, i, 0, 0, { ...opt, guides: false, brush: false });
+      const image = grid.getImageData(0, 0, canvas.width, canvas.height);
+      pixelateGrid(image, size);
+      grid.putImageData(image, 0, 0);
+      t.save();
+      t.imageSmoothingEnabled = false;
+      t.drawImage(canvas, x, y);
+      if (opt.guides && state.showPivotOverlay) drawPivot(t, x, y);
+      if (opt.brush) drawBrush(t);
+      t.restore();
+    }
+    function drawSpriteContent(t, i, x = 0, y = 0, opt = {}) {
       if (drawAnimationSprite(t, i, x, y, opt)) return;
       drawBaseSprite(t, i, x, y, opt);
     }
@@ -6518,6 +6547,7 @@
       syncPlaybackUi();
       updateActiveThumb();
       updatePencilLayerUi();
+      syncPixelGridUi();
     }
     function drawCompositorCanvas(opt = {}) {
       const frame = compositorFrameSize();
@@ -6922,7 +6952,13 @@
       updateInfo();
     }
 
-    function updateInfo() {
+    function updateInfo({ deferHiddenPalette = false } = {}) {
+      // Preserve palette editing state when it is in use, even with its panel closed.
+      const refreshPalette = !deferHiddenPalette
+        || els.paletteCanvas.closest('.inspector-active')
+        || state.indexPreviewVisible || state.indexColorSelectMode || state.selectedPaletteIndices.length
+        || state.referencePaletteVisible || state.importedPaletteInfo?.palette?.length
+        || state.paletteLayers.some(layer => !layer.isDefault);
       syncHistoryButtons();
       if (typeof updateAnimationUi === 'function') updateAnimationUi();
       syncEmptyState();
@@ -7085,7 +7121,7 @@
       els.canvasShell.classList.toggle('animation-rectangle-cursor', animationPanelActive() && state.animationTool === 'rectangle' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-wand-cursor', animationPanelActive() && state.animationTool === 'wand' && !colorPicker.pickMode);
       els.canvasShell.classList.toggle('animation-dropper-cursor', animationPanelActive() && (state.animationTool === 'dropper' || tempPencilPicker) && !colorPicker.pickMode);
-      updateIndexPreview();
+      if (refreshPalette) updateIndexPreview();
       setButtons(hasFrames());
       setDisplayVisibilityButtons();
       if (spriteSheetBuilderTimelineAvailable()) {
@@ -7122,12 +7158,15 @@
       els.resetAllMasksButton.disabled = spriteSheetToolSurface ? !builderHasMasks : (!hasFrames() || !hasUnbakedMasks);
       els.bakeAllMasksButton.disabled = !hasFrames() || !hasUnbakedMasks;
       updatePencilLayerUi();
-      updateReferencePaletteUi();
-      syncPaletteSelectionUi();
+      if (refreshPalette) {
+        updateReferencePaletteUi();
+        syncPaletteSelectionUi();
+      }
       syncPaletteMatchUi();
       syncSpriteSheetBuilderUi();
       syncSpriteEditUi();
       syncEditToolClipOutlineUi();
+      syncPixelGridUi();
       updateReferenceCompositorUi();
       updateMaskBakeIndicator();
     }
@@ -7297,11 +7336,14 @@
       const first = prepared.reduce((best, c) => !best || c.weight > best.weight ? c : best, null);
       if (!first) return [];
       centers.push({ r: first.r, g: first.g, b: first.b });
+      const nearestDistances = new Float64Array(prepared.length).fill(Infinity);
       while (centers.length < limit && centers.length < prepared.length) {
+        const latestCenter = centers[centers.length - 1];
         let best = null, bestScore = -1;
-        prepared.forEach(c => {
-          let minDist = Infinity;
-          centers.forEach(center => { minDist = Math.min(minDist, colorDistanceSq(c, center)); });
+        // Only the new center can improve each entry's nearest distance.
+        prepared.forEach((c, i) => {
+          const minDist = Math.min(nearestDistances[i], colorDistanceSq(c, latestCenter));
+          nearestDistances[i] = minDist;
           const score = minDist * c.weight;
           if (score > bestScore) { bestScore = score; best = c; }
         });
@@ -8709,6 +8751,41 @@
     }
     function bakeViewedColorTableAll() {
       activePaletteLayerHasPendingChanges() ? applySelectedPaletteColorsAll() : indexAllFrames();
+    }
+    function normalizePixelGridSize(value) {
+      return clamp(Math.round(Number(value)) || 1, 1, 8192);
+    }
+    function pixelateGrid({ data, width, height }, size) {
+      const pixels = new Uint32Array(data.buffer, data.byteOffset, width * height);
+      for (let top = 0; top < height; top += size) {
+        const bottom = Math.min(top + size, height);
+        const centerRow = Math.floor((top + bottom) / 2) * width;
+        for (let left = 0; left < width; left += size) {
+          const right = Math.min(left + size, width);
+          const color = pixels[centerRow + Math.floor((left + right) / 2)];
+          for (let y = top; y < bottom; y++) pixels.fill(color, y * width + left, y * width + right);
+        }
+      }
+    }
+    function syncPixelGridUi() {
+      const available = hasFrames() && !spriteSheetBuilderPanelActive() && !state.referenceCompositorVisible;
+      const input = $('pixelGridSizeInput');
+      input.disabled = $('applyPixelGridButton').disabled = !available;
+      setVal(input, available ? state.frames[state.currentFrame]?.pixelGridSize || 1 : 1);
+    }
+    function applyPixelGrid() {
+      const frame = state.frames[state.currentFrame], input = $('pixelGridSizeInput');
+      if (!frame || input.disabled) return;
+      const size = normalizePixelGridSize(input.value);
+      input.value = String(size);
+      if (size === (frame.pixelGridSize || 1)) return;
+      pause(false, { updateInfo: false });
+      pushHistory();
+      frame.pixelGridSize = size;
+      markFrameBitmapsDirty();
+      if (!updateFrameThumb(state.currentFrame)) buildFilmstrip();
+      drawFrame(state.currentFrame);
+      updateInfo({ deferHiddenPalette: true });
     }
     function truePixelCanvas(src, resolution = state.truePixelResolution) {
       const out = document.createElement('canvas');
@@ -11137,7 +11214,7 @@
       syncSpriteSheetBuilderCanvasPreview();
     }
     function cloneFrameRecord(frame, name = frame.name) {
-      return { kind: 'image', id: `image-${Date.now()}-${state.importedId++}`, name, skipped: !!frame.skipped, ghost: !!frame.ghost, canvas: canvasClone(frame.canvas), sourceCanvas: canvasClone(frame.sourceCanvas || frame.canvas), pencilLayers: clonePencilLayers(frame.pencilLayers || []), animationCels: cloneAnimationCels(frame.animationCels), animationVisibility: cloneAnimationVisibility(frame.animationVisibility) };
+      return { kind: 'image', id: `image-${Date.now()}-${state.importedId++}`, name, skipped: !!frame.skipped, ghost: !!frame.ghost, pixelGridSize: frame.pixelGridSize, canvas: canvasClone(frame.canvas), sourceCanvas: canvasClone(frame.sourceCanvas || frame.canvas), pencilLayers: clonePencilLayers(frame.pencilLayers || []), animationCels: cloneAnimationCels(frame.animationCels), animationVisibility: cloneAnimationVisibility(frame.animationVisibility) };
     }
     function normalizeTimelineSelection() {
       if (!hasFrames()) {
@@ -13226,7 +13303,7 @@
           background: state.background, backgroundCustomColor: cloneColor(state.backgroundCustomColor), brushAction: state.brushAction, brushSize: state.brushSize, pencilToolMode: state.pencilToolMode, pencilEraserPixelMode: !!state.pencilEraserPixelMode, pencilHardness: state.pencilHardness, pencilColor: cloneColor(state.pencilColor), pencilColors: clonePencilColors(state.pencilColors, state.pencilColor), activePencilColorIndex: state.activePencilColorIndex, activePencilLayerId: state.activePencilLayerId, magicTolerance: state.magicTolerance, magicAntialias: state.magicAntialias, magicContiguous: state.magicContiguous, haloTolerance: state.haloTolerance, indexColors: state.indexColors, indexKeepTransparency: state.indexKeepTransparency, indexHighlightColors: state.indexHighlightColors !== false, indexHighlightColor: cloneColor(state.indexHighlightColor || DEFAULT_INDEX_HIGHLIGHT_COLOR), indexChannelMode: state.indexChannelMode, indexPreviewVisible: !!state.indexPreviewVisible, indexColorSelectMode: !!state.indexColorSelectMode, selectedPaletteIndices: [...(state.selectedPaletteIndices || [])], paletteLayers: clonePaletteLayers(state.paletteLayers), activePaletteLayerId: state.activePaletteLayerId, paletteLayerCounter: state.paletteLayerCounter, paletteAdjust: normalizePaletteAdjust(state.paletteAdjust), importedPaletteInfo: cloneImportedPaletteInfo(state.importedPaletteInfo), importedPaletteRevision: state.importedPaletteRevision, referencePaletteInfo: cloneImportedPaletteInfo(state.referencePaletteInfo), referencePaletteVisible: state.referencePaletteVisible, referencePaletteSelectedIndices: [...state.referencePaletteSelectedIndices], referencePaletteTargetIndex: state.referencePaletteTargetIndex, truePixelResolution: state.truePixelResolution,
           maskMode: state.maskMode, hideMask: state.hideMask, pencilMode: state.pencilMode, paintBucketMode: state.paintBucketMode, eyedropperMode: state.eyedropperMode, zoom: state.zoom, panX: state.panX, panY: state.panY
         },
-        frames: state.frames.map((f,i)=>({ kind:f.kind, id:f.id, name:f.name, skipped:!!f.skipped, ghost:!!f.ghost, flipX:frameFlipX(i), flipY:frameFlipY(i), sourceIndex:Number.isFinite(f.sourceIndex)?f.sourceIndex:null, sourceFps:Number.isFinite(f.sourceFps)?f.sourceFps:null, sheetSlice:cloneSheetRect(f.sheetSlice), sheetCrop:cloneSheetRect(f.sheetCrop), canvas:f.canvas.toDataURL('image/png'), sourceCanvas:(f.sourceCanvas || f.canvas).toDataURL('image/png'), animationCels:serializeAnimationCels(f.animationCels), animationVisibility:cloneAnimationVisibility(f.animationVisibility), pencilLayers:(f.pencilLayers || []).filter(layer => layer?.canvas).map(layer => ({ id:layer.id, name:layer.name, visible:layer.visible !== false, useMask:layer.useMask !== false, blendMode:normalizePencilBlendMode(layer), normalMode:normalizePencilBlendMode(layer)==='normal', space:pencilLayerIsCageSpace(layer)?'cage':'source', data:layer.canvas.toDataURL('image/png') })), offset:state.frameOffsets[i]||{x:0,y:0}, mask:state.maskDirty[i]?state.frameMasks[i].toDataURL('image/png'):null, maskDirty:!!state.maskDirty[i], indexed: state.indexedFrames[i] ? serializeIndexedFrameInfo(state.indexedFrames[i]) : null }))
+        frames: state.frames.map((f,i)=>({ kind:f.kind, id:f.id, name:f.name, skipped:!!f.skipped, ghost:!!f.ghost, pixelGridSize:f.pixelGridSize, flipX:frameFlipX(i), flipY:frameFlipY(i), sourceIndex:Number.isFinite(f.sourceIndex)?f.sourceIndex:null, sourceFps:Number.isFinite(f.sourceFps)?f.sourceFps:null, sheetSlice:cloneSheetRect(f.sheetSlice), sheetCrop:cloneSheetRect(f.sheetCrop), canvas:f.canvas.toDataURL('image/png'), sourceCanvas:(f.sourceCanvas || f.canvas).toDataURL('image/png'), animationCels:serializeAnimationCels(f.animationCels), animationVisibility:cloneAnimationVisibility(f.animationVisibility), pencilLayers:(f.pencilLayers || []).filter(layer => layer?.canvas).map(layer => ({ id:layer.id, name:layer.name, visible:layer.visible !== false, useMask:layer.useMask !== false, blendMode:normalizePencilBlendMode(layer), normalMode:normalizePencilBlendMode(layer)==='normal', space:pencilLayerIsCageSpace(layer)?'cage':'source', data:layer.canvas.toDataURL('image/png') })), offset:state.frameOffsets[i]||{x:0,y:0}, mask:state.maskDirty[i]?state.frameMasks[i].toDataURL('image/png'):null, maskDirty:!!state.maskDirty[i], indexed: state.indexedFrames[i] ? serializeIndexedFrameInfo(state.indexedFrames[i]) : null }))
       };
     }
     function projectHasContent() {
@@ -13349,6 +13426,7 @@
             name: f.name || `Frame ${frames.length + 1}`,
             skipped: !!f.skipped,
             ghost: !!f.ghost,
+            pixelGridSize: normalizePixelGridSize(f.pixelGridSize),
             sourceIndex: Number.isFinite(f.sourceIndex) ? f.sourceIndex : null,
             sourceFps: Number.isFinite(f.sourceFps) ? f.sourceFps : null,
             sheetSlice: cloneSheetRect(f.sheetSlice),
@@ -16666,7 +16744,7 @@
         updateMaskEditThumbs(state.currentFrame);
       } else if (!updateFrameThumb(state.currentFrame)) buildFilmstrip();
       drawFrame(state.currentFrame);
-      updateInfo();
+      updateInfo({ deferHiddenPalette: mode.startsWith('pencil:') });
     }
     function settleEditedMask(i) {
       const layer = selectedAnimationMaskLayer();
@@ -16717,7 +16795,7 @@
     }
     function removeRuler(hit) { if (!hit) return; if (hit.kind === 'v') state.rulersV.splice(hit.index, 1); else state.rulersH.splice(hit.index, 1); }
 
-    function frameImageData(i){const w=state.cageWidth,h=state.cageHeight,tmp=makeMask(w,h),tc=tmp.getContext('2d'); drawSprite(tc,i,0,0,{applyMask:false}); return tc.getImageData(0,0,w,h);}
+    function frameImageData(i){const w=state.cageWidth,h=state.cageHeight,tmp=makeMask(w,h),tc=tmp.getContext('2d'); drawSpriteContent(tc,i,0,0,{applyMask:false}); return tc.getImageData(0,0,w,h);}
     function baseMaskAlpha(i,img){const w=img.width,h=img.height,alpha=new Uint8Array(w*h); if(state.maskDirty[i]){const d=state.frameMasks[i].getContext('2d').getImageData(0,0,w,h).data; for(let id=0;id<alpha.length;id++)alpha[id]=d[id*4+3]?255:0;} return alpha;}
     function haloRadius(){ return Math.max(0, Math.ceil(state.haloTolerance / 6)); }
     function computeHaloSelection(i){
@@ -18354,7 +18432,8 @@
       if (state.indexPreviewVisible) {
         const preview = currentIndexPreview(i);
         if (preview?.imageData && preview?.palette?.length) {
-          return { imageData: preview.imageData, paletteInfo: { palette: preview.palette, colorLimit: preview.colorLimit, keepTransparency: preview.keepTransparency } };
+          const imageData = state.frames[i]?.pixelGridSize > 1 ? renderExportFrameImageData(i) : preview.imageData;
+          return { imageData, paletteInfo: { palette: preview.palette, colorLimit: preview.colorLimit, keepTransparency: preview.keepTransparency } };
         }
       }
       const imageData = renderExportFrameImageData(i), applied = state.indexedFrames[i];
@@ -20132,6 +20211,7 @@
     els.editToolClipOutlineInput?.addEventListener('change', () => setEditToolClipOutlineValues({ outline: els.editToolClipOutlineInput.checked }));
     els.editToolClipOutlineWidthInput?.addEventListener('input', () => setEditToolClipOutlineValues({ outlineWidth: els.editToolClipOutlineWidthInput.value }));
     els.editToolClipOutlineColorButton?.addEventListener('click', openEditToolClipOutlineColorPicker);
+    $('applyPixelGridButton').addEventListener('click', applyPixelGrid);
     els.truePixelButton.addEventListener('click',truePixelCurrentFrame); els.truePixelAllButton.addEventListener('click',truePixelAllFrames); els.truePixelResizeButton.addEventListener('click',resizeToTruePixelResolution); els.truePixelResetButton.addEventListener('click',resetTruePixelCurrentFrame); els.truePixelPreviewButton.addEventListener('click',toggleTruePixelPreview);
     els.prevButton.addEventListener('click',()=>step(-1)); els.playButton.addEventListener('click',()=>playbackControlsActive()?pause(true):play()); els.stopButton.addEventListener('click',stop); els.nextButton.addEventListener('click',()=>step(1)); els.playbackLoopButton.addEventListener('click',togglePlaybackLoop);
     els.nudgeLeftButton.addEventListener('click',()=>nudge(-1,0)); els.nudgeRightButton.addEventListener('click',()=>nudge(1,0)); els.nudgeUpButton.addEventListener('click',()=>nudge(0,-1)); els.nudgeDownButton.addEventListener('click',()=>nudge(0,1));
@@ -20411,7 +20491,7 @@
       state.dragStartOffsets = [];
       state.dragStartClipOffsets = [];
       if (mode === 'pan') syncBrushCursorFromEvent(e);
-      updateInfo();
+      updateInfo({ deferHiddenPalette: mode === 'pencil' });
     }
     els.canvasShell.addEventListener('pointerup',endDrag); els.canvasShell.addEventListener('pointercancel',endDrag); els.canvasShell.addEventListener('pointerleave',e=>{hideSpriteSheetBuilderCellActions();if(state.dragging)endDrag(e); else if(!syncBrushCursorFromEvent(e) && state.brushCursorVisible)hideBrushCursor(false);});
     document.addEventListener('pointermove', e => {
@@ -20827,6 +20907,8 @@
         sidePanels?.classList.toggle('inspector-hidden', !isOpen);
         stageCard?.classList.toggle('inspector-open', isOpen);
         setDisplayVisibilityButtons();
+        syncPixelGridUi();
+        if (group?.contains(els.paletteCanvas)) updateInfo();
         requestAnimationFrame(() => {
           if (syncSpriteSheetBuilderCanvasPreview()) return;
           updateCanvasZoom();
