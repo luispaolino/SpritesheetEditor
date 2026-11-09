@@ -9,7 +9,7 @@ const ANIMATION_SELECTION_TOOLS = {
 };
 const animationEls = {
   group: $('animationGroup'), input: $('animationFileInput'), drop: $('animationDropZone'),
-  list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'), addColor: $('animationAddColorButton'),
+  list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'),
   size: $('animationBrushSizeInput'), sizeValue: $('animationBrushSizeValue'), sizeField: $('animationBrushSizeField'),
   selectionButton: $('animationSelectionToolButton'), selectionMenu: $('animationSelectionToolMenu'),
   wandSettings: $('animationWandSettings'), wandAntialias: $('animationWandAntialias'),
@@ -856,7 +856,6 @@ function updateAnimationUi(force = false) {
   const size = builder ? state.brushSize : state.animationBrushSize || 1;
   animationEls.size.value = size;
   animationEls.sizeValue.textContent = size;
-  animationEls.addColor.disabled = builder ? !builderReady : !hasFrames();
   animationEls.wandSettings.hidden = tool !== 'wand';
   const wand = animationWandSettings();
   animationEls.wandAntialias.checked = wand.antialias;
@@ -934,7 +933,7 @@ function updateAnimationUi(force = false) {
     if (state.restoring || document.activeElement !== opacity || opacity.hasAttribute('data-numeric-committing')) opacity.value = normalizeAnimationOpacity(layer.opacity);
     item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); if(layer.group)button.removeAttribute('aria-pressed');else button.setAttribute('aria-pressed',String(flip)); button.disabled = !offset; });
   });
-  const colorsEnabled = !animationEls.addColor.disabled;
+  const colorsEnabled = builder ? builderReady : hasFrames();
   const colorKey = JSON.stringify([state.pencilColors,state.activePencilColorIndex,colorsEnabled]);
   if (animationEls.colors.dataset.colorKey !== colorKey) {
     animationEls.colors.dataset.colorKey = colorKey; animationEls.colors.replaceChildren();
@@ -1589,10 +1588,6 @@ animationEls.colors.addEventListener('contextmenu', e => {
   if (!button || button.disabled) return;
   e.preventDefault();
   openPencilColorContextMenu(Number(button.dataset.animationColor), e.clientX, e.clientY);
-});
-animationEls.addColor.addEventListener('click', () => {
-  openColorPicker({ type: 'pencil-add', applyOnPick: true }, state.pencilColor, 'Pencil Color');
-  beginColorPickerCanvasPick();
 });
 animationEls.list.addEventListener('click',e=>{
   if(animationLayerDrag?.active)return;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.6.5" />
+  <link rel="stylesheet" href="animation.css?v=1.6.5-1" />
   <style>
     :root {
       --bg: #10131b;
@@ -1849,7 +1849,6 @@
               <button id="animationEraserButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="eraser" title="Eraser (E)" aria-label="Eraser (E)"><img class="tool-icon-image" src="icons/eraser.svg" alt="" /></button>
               <button id="animationBucketButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="bucket" title="Paint Bucket (G). Hold Ctrl/Cmd to pick a color." aria-label="Paint Bucket (G)"><img class="tool-icon-image" src="icons/paint-bucket.svg" alt="" /></button>
               <div id="animationColorStrip" class="pencil-color-strip" aria-label="Pencil colors"></div>
-              <button id="animationAddColorButton" class="swatch-button" type="button" aria-label="Add a color from the canvas" title="Add a color from the canvas">+</button>
             </div>
             <div class="animation-wand-settings" id="animationWandSettings" role="group" aria-label="Magic Wand settings" hidden>
               <label class="check-field"><input id="animationWandAntialias" type="checkbox" /> Anti-aliasing</label>
@@ -1868,7 +1867,7 @@
               <button id="animationMergeButton" class="secondary small-button" type="button">Merge</button>
             </div>
             <div class="edit-image-effects">
-              <details class="inspector-section" open>
+              <details class="inspector-section">
                 <summary>Edit Colors</summary>
                 <div class="inspector-section-body">
                   <div class="palette-adjust-controls">
@@ -1908,7 +1907,7 @@
                   </div>
                 </div>
               </details>
-              <details class="inspector-section" open>
+              <details class="inspector-section">
                 <summary>Outline</summary>
                 <div class="inspector-section-body clip-outline-controls">
                   <div class="clip-outline-main-row">
@@ -2815,16 +2814,6 @@
       state.pencilColors[safeIndex] = cloneColor(color);
       state.activePencilColorIndex = safeIndex;
       state.pencilColor = cloneColor(state.pencilColors[safeIndex]);
-      if (opt.refresh !== false) {
-        if (hasFrames()) drawFrame(state.currentFrame);
-        updateInfo();
-      }
-    }
-    function addPencilColor(color, opt = {}) {
-      normalizePencilColorState();
-      state.pencilColors.push(cloneColor(color));
-      state.activePencilColorIndex = state.pencilColors.length - 1;
-      state.pencilColor = cloneColor(color);
       if (opt.refresh !== false) {
         if (hasFrames()) drawFrame(state.currentFrame);
         updateInfo();
@@ -16750,10 +16739,6 @@
       if (!colorPicker.open) return;
       colorPicker.pickMode = false;
       setColorPickerColor(color);
-      if (colorPicker.target?.applyOnPick) {
-        applyColorPickerSelection();
-        return;
-      }
       showError('');
       els.colorModal.classList.add('show');
       positionColorModal(false);
@@ -16838,10 +16823,6 @@
       showError('');
       if (target.type === 'pencil') {
         setPencilColorAt(Number.isInteger(target.index) ? target.index : state.activePencilColorIndex, color, { refresh: false });
-        if (hasFrames()) drawFrame(state.currentFrame);
-        updateInfo();
-      } else if (target.type === 'pencil-add') {
-        addPencilColor(color, { refresh: false });
         if (hasFrames()) drawFrame(state.currentFrame);
         updateInfo();
       } else if (target.type === 'background') {
@@ -20445,7 +20426,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.6.5"></script>
+  <script src="animation.js?v=1.6.5-1"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);
