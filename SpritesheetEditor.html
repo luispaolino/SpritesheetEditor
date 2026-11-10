@@ -1497,9 +1497,19 @@
           <details class="inspector-section" open>
             <summary>Cage</summary>
             <div class="inspector-section-body">
+              <div class="field">
+                <label for="cageResolutionPresetInput">Presets</label>
+                <select id="cageResolutionPresetInput" disabled>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
               <div class="field-row">
                 <div class="field"><label for="cageWidthInput">Cage Width</label><input id="cageWidthInput" type="number" min="1" step="1" value="1" /></div>
                 <div class="field"><label for="cageHeightInput">Cage Height</label><input id="cageHeightInput" type="number" min="1" step="1" value="1" /></div>
+              </div>
+              <div class="two-buttons">
+                <button id="fitCageToSpriteButton" class="secondary small-button" type="button" disabled>Fit Cage to Sprite</button>
+                <button id="dimOutsideCageButton" class="secondary small-button" type="button" aria-pressed="false" disabled>Dim Outside Cage</button>
               </div>
               <div class="field-row">
                 <div class="field">
@@ -1511,10 +1521,7 @@
                   <input id="pivotOnlyYInput" type="number" step="1" value="0" />
                 </div>
               </div>
-              <div class="two-buttons">
-                <button id="fitCageToSpriteButton" class="secondary small-button" type="button" disabled>Fit Cage to Sprite</button>
-                <button id="centerPivotButton" class="secondary small-button" type="button" disabled>Center Pivot</button>
-              </div>
+              <button id="centerPivotButton" class="secondary small-button standalone-button" type="button" disabled>Center Pivot</button>
             </div>
           </details>
           <details class="inspector-section" open>
@@ -1981,10 +1988,7 @@
             <div class="field">
               <label for="referenceCompositorResolutionPresetInput">Presets</label>
               <select id="referenceCompositorResolutionPresetInput">
-                <option value="custom" selected>Custom</option>
-                <option value="street-fighter-ii">Street Fighter II (384 x 224)</option>
-                <option value="mortal-kombat">Mortal Kombat (400 x 254)</option>
-                <option value="king-of-fighter">King of Fighter (320 x 224)</option>
+                <option value="custom">Custom</option>
               </select>
             </div>
             <label class="check-field" for="referenceCompositorMaskOutsideCageInput">
@@ -2542,6 +2546,7 @@
       referenceCompositorExportProgressTrack: $('referenceCompositorExportProgressTrack'),
       referenceCompositorExportProgressBar: $('referenceCompositorExportProgressBar'),
       referenceCompositorResolutionPresetInput: $('referenceCompositorResolutionPresetInput'),
+      cageResolutionPresetInput: $('cageResolutionPresetInput'), dimOutsideCageButton: $('dimOutsideCageButton'),
       referenceClipReverseInput: $('referenceClipReverseInput'),
       referenceClipHoldLastFrameInput: $('referenceClipHoldLastFrameInput'),
       referenceClipHoldFramesInput: $('referenceClipHoldFramesInput')
@@ -2569,11 +2574,16 @@
     const REFERENCE_COMPOSITOR_DEFAULT_LENGTH = 60;
     const REFERENCE_COMPOSITOR_DEFAULT_WIDTH = 320;
     const REFERENCE_COMPOSITOR_DEFAULT_HEIGHT = 240;
-    const REFERENCE_COMPOSITOR_RESOLUTION_PRESETS = {
-      'street-fighter-ii': { width: 384, height: 224 },
-      'mortal-kombat': { width: 400, height: 254 },
-      'king-of-fighter': { width: 320, height: 224 }
+    const RESOLUTION_PRESETS = {
+      'street-fighter-ii': { label: 'Street Fighter II', width: 384, height: 224 },
+      'mortal-kombat': { label: 'Mortal Kombat', width: 400, height: 254 },
+      'king-of-fighter': { label: 'King of Fighter', width: 320, height: 224 }
     };
+    for (const select of [els.cageResolutionPresetInput, els.referenceCompositorResolutionPresetInput]) {
+      for (const [value, { label, width, height }] of Object.entries(RESOLUTION_PRESETS)) {
+        select.add(new Option(`${label} (${width} x ${height})`, value));
+      }
+    }
     const REFERENCE_COMPOSITOR_MIN_CLIP_WIDTH = 8;
     const REFERENCE_COMPOSITOR_SINGLE_SPRITE_CLIP_WIDTH = 34;
     const DEFAULT_REFERENCE_CLIP_SPEED = 100;
@@ -2642,7 +2652,7 @@
       rows: 1, cols: 4, totalFrames: 0, currentFrame: 0, startFrame: 0, endFrame: 0, importFrameSkip: 0, importFrameSkipMax: 60,
       fps: 12, pingPongAnimation: false, loopPlayback: true, playing: false, animationId: null, lastTick: 0, playbackDirection: 1, referenceAnimationPlaying: false, referenceAnimationTime: 0, referenceAnimationLastTick: 0,
       frameWidth: 0, frameHeight: 0, cageWidth: 1, cageHeight: 1, cageCustom: false,
-      scaleX: 1, scaleY: 1, scaleLocked: true, scaleAll: true, scaleUnit: 'percent', frameScales: [], frameFlips: [], frameFlipYs: [], offsetXAll: 0, offsetYAll: 0, pivotX: null, pivotY: 0, rulersV: [], rulersH: [], rulersBeyondCage: false, rulerColor: cloneColor(DEFAULT_RULER_COLOR), showCageOverlay: true, showRulerOverlay: true, showPivotOverlay: true, pivotDark: false,
+      scaleX: 1, scaleY: 1, scaleLocked: true, scaleAll: true, scaleUnit: 'percent', frameScales: [], frameFlips: [], frameFlipYs: [], offsetXAll: 0, offsetYAll: 0, pivotX: null, pivotY: 0, rulersV: [], rulersH: [], rulersBeyondCage: false, rulerColor: cloneColor(DEFAULT_RULER_COLOR), showCageOverlay: true, dimOutsideCage: false, showRulerOverlay: true, showPivotOverlay: true, pivotDark: false,
       background: 'checker', scanlinesVisible: false, scanlineOpacity: DEFAULT_SCANLINE_OPACITY, referenceCastShadow: false, referenceShadowColor: cloneColor(DEFAULT_REFERENCE_SHADOW_COLOR), referenceShadowHeight: DEFAULT_REFERENCE_SHADOW_HEIGHT, referenceShadowOffsetY: DEFAULT_REFERENCE_SHADOW_OFFSET_Y, spriteOutline: false, spriteOutlineWidth: DEFAULT_REFERENCE_CLIP_OUTLINE_WIDTH, spriteOutlineColor: cloneColor(DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR), oneRowPack: false, showSkippedFrames: true, backgroundCustomColor: { r: 32, g: 40, b: 52, a: 255 }, displayReferenceUnit: 'percent', displayReferenceLayers: [], activeDisplayReferenceId: '', displayReferenceLayerCounter: 0, displayReferenceCanvas: null, displayReferenceName: '', displayReferenceVisible: false, displayReferenceOffsetX: 0, displayReferenceOffsetY: 0, displayReferenceScale: 100, referenceCompositorVisible: false, referenceCompositorWidth: REFERENCE_COMPOSITOR_DEFAULT_WIDTH, referenceCompositorHeight: REFERENCE_COMPOSITOR_DEFAULT_HEIGHT, referenceCompositorMaskOutsideCage: false, referenceCompositorAssets: [], referenceCompositorAudioAssets: [], referenceCompositorFontAssets: [], referenceCompositorTracks: [], referenceCompositorClips: [], activeReferenceCompositorClipId: '', selectedReferenceCompositorClipIds: [], activeReferenceCompositorTrackId: '', referenceCompositorCursorFrame: 0, referenceCompositorStartFrame: 0, referenceCompositorEndFrame: REFERENCE_COMPOSITOR_DEFAULT_LENGTH - 1, referenceCompositorPxPerFrame: REFERENCE_COMPOSITOR_PX_PER_FRAME, referenceCompositorLoop: true, referenceCompositorExportAudio: true, referenceCompositorVideoQuality: DEFAULT_COMPOSITOR_VIDEO_QUALITY, referenceCompositorVideoBitrate: DEFAULT_COMPOSITOR_VIDEO_BITRATE_MBPS, referenceCompositorAudioBitrate: DEFAULT_COMPOSITOR_AUDIO_BITRATE_KBPS, referenceCompositorExporting: false, referenceCompositorPlaying: false, referenceCompositorLastTick: 0, fontCanvas: null, fontName: '', fontConfigSpritesheetName: '', fontRows: 1, fontCols: DEFAULT_FONT_COLUMNS, fontColsAuto: true, fontOrder: DEFAULT_FONT_ORDER, fontLetterGap: 0, fontSpace: 0, fontRowGap: 0, fontAlign: 'center', fontForceUppercase: false, fontCastShadow: false, fontShadowColor: cloneColor(DEFAULT_FONT_SHADOW_COLOR), fontShadowOffsetX: 2, fontShadowOffsetY: 2, fontLetterOffsets: {}, fontLetterGaps: {}, activeFontLetter: '', fontColor: cloneColor(DEFAULT_FONT_COLOR), fontText: '', fontRevision: 0, frameOffsets: [], frameMasks: [], maskDirty: [], indexedFrames: [],
       maskMode: false, hideMask: false, pencilMode: false, pencilCtrlPickMode: false, paintBucketMode: false, eyedropperMode: false, brushAction: 'mask', brushSize: 18, pencilToolMode: 'pencil', pencilEraserPixelMode: false, pencilHardness: 100, pencilColor: cloneColor(DEFAULT_PENCIL_COLOR), pencilColors: [cloneColor(DEFAULT_PENCIL_COLOR)], activePencilColorIndex: 0, pencilColorContextIndex: null, activePencilLayerId: '', magicTolerance: 32, magicAntialias: true, magicContiguous: true, haloTolerance: 12, showHalo: false, indexColors: 256, indexKeepTransparency: true, indexHighlightColors: true, indexHighlightColor: cloneColor(DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible: false, indexResetPendingAll: false, indexChannelMode: 'none', importedPaletteInfo: null, importedPaletteRevision: 0, frameBitmapRevision: 0, indexPreviewKey: '', indexPreviewResult: null, uploadedPaletteKey: '', uploadedPaletteInfo: null, indexColorSelectMode: false, paletteDropperMode: false, paletteMergeTargetIndices: [], selectedPaletteIndices: [], paletteLayers: [], activePaletteLayerId: '', paletteLayerCounter: 0, paletteSelectionDragging: false, paletteSelectionDragStartIndex: null, paletteSelectionDragAction: 'select', paletteAdjust: { h: 0, s: 0, l: 0, b: 0, c: 0 }, paletteAdjustBasePalette: null, paletteAdjustHistoryPushed: false, spriteEditMode: false, spriteEditAdjust: { h: 0, s: 0, l: 0, b: 0, c: 0, sharp: 0 }, spriteEditBaseFrames: null, spriteEditHistoryPushed: false, spriteEditApplyToken: 0, spriteEditApplyScheduled: false, spriteEditApplying: false, spriteEditClosePendingReset: false, referencePaletteInfo: null, referencePaletteVisible: false, referencePaletteSelectedIndices: [], referencePaletteTargetIndex: null, referencePaletteSelectionDragging: false, referencePaletteSelectionDragStartIndex: null, referencePaletteSelectionDragAction: 'select', spriteSheetBuilderRows: [], spriteSheetBuilderRowCounter: 0, spriteSheetBuilderSourceRows: 1, spriteSheetBuilderSourceCols: 1, spriteSheetBuilderCageWidth: 0, spriteSheetBuilderCageHeight: 0, spriteSheetBuilderPivotX: 0, spriteSheetBuilderPivotY: 0, spriteSheetBuilderGlobalScale: 100, spriteSheetBuilderShowNames: false, spriteSheetBuilderShowCage: false, spriteSheetBuilderPaletteInfo: null, spriteSheetBuilderApplyPalette: true, spriteSheetBuilderExporting: false, spriteSheetBuilderDragRowId: '', activeSpriteSheetBuilderRowId: '', activeSpriteSheetBuilderFrameIndex: 0, spriteSheetBuilderPreviewZoom: 1, spriteSheetBuilderPreviewPanX: 0, spriteSheetBuilderPreviewPanY: 0, spriteSheetBuilderHoveredCell: null, spriteSheetBuilderHoveredAddCell: null, spriteSheetBuilderReplaceTarget: null, spriteSheetBuilderReferenceKeyDown: false, spriteSheetBuilderInputHistoryPushed: false, spriteSheetBuilderStroke: null,
       truePixelResolution: 128, truePixelReferenceCanvas: null, truePixelReferenceName: '', truePixelReferenceSize: null, truePixelPreviewVisible: false, truePixelPreviewKey: '', truePixelPreviewResult: null,
@@ -3267,20 +3277,18 @@
       const base = Number.isFinite(parsed) ? parsed : fallback;
       return clamp(Math.round(base || fallback || 1), 1, 8192);
     }
-    function referenceCompositorResolutionPresetValue(width = state.referenceCompositorWidth, height = state.referenceCompositorHeight) {
-      const normalizedWidth = normalizeReferenceCompositorResolution(width, REFERENCE_COMPOSITOR_DEFAULT_WIDTH);
-      const normalizedHeight = normalizeReferenceCompositorResolution(height, REFERENCE_COMPOSITOR_DEFAULT_HEIGHT);
-      const match = Object.entries(REFERENCE_COMPOSITOR_RESOLUTION_PRESETS)
-        .find(([, preset]) => preset.width === normalizedWidth && preset.height === normalizedHeight);
+    function resolutionPresetValue(width, height) {
+      const match = Object.entries(RESOLUTION_PRESETS)
+        .find(([, preset]) => preset.width === width && preset.height === height);
       return match?.[0] || 'custom';
     }
     function syncReferenceCompositorResolutionPreset() {
       if (!els.referenceCompositorResolutionPresetInput) return;
       const size = compositorFrameSize();
-      els.referenceCompositorResolutionPresetInput.value = referenceCompositorResolutionPresetValue(size.width, size.height);
+      els.referenceCompositorResolutionPresetInput.value = resolutionPresetValue(size.width, size.height);
     }
     function applyReferenceCompositorResolutionPreset(value = els.referenceCompositorResolutionPresetInput?.value) {
-      const preset = REFERENCE_COMPOSITOR_RESOLUTION_PRESETS[String(value || '')];
+      const preset = RESOLUTION_PRESETS[value];
       if (!preset) return;
       setReferenceCompositorResolution(preset.width, preset.height);
     }
@@ -4093,6 +4101,7 @@
 
     function snapshot() {
       return {
+        dimOutsideCage: state.dimOutsideCage,
         animationLayers: cloneAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationWandSettings: animationWandSettings(), animationSelectionHistory: animationSelectionHistoryState(),
         sheetImage: state.sheetImage,
         sheetImages: sheetSources().map(sheet => ({ image: sheet.image, name: sheet.name || 'spritesheet' })),
@@ -4236,6 +4245,7 @@
       state.fontRevision = Math.max(0, Math.round(parseFloat(s.fontRevision) || 0));
       clearFontGlyphCache();
       state.showCageOverlay = s.showCageOverlay !== undefined ? s.showCageOverlay !== false : s.showGuideOverlay !== false;
+      state.dimOutsideCage = s.dimOutsideCage === true;
       state.showRulerOverlay = s.showRulerOverlay !== undefined ? s.showRulerOverlay !== false : s.showGuideOverlay !== false;
       state.showPivotOverlay = s.showPivotOverlay !== false;
       state.pivotDark = !!s.pivotDark;
@@ -5308,10 +5318,12 @@
       if (!overlay) return;
       const alpha = normalizeScanlineOpacity(state.scanlineOpacity) / 100;
       const drawScanlines = !!state.scanlinesVisible && !!alpha;
-      const hasTopRulers = !spriteSheetBuilderPanelActive() && state.showRulerOverlay !== false && !!((state.rulersV || []).length || (state.rulersH || []).length);
-      const hasSpriteSheetBuilderCages = spriteSheetBuilderPanelActive() && spriteSheetBuilderPreviewAvailable() && (!!state.spriteSheetBuilderShowCage || !!state.activeSpriteSheetBuilderRowId);
-      const drawTopGuides = !spriteSheetBuilderPanelActive() && ((hasFrames() && (state.showCageOverlay !== false || hasTopRulers)) || (state.referenceCompositorVisible && state.showCageOverlay !== false));
-      if (!drawScanlines && !drawTopGuides && !hasSpriteSheetBuilderCages) {
+      const builderActive = spriteSheetBuilderPanelActive();
+      const hasTopRulers = !builderActive && state.showRulerOverlay !== false && !!((state.rulersV || []).length || (state.rulersH || []).length);
+      const hasSpriteSheetBuilderCages = builderActive && spriteSheetBuilderPreviewAvailable() && (!!state.spriteSheetBuilderShowCage || !!state.activeSpriteSheetBuilderRowId);
+      const drawTopGuides = !builderActive && ((hasFrames() && (state.showCageOverlay !== false || hasTopRulers)) || (state.referenceCompositorVisible && state.showCageOverlay !== false));
+      const dimOutsideCage = state.dimOutsideCage && hasFrames() && !builderActive && !state.referenceCompositorVisible;
+      if (!drawScanlines && !drawTopGuides && !hasSpriteSheetBuilderCages && !dimOutsideCage) {
         const octx = overlay.getContext('2d', { alpha: true });
         if (octx) octx.clearRect(0, 0, overlay.width || 1, overlay.height || 1);
         overlay.style.display = 'none';
@@ -5333,6 +5345,13 @@
       const octx = overlay.getContext('2d', { alpha: true });
       octx.setTransform(targetWidth/width, 0, 0, targetHeight/height, 0, 0);
       octx.clearRect(0, 0, width, height);
+      if (dimOutsideCage) {
+        octx.fillStyle = 'rgba(0, 0, 0, .5)';
+        octx.beginPath();
+        octx.rect(0, 0, width, height);
+        octx.rect(mainRect.left - rect.left, mainRect.top - rect.top, mainRect.width, mainRect.height);
+        octx.fill('evenodd');
+      }
       if (drawScanlines) {
         const frame = previewFrameSize();
         const zoomY = mainRect.height > 0 && frame.height > 0 ? mainRect.height / frame.height : Math.max(.01, state.zoom);
@@ -6607,6 +6626,10 @@
       if (els.importVideoInfo) { const stats = videoTimelineStats(); els.importVideoInfo.textContent = `Video: ${stats.count} frames, ${stats.fpsText} (${stats.durationText})`; }
       setVal(els.speedInput, state.fps); setVal(els.backgroundInput, state.background); setVal(els.scanlineOpacityInput, state.scanlineOpacity); setVal(els.referenceShadowHeightInput, state.referenceShadowHeight); setVal(els.referenceShadowOffsetYInput, state.referenceShadowOffsetY); setVal(els.maskBrushSizeInput, state.brushSize); setVal(els.maskBrushHardnessInput, state.pencilHardness); setVal(els.magicToleranceInput, state.magicTolerance); setVal(els.haloToleranceInput, state.haloTolerance); setVal(els.indexColorsInput, state.indexColors); setVal(els.truePixelResolutionInput, state.truePixelResolution);
       const currentScale = frameScale(state.currentFrame), globalScale = allFrameScale();
+      els.cageResolutionPresetInput.value = resolutionPresetValue(state.cageWidth, state.cageHeight);
+      els.cageResolutionPresetInput.disabled = els.dimOutsideCageButton.disabled = !hasFrames();
+      els.dimOutsideCageButton.classList.toggle('active', state.dimOutsideCage);
+      els.dimOutsideCageButton.setAttribute('aria-pressed', String(state.dimOutsideCage));
       setVal(els.cageWidthInput, Math.round(state.cageWidth)); setVal(els.cageHeightInput, Math.round(state.cageHeight)); setVal(els.scaleFrameXInput, scaleInputValue('x', currentScale)); setVal(els.scaleFrameYInput, scaleInputValue('y', currentScale)); setVal(els.scaleXInput, scaleInputValue('x', globalScale)); setVal(els.scaleYInput, scaleInputValue('y', globalScale));
       setVal(els.offsetXAllInput, Math.round(state.offsetXAll || 0)); setVal(els.offsetYAllInput, Math.round(state.offsetYAll || 0)); setVal(els.pivotOnlyXInput, pivotXValue()); setVal(els.pivotOnlyYInput, Math.round(state.pivotY)); setVal(els.offsetXInput, Math.round(o.x)); setVal(els.offsetYInput, Math.round(o.y));
       const referenceUnit = referenceTransformUnit(), referenceUnitLabel = referenceUnit === 'px' ? 'Px' : '%';
@@ -12928,6 +12951,7 @@
       return {
         format: 'spritesheet-editor-project', version: 1, imageName: state.imageName, importedId: state.importedId, sheetImage, sheetImages,
         settings: {
+          dimOutsideCage: state.dimOutsideCage,
           animationLayers: serializeAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationWandSettings: animationWandSettings(), rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, importFrameSkip: state.importFrameSkip, importFrameSkipMax: state.importFrameSkipMax, fps: state.fps, pingPongAnimation: state.pingPongAnimation, loopPlayback: state.loopPlayback !== false, oneRowPack: state.oneRowPack,
           frameWidth: state.frameWidth, frameHeight: state.frameHeight, cageWidth: state.cageWidth, cageHeight: state.cageHeight, cageCustom: state.cageCustom,
           scaleX: state.scaleX, scaleY: state.scaleY, scaleLocked: state.scaleLocked, scaleAll: state.scaleAll, scaleControls: 'split', scaleUnit: state.scaleUnit, frameScales: state.frameScales.map(scale => ({ ...scale })), frameFlips: state.frameFlips.map(Boolean), frameFlipYs: state.frameFlipYs.map(Boolean), offsetXAll: state.offsetXAll, offsetYAll: state.offsetYAll, pivotX: state.pivotX, pivotY: state.pivotY, rulersV: [...state.rulersV], rulersH: [...state.rulersH], rulersBeyondCage: !!state.rulersBeyondCage, rulerColor: cloneColor(state.rulerColor), showCageOverlay: state.showCageOverlay !== false, showRulerOverlay: state.showRulerOverlay !== false, showPivotOverlay: state.showPivotOverlay, pivotDark: state.pivotDark,
@@ -12971,6 +12995,7 @@
       pause(true); showError('');
       closeFrameContextMenu(); closeReferenceCompositorContextMenu(); closePencilColorContextMenu(); closeColorPicker(); closePaletteLayerModal(); closeReferenceFadeModal(); closeReferenceClipModal(); closeReferenceAudioModal(); closeReferenceTextModal();
       stopReferenceCompositorAudio(true);
+      state.dimOutsideCage = false;
       Object.assign(state,{ sheetImage:null, sheetImages:[], imageName:'spritesheet', frames:[], importedId:0, rows:1, cols:4, totalFrames:0, currentFrame:0, startFrame:0, endFrame:0, importFrameSkip:0, importFrameSkipMax:60, fps:12, pingPongAnimation:false, loopPlayback:true, playing:false, animationId:null, lastTick:0, playbackDirection:1, referenceAnimationPlaying:false, referenceAnimationTime:0, referenceAnimationLastTick:0, frameWidth:0, frameHeight:0, cageWidth:1, cageHeight:1, cageCustom:false, scaleX:1, scaleY:1, scaleLocked:true, scaleAll:true, scaleUnit:'percent', frameScales:[], frameFlips:[], frameFlipYs:[], offsetXAll:0, offsetYAll:0, pivotX:null, pivotY:0, rulersV:[], rulersH:[], rulersBeyondCage:false, rulerColor:cloneColor(DEFAULT_RULER_COLOR), showCageOverlay:true, showRulerOverlay:true, showPivotOverlay:true, pivotDark:false, background:'checker', scanlinesVisible:false, scanlineOpacity:DEFAULT_SCANLINE_OPACITY, referenceCastShadow:false, referenceShadowColor:cloneColor(DEFAULT_REFERENCE_SHADOW_COLOR), referenceShadowHeight:DEFAULT_REFERENCE_SHADOW_HEIGHT, referenceShadowOffsetY:DEFAULT_REFERENCE_SHADOW_OFFSET_Y, spriteOutline:false, spriteOutlineWidth:DEFAULT_REFERENCE_CLIP_OUTLINE_WIDTH, spriteOutlineColor:cloneColor(DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR), oneRowPack:false, showSkippedFrames:true, backgroundCustomColor:{ r: 32, g: 40, b: 52, a: 255 }, displayReferenceUnit:'percent', displayReferenceLayers:[], activeDisplayReferenceId:'', displayReferenceLayerCounter:0, displayReferenceCanvas:null, displayReferenceName:'', displayReferenceVisible:false, displayReferenceOffsetX:0, displayReferenceOffsetY:0, displayReferenceScale:100, fontCanvas:null, fontName:'', fontConfigSpritesheetName:'', fontRows:1, fontCols:DEFAULT_FONT_COLUMNS, fontColsAuto:true, fontOrder:DEFAULT_FONT_ORDER, fontLetterGap:0, fontSpace:0, fontRowGap:0, fontAlign:'center', fontForceUppercase:false, fontLetterOffsets:{}, activeFontLetter:'', fontColor:cloneColor(DEFAULT_FONT_COLOR), fontText:'', fontRevision:0, frameOffsets:[], frameMasks:[], maskDirty:[], indexedFrames:[], maskMode:false, hideMask:false, pencilMode:false, pencilCtrlPickMode:false, paintBucketMode:false, eyedropperMode:false, paletteDropperMode:false, paletteMergeTargetIndices:[], brushAction:'mask', brushSize:18, pencilToolMode:'pencil', pencilEraserPixelMode:false, pencilHardness:100, pencilColor:cloneColor(DEFAULT_PENCIL_COLOR), pencilColors:[cloneColor(DEFAULT_PENCIL_COLOR)], activePencilColorIndex:0, pencilColorContextIndex:null, activePencilLayerId:'', magicTolerance:32, magicAntialias:true, magicContiguous:true, haloTolerance:12, showHalo:false, indexColors:256, indexKeepTransparency:true, indexHighlightColors:true, indexHighlightColor:cloneColor(DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible:false, indexResetPendingAll:false, indexChannelMode:'none', importedPaletteInfo:null, importedPaletteRevision:0, frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, uploadedPaletteKey:'', uploadedPaletteInfo:null, indexColorSelectMode:false, selectedPaletteIndices:[], paletteLayers:[], activePaletteLayerId:'', paletteLayerCounter:0, paletteSelectionDragging:false, paletteSelectionDragStartIndex:null, paletteSelectionDragAction:'select', paletteAdjust:{ h:0, s:0, l:0, b:0, c:0 }, paletteAdjustBasePalette:null, paletteAdjustHistoryPushed:false, spriteEditMode:false, spriteEditAdjust:{ h:0, s:0, l:0, b:0, c:0, sharp:0 }, spriteEditBaseFrames:null, spriteEditHistoryPushed:false, spriteEditApplyToken:0, spriteEditApplyScheduled:false, spriteEditApplying:false, spriteEditClosePendingReset:false, referencePaletteInfo:null, referencePaletteVisible:false, referencePaletteSelectedIndices:[], referencePaletteTargetIndex:null, referencePaletteSelectionDragging:false, referencePaletteSelectionDragStartIndex:null, referencePaletteSelectionDragAction:'select', truePixelResolution:128, truePixelReferenceCanvas:null, truePixelReferenceName:'', truePixelReferenceSize:null, truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, brushCursorVisible:false, brushX:0, brushY:0, zoom:1, panX:0, panY:0, dragging:false, dragMode:'offset', dragPointerId:null, dragLastX:0, dragLastY:0, dragStartX:0, dragStartY:0, dragStartPanX:0, dragStartPanY:0, dragStartOffsetX:0, dragStartOffsetY:0, maskLastX:0, maskLastY:0, brushLineAnchor:null, draggedFrameIndex:null, draggedFrameIndices:[], dropIndex:null, contextFrameIndex:null, selectedFrameIndices:[], selectionAnchorFrame:null, timelineDragging:false, numberInputScrubbing:false, offsetXAllHistoryPushed:false, offsetYAllHistoryPushed:false, undoStack:[], redoStack:[], restoring:false });
       state.fontCastShadow = false;
       state.fontShadowColor = cloneColor(DEFAULT_FONT_SHADOW_COLOR);
@@ -13100,6 +13125,7 @@
         const savedAnimationLayers = await restoreAnimationLayers(s.animationLayers);
         Object.assign(state,{ sheetImage:sheetImages[0]?.image || null, sheetImages, imageName:project.imageName||file.name||'spritesheet', frames, importedId:project.importedId||0, rows:clamp(parseInt(s.rows,10)||1,1,100), cols:clamp(parseInt(s.cols,10)||1,1,100), currentFrame:Number.isFinite(savedCurrent)?savedCurrent:0, startFrame:Number.isFinite(savedStart)?savedStart:0, endFrame:Number.isFinite(savedEnd)?savedEnd:Math.max(0,frames.length-1), importFrameSkip:clamp(parseInt(s.importFrameSkip,10)||0,0,Math.max(1,parseInt(s.importFrameSkipMax,10)||60)), importFrameSkipMax:Math.max(1,parseInt(s.importFrameSkipMax,10)||60), fps:clamp(parseInt(s.fps,10)||12,1,60), pingPongAnimation:!!s.pingPongAnimation, loopPlayback:s.loopPlayback!==false, oneRowPack:s.oneRowPack!==undefined?!!s.oneRowPack:!!s.recommendedRepack, playbackDirection:1, referenceAnimationPlaying:false, referenceAnimationTime:0, referenceAnimationLastTick:0, frameWidth:s.frameWidth||0, frameHeight:s.frameHeight||0, cageWidth:clamp(Math.round(s.cageWidth||frames[0]?.canvas.width||1),1,8192), cageHeight:clamp(Math.round(s.cageHeight||frames[0]?.canvas.height||1),1,8192), cageCustom:!!s.cageCustom, scaleX:clamp(parseFloat(s.scaleX)||1,.01,100), scaleY:clamp(parseFloat(s.scaleY)||1,.01,100), scaleLocked:s.scaleLocked!==false, scaleUnit:s.scaleUnit==='px'?'px':'percent', displayReferenceUnit:s.displayReferenceUnit==='px'?'px':'percent', offsetXAll:Math.round(s.offsetXAll||0), offsetYAll:Math.round(s.offsetYAll||0), pivotX:Number.isFinite(parseFloat(s.pivotX))?Math.round(parseFloat(s.pivotX)):null, pivotY:Math.round(s.pivotY||0), rulersV:Array.isArray(s.rulersV)?s.rulersV:[], rulersH:Array.isArray(s.rulersH)?s.rulersH:[], rulersBeyondCage:!!s.rulersBeyondCage, rulerColor:cloneColor(s.rulerColor || DEFAULT_RULER_COLOR), showCageOverlay:s.showCageOverlay!==undefined?s.showCageOverlay!==false:s.showGuideOverlay!==false, showRulerOverlay:s.showRulerOverlay!==undefined?s.showRulerOverlay!==false:s.showGuideOverlay!==false, showPivotOverlay:s.showPivotOverlay!==false, pivotDark:!!s.pivotDark, background:['checker','dark','light','transparent','custom'].includes(s.background)?s.background:'checker', backgroundCustomColor:cloneColor(s.backgroundCustomColor || { r: 32, g: 40, b: 52, a: 255 }), frameOffsets:project.frames.map(f=>({x:Math.round(f.offset?.x||0),y:Math.round(f.offset?.y||0)})), frameMasks:masks.map(m=>m||makeMask()), maskDirty:project.frames.map(f=>!!f.mask), indexedFrames, maskMode:!!s.maskMode, hideMask:!!s.hideMask, pencilMode:false, pencilCtrlPickMode:false, eyedropperMode:false, brushAction:['mask','restore','wand'].includes(s.brushAction)?s.brushAction:'mask', brushSize:clamp(parseInt(s.brushSize,10)||18,1,120), pencilToolMode:normalizePencilToolMode(s.pencilToolMode), pencilEraserPixelMode:!!s.pencilEraserPixelMode, pencilHardness:clamp(Math.round(Number.isFinite(parseFloat(s.pencilHardness))?parseFloat(s.pencilHardness):100),0,100), pencilColor:cloneColor(s.pencilColor || { r: 182, g: 192, b: 207, a: 255 }), activePencilLayerId:s.activePencilLayerId || '', magicTolerance:clamp(Number.isFinite(savedMagicTolerance)?savedMagicTolerance:32,0,255), magicAntialias:s.magicAntialias!==false, magicContiguous:s.magicContiguous!==false, haloTolerance:clamp(parseInt(s.haloTolerance,10)||12,0,30), showHalo:false, indexColors:clamp(parseInt(s.indexColors,10)||256,3,256), indexKeepTransparency:s.indexKeepTransparency!==false, indexHighlightColors:s.indexHighlightColors!==false, indexHighlightColor:cloneColor(s.indexHighlightColor || DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible:false, indexResetPendingAll:false, indexChannelMode:['r','g','b','a'].includes(s.indexChannelMode)?s.indexChannelMode:'none', frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, uploadedPaletteKey:'', uploadedPaletteInfo:null, truePixelResolution:normalizeTruePixelResolution(s.truePixelResolution || 128), truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, zoom:clamp(parseFloat(s.zoom)||1,CANVAS_ZOOM_MIN,CANVAS_ZOOM_MAX), panX:parseFloat(s.panX)||0, panY:parseFloat(s.panY)||0, undoStack:[], redoStack:[], restoring:false });
         state.animationLayers = savedAnimationLayers;
+        state.dimOutsideCage = s.dimOutsideCage === true;
         state.activeAnimationLayerId = s.activeAnimationLayerId || "";
         state.selectedAnimationLayerIds=[...(s.selectedAnimationLayerIds || [state.activeAnimationLayerId].filter(Boolean))];
         state.animationSelectionAnchorId=state.activeAnimationLayerId;
@@ -19423,7 +19449,16 @@
       updateInfo();
     });
     [els.cageWidthInput,els.cageHeightInput].forEach(el=>el.addEventListener('input',()=>setCage(parseFloat(els.cageWidthInput.value)||state.frameWidth,parseFloat(els.cageHeightInput.value)||state.frameHeight)));
+    els.cageResolutionPresetInput.addEventListener('change', () => {
+      const preset = RESOLUTION_PRESETS[els.cageResolutionPresetInput.value];
+      if (preset && (preset.width !== state.cageWidth || preset.height !== state.cageHeight)) setCage(preset.width, preset.height);
+    });
     els.fitCageToSpriteButton.addEventListener('click', fitCageToCurrentSprite);
+    els.dimOutsideCageButton.addEventListener('click', () => {
+      state.dimOutsideCage = !state.dimOutsideCage;
+      renderScanlineOverlay();
+      updateInfo({ deferHiddenPalette: true });
+    });
     els.centerPivotButton.addEventListener('click', centerPivotInCage);
     els.flipSpriteHorizontalButton.addEventListener('click', toggleSpriteFlipHorizontal);
     els.flipSpriteVerticalButton.addEventListener('click', toggleSpriteFlipVertical);
