@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.6.5-1" />
+  <link rel="stylesheet" href="animation.css?v=1.6.5-2" />
   <style>
     :root {
       --bg: #10131b;
@@ -247,12 +247,13 @@
       border: 0; border-radius: 0; background: transparent; box-shadow: none; pointer-events: auto;
     }
     .timeline-card { grid-area: timeline; }
+    .app.timeline-hidden { grid-template-areas: "left center"; }
     .app.compositor-mode {
       --stage-height: calc(100vh - 96px);
       grid-template-areas: "left center";
       grid-template-rows: auto;
     }
-    .app.compositor-mode .timeline-card { display: none; }
+    .app:is(.compositor-mode, .timeline-hidden) .timeline-card { display: none; }
     .app.compositor-mode .left-panel {
       max-height: var(--stage-height);
       overflow-y: auto;
@@ -1232,6 +1233,7 @@
 
     @media (max-width: 1180px) {
       .app { grid-template-columns: 1fr; grid-template-areas: "left" "center" "timeline"; }
+      .app.timeline-hidden { grid-template-areas: "left" "center"; }
       .stage-card { --floating-menu-gutter: 24px; }
     }
     @media (max-width: 900px) {
@@ -1253,7 +1255,7 @@
       grid-template-rows: minmax(0, 1fr) auto;
       grid-template-areas: "left center" "timeline timeline";
     }
-    .app.canvas-expanded.compositor-mode {
+    .app.canvas-expanded:is(.compositor-mode, .timeline-hidden) {
       grid-template-rows: minmax(0, 1fr);
       grid-template-areas: "left center";
     }
@@ -1475,7 +1477,7 @@
           <button id="bakeTransformButton" class="secondary small-button standalone-button" type="button" disabled>Bake Transform</button>
         </div>
         <div class="group">
-          <p class="group-title"><span>Display</span><span class="group-title-actions"><button id="cageVisibilityButton" class="lock-button active" type="button" disabled title="Hide Cage" aria-label="Hide Cage"></button><button id="rulerVisibilityButton" class="lock-button active" type="button" disabled title="Hide Rulers" aria-label="Hide Rulers"></button><button id="pivotVisibilityButton" class="lock-button active" type="button" disabled title="Hide Pivot & Offset Guides" aria-label="Hide Pivot & Offset Guides"></button></span></p>
+          <p class="group-title"><span>Display</span><span class="group-title-actions"><button id="timelineVisibilityButton" class="lock-button active" type="button" title="Hide Timeline" aria-label="Hide Timeline" aria-controls="timelineCard" aria-pressed="true"></button><button id="cageVisibilityButton" class="lock-button active" type="button" disabled title="Hide Cage" aria-label="Hide Cage"></button><button id="rulerVisibilityButton" class="lock-button active" type="button" disabled title="Hide Rulers" aria-label="Hide Rulers"></button><button id="pivotVisibilityButton" class="lock-button active" type="button" disabled title="Hide Pivot & Offset Guides" aria-label="Hide Pivot & Offset Guides"></button></span></p>
           <div class="field">
             <label for="backgroundInput">Preview background</label>
             <select id="backgroundInput">
@@ -2097,7 +2099,7 @@
     </div>
     </section>
 
-    <section class="card timeline-card">
+    <section class="card timeline-card" id="timelineCard">
       <div class="timeline-toolbar">
         <strong>Timeline</strong>
         <div class="transport-row">
@@ -2510,7 +2512,7 @@
     const $ = (id) => document.getElementById(id);
     const els = {
       referenceFadeMirrorInput: $('referenceFadeMirrorInput'),
-      canvasHistoryButtons: $('canvasHistoryButtons'), canvasExpandButton: $('canvasExpandButton'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'),
+      canvasHistoryButtons: $('canvasHistoryButtons'), canvasExpandButton: $('canvasExpandButton'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'), timelineVisibilityButton: $('timelineVisibilityButton'),
       fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), referencePaletteFileInput: $('referencePaletteFileInput'), dropZone: $('dropZone'), importFrameSkipInput: $('importFrameSkipInput'), importFrameSkipValue: $('importFrameSkipValue'), importVideoInfo: $('importVideoInfo'),
       rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'), pingPongInput: $('pingPongInput'), oneRowPackInput: $('oneRowPackInput'),
       frameInput: $('frameInput'), frameValue: $('frameValue'), totalFramesValue: $('totalFramesValue'), reverseOrderButton: $('reverseOrderButton'), showSkippedFramesInput: $('showSkippedFramesInput'), deleteSkippedButton: $('deleteSkippedButton'), backgroundInput: $('backgroundInput'), scanlinesInput: $('scanlinesInput'), scanlineOpacityInput: $('scanlineOpacityInput'), scanlineOpacityValue: $('scanlineOpacityValue'), rulersBeyondCageInput: $('rulersBeyondCageInput'), rulerColorButton: $('rulerColorButton'), rulerColorSwatch: $('rulerColorSwatch'), referenceShadowInput: $('referenceShadowInput'), referenceShadowColorButton: $('referenceShadowColorButton'), referenceShadowColorSwatch: $('referenceShadowColorSwatch'), referenceShadowHeightInput: $('referenceShadowHeightInput'), referenceShadowHeightValue: $('referenceShadowHeightValue'), referenceShadowOffsetYInput: $('referenceShadowOffsetYInput'),
@@ -4026,6 +4028,7 @@
         button.dataset.iconBody = iconBody;
       }
     }
+    const ICON_TIMELINE = '<rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M3 10h18M3 14h18M9 10v4m6-4v4"></path>';
     const ICON_CAGE = '<path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M14 3h1"></path><path d="M21 9v1"></path><path d="M21 14v1"></path><path d="M14 21h1"></path><path d="M9 21h1"></path><path d="M3 14v1"></path><path d="M3 9v1"></path>';
     const ICON_RULER = '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z"></path><path d="m14.5 12.5 2-2"></path><path d="m11.5 9.5 2-2"></path><path d="m8.5 6.5 2-2"></path><path d="m17.5 15.5 2-2"></path>';
     const ICON_PIVOT = '<path d="M5 12h14"></path><path d="M12 5v14"></path>';
@@ -4048,6 +4051,9 @@
     }
     function setDisplayVisibilityButtons() {
       const builderActive = spriteSheetBuilderPanelActive();
+      const timelineButton = els.timelineVisibilityButton;
+      timelineButton.hidden = !!state.referenceCompositorVisible;
+      setOverlayIconButton(timelineButton, !timelineButton.closest('.app').classList.contains('timeline-hidden'), 'Timeline', ICON_TIMELINE);
       setOverlayIconButton(els.cageVisibilityButton, builderActive ? !!state.spriteSheetBuilderShowCage : state.showCageOverlay !== false, builderActive ? 'Sprite Sheet Grid' : 'Cage', ICON_CAGE);
       setOverlayIconButton(els.rulerVisibilityButton, state.showRulerOverlay !== false, 'Rulers', ICON_RULER);
       setOverlayIconButton(els.pivotVisibilityButton, state.showPivotOverlay !== false, 'Pivot & Offset Guides', ICON_PIVOT);
@@ -18634,6 +18640,12 @@
       if (!expanded) syncStageHeightToOpenLeftPanel();
       requestAnimationFrame(updateCanvasZoom);
     });
+    els.timelineVisibilityButton.addEventListener('click', () => {
+      const hidden = els.timelineVisibilityButton.closest('.app').classList.toggle('timeline-hidden');
+      if (hidden) closeFrameContextMenu();
+      setDisplayVisibilityButtons();
+      requestAnimationFrame(updateCanvasZoom);
+    });
     els.canvasUndoButton.addEventListener('click', undo);
     els.canvasRedoButton.addEventListener('click', redo);
     els.ghostFrameMenuButton.addEventListener('click', () => { const i = state.contextFrameIndex ?? state.currentFrame, targets = frameActionIndices(i); closeFrameContextMenu(); toggleFrameGhost(targets); });
@@ -20358,7 +20370,7 @@
           if (referenceTabButton?.parentNode) referenceTabButton.parentNode.insertBefore(compositorTabButton, referenceTabButton.nextSibling);
           else els.floatingToolTabs.appendChild(compositorTabButton);
         }
-        const visibilityButtons = [els.cageVisibilityButton, els.rulerVisibilityButton, els.pivotVisibilityButton].filter(Boolean);
+        const visibilityButtons = [els.timelineVisibilityButton, els.cageVisibilityButton, els.rulerVisibilityButton, els.pivotVisibilityButton].filter(Boolean);
         if (visibilityButtons.length) {
           const sourceActions = visibilityButtons[0].closest('.group-title-actions');
           const visibilityGroup = document.createElement('div');

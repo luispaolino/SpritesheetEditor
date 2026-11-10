@@ -10,10 +10,13 @@
 .animation-group-item .animation-layer-name { position: relative; padding-left: 22px; }
 .animation-group-arrow { position: absolute; left: 7px; color: #9be7b9; }
 .animation-inherited-hidden { opacity: .6; }
-.animation-layer-add-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+#animationLayerList:empty { display: none; }
+.animation-layer-add-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .animation-layer-add-actions button { width: 100%; min-width: 0; min-height: 38px; white-space: nowrap; }
-.edit-image-effects { display: grid; gap: 8px; margin-top: 10px; }
-.edit-image-effects #animationExportLayerButton { width: 100%; }
+.edit-image-effects { display: grid; }
+.edit-image-effects > .inspector-section:not([open]) { gap: 0; padding: 0; }
+.edit-image-effects > .inspector-section:not([open]) summary { min-height: 30px; }
+.edit-image-effects #animationExportLayerButton { margin-top: 6px; }
 .animation-group.sprite-sheet-builder-tool-panel :is(.group-title-actions, #animationDropZone, .animation-selection-tool, #animationSplitButton, #animationLayerList, .animation-layer-add-actions, .edit-image-effects) { display: none; }
 .side-panels .reference-layer-item.animation-layer-item {
   width: calc(100% - var(--animation-layer-depth, 0) * 14px);
@@ -36,7 +39,7 @@
 .animation-layer-item.animation-drop-before { box-shadow: 0 -3px 0 var(--accent); }
 .animation-layer-item.animation-drop-after { box-shadow: 0 3px 0 var(--accent); }
 .animation-layer-item.animation-drop-inside { box-shadow: inset 0 0 0 2px #7bdfa7; }
-.animation-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin-bottom: 12px; }
+.animation-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
 .side-panels .animation-tools .tool-icon-button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; }
 .animation-tools .tool-button.active { color: #071018; background: var(--warning); border-color: transparent; }
 .animation-selection-tool { position: relative; }
