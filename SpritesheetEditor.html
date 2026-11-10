@@ -4561,14 +4561,14 @@
       state.endFrame = clamp((parseInt(els.endFrameInput.value, 10) || state.frames.length) - 1, state.startFrame, state.frames.length - 1);
       state.currentFrame = clamp(state.currentFrame, state.startFrame, state.endFrame);
     }
-    function syncAfterDataChange(resetRange = true) {
+    function syncAfterDataChange(resetRange = true, infoOptions) {
       state.spriteEditMode = false;
       state.spriteEditAdjust = neutralSpriteEditAdjust();
       resetSpriteEditSession();
       ensureRows(); updateMetrics(); syncImportFrameSkipMax(); if (resetRange) setRangeAll(); else readRange();
       normalizeTimelineSelection();
       if (hasFrames()) { els.emptyState.style.display = 'none'; buildFilmstrip(); drawFrame(state.currentFrame); } else { syncEmptyState(); buildFilmstrip(); }
-      updateInfo();
+      updateInfo(infoOptions);
     }
 
     function guideThickness() { return 1; }
@@ -12635,7 +12635,7 @@
     }
     async function loadSpritesheets(files) {
       try {
-        pause(true);
+        pause(true, { updateInfo: false });
         showError('');
         const preservedReferenceState = snapshotReferenceStateForSpritesheetLoad();
         const preservedPivot = hasFrames() ? { x: pivotXValue(), y: pivotYValue() } : null;
@@ -12670,13 +12670,13 @@
         state.referenceCompositorVideoBitrate = DEFAULT_COMPOSITOR_VIDEO_BITRATE_MBPS;
         state.referenceCompositorAudioBitrate = DEFAULT_COMPOSITOR_AUDIO_BITRATE_KBPS;
         resetAnimationState();
-        state.rows = preserveGrid ? rows : 1; state.cols = preserveGrid ? cols : clamp(Math.max(1, frames.length), 1, 100); els.rowsInput.value = state.rows; els.colsInput.value = state.cols; state.frames = frames; state.currentFrame = 0; state.selectedFrameIndices = [0]; state.selectionAnchorFrame = 0; state.frameOffsets = []; state.frameMasks = []; state.maskDirty = []; state.indexedFrames = []; state.frameScales = []; state.frameFlips = []; state.frameFlipYs = []; state.offsetXAll = 0; state.offsetYAll = 0; state.rulersV = []; state.rulersH = []; state.rulersBeyondCage = false; state.rulerColor = cloneColor(DEFAULT_RULER_COLOR); state.cageCustom = false; state.zoom = 1; state.panX = 0; state.panY = 0; state.maskMode = false; state.pencilMode = false; state.pencilCtrlPickMode = false; state.brushLineAnchor = null; state.pencilToolMode = 'pencil'; state.pencilEraserPixelMode = false; state.pencilColor = cloneColor(DEFAULT_PENCIL_COLOR); state.pencilColors = [cloneColor(DEFAULT_PENCIL_COLOR)]; state.activePencilColorIndex = 0; state.pencilColorContextIndex = null; state.paintBucketMode = false; state.eyedropperMode = false; state.paletteDropperMode = false; state.paletteMergeTargetIndices = []; state.activePencilLayerId = ''; state.hideMask = false; state.indexPreviewVisible = false; state.indexResetPendingAll = false; state.indexHighlightColors = true; state.indexHighlightColor = cloneColor(DEFAULT_INDEX_HIGHLIGHT_COLOR); state.indexChannelMode = 'none'; state.truePixelPreviewVisible = false; state.importedPaletteInfo = null; state.importedPaletteRevision = 0; state.indexColorSelectMode = false; state.selectedPaletteIndices = []; state.paletteLayers = []; state.activePaletteLayerId = ''; state.paletteLayerCounter = 0; state.paletteSelectionDragging = false; state.paletteSelectionDragStartIndex = null; state.paletteSelectionDragAction = 'select'; state.paletteAdjust = normalizePaletteAdjust({}); state.paletteAdjustBasePalette = null; state.paletteAdjustHistoryPushed = false; state.referencePaletteInfo = null; state.referencePaletteVisible = false; state.referencePaletteSelectedIndices = []; state.referencePaletteTargetIndex = null; state.referencePaletteSelectionDragging = false; state.referencePaletteSelectionDragStartIndex = null; state.referencePaletteSelectionDragAction = 'select'; state.showSkippedFrames = true; state.displayReferenceUnit = 'percent'; state.displayReferenceLayers = []; state.activeDisplayReferenceId = ''; state.displayReferenceLayerCounter = 0; state.displayReferenceCanvas = null; state.displayReferenceName = ''; state.displayReferenceVisible = false; state.displayReferenceOffsetX = 0; state.displayReferenceOffsetY = 0; state.displayReferenceScale = 100; state.referenceCompositorVisible = false; state.referenceCompositorWidth = REFERENCE_COMPOSITOR_DEFAULT_WIDTH; state.referenceCompositorHeight = REFERENCE_COMPOSITOR_DEFAULT_HEIGHT; state.referenceCompositorMaskOutsideCage = false; state.referenceCompositorAssets = []; state.referenceCompositorAudioAssets = []; state.referenceCompositorFontAssets = []; state.referenceCompositorTracks = []; state.referenceCompositorClips = []; state.activeReferenceCompositorClipId = ''; state.selectedReferenceCompositorClipIds = []; state.activeReferenceCompositorTrackId = ''; state.referenceCompositorCursorFrame = 0; state.referenceCompositorStartFrame = 0; state.referenceCompositorEndFrame = REFERENCE_COMPOSITOR_DEFAULT_LENGTH - 1; state.referenceCompositorPxPerFrame = REFERENCE_COMPOSITOR_PX_PER_FRAME; state.referenceCompositorLoop = true; state.referenceCompositorExportAudio = true; state.referenceCompositorVideoQuality = DEFAULT_COMPOSITOR_VIDEO_QUALITY; state.referenceCompositorPlaying = false; state.referenceCompositorLastTick = 0; state.fontCanvas = null; state.fontName = ''; state.fontConfigSpritesheetName = ''; state.fontRows = 1; state.fontCols = DEFAULT_FONT_COLUMNS; state.fontColsAuto = true; state.fontOrder = DEFAULT_FONT_ORDER; state.fontLetterGap = 0; state.fontSpace = 0; state.fontRowGap = 0; state.fontAlign = 'center'; state.fontForceUppercase = false; state.fontLetterOffsets = {}; state.activeFontLetter = ''; state.fontColor = cloneColor(DEFAULT_FONT_COLOR); state.fontText = ''; state.fontRevision = 0; clearFontGlyphCache(); if (els.displayReferenceLayerHost) els.displayReferenceLayerHost.textContent = ''; state.referenceAnimationPlaying = false; state.referenceAnimationTime = 0; state.referenceAnimationLastTick = 0; state.pivotDark = false; state.offsetXAllHistoryPushed = false; state.offsetYAllHistoryPushed = false; state.undoStack = []; state.redoStack = []; closeFrameContextMenu(); closeReferenceCompositorContextMenu(); closeColorPicker(); closePaletteLayerModal(); closeReferenceFadeModal(); closeReferenceClipModal(); closeReferenceAudioModal(); closeReferenceTextModal(); closePencilColorContextMenu(); stopReferenceCompositorAudio(); applyImportedVideoPlaybackFps(frames); markFrameBitmapsDirty(); updateMetrics(); syncImportFrameSkipMax(); applyVideoFrameSkipFromSlider(); if (preservedPivot) { state.pivotX = clamp(Math.round(preservedPivot.x), 0, state.cageWidth); state.pivotY = clamp(Math.round(preservedPivot.y), 0, state.cageHeight); } else { state.pivotX = defaultPivotX(); state.pivotY = state.cageHeight; } syncAfterDataChange(true); restoreReferenceStateAfterSpritesheetLoad(preservedReferenceState);
+        state.rows = preserveGrid ? rows : 1; state.cols = preserveGrid ? cols : clamp(Math.max(1, frames.length), 1, 100); els.rowsInput.value = state.rows; els.colsInput.value = state.cols; state.frames = frames; state.currentFrame = 0; state.selectedFrameIndices = [0]; state.selectionAnchorFrame = 0; state.frameOffsets = []; state.frameMasks = []; state.maskDirty = []; state.indexedFrames = []; state.frameScales = []; state.frameFlips = []; state.frameFlipYs = []; state.offsetXAll = 0; state.offsetYAll = 0; state.rulersV = []; state.rulersH = []; state.rulersBeyondCage = false; state.rulerColor = cloneColor(DEFAULT_RULER_COLOR); state.cageCustom = false; state.zoom = 1; state.panX = 0; state.panY = 0; state.maskMode = false; state.pencilMode = false; state.pencilCtrlPickMode = false; state.brushLineAnchor = null; state.pencilToolMode = 'pencil'; state.pencilEraserPixelMode = false; state.pencilColor = cloneColor(DEFAULT_PENCIL_COLOR); state.pencilColors = [cloneColor(DEFAULT_PENCIL_COLOR)]; state.activePencilColorIndex = 0; state.pencilColorContextIndex = null; state.paintBucketMode = false; state.eyedropperMode = false; state.paletteDropperMode = false; state.paletteMergeTargetIndices = []; state.activePencilLayerId = ''; state.hideMask = false; state.indexPreviewVisible = false; state.indexResetPendingAll = false; state.indexHighlightColors = true; state.indexHighlightColor = cloneColor(DEFAULT_INDEX_HIGHLIGHT_COLOR); state.indexChannelMode = 'none'; state.truePixelPreviewVisible = false; state.importedPaletteInfo = null; state.importedPaletteRevision = 0; state.indexColorSelectMode = false; state.selectedPaletteIndices = []; state.paletteLayers = []; state.activePaletteLayerId = ''; state.paletteLayerCounter = 0; state.paletteSelectionDragging = false; state.paletteSelectionDragStartIndex = null; state.paletteSelectionDragAction = 'select'; state.paletteAdjust = normalizePaletteAdjust({}); state.paletteAdjustBasePalette = null; state.paletteAdjustHistoryPushed = false; state.referencePaletteInfo = null; state.referencePaletteVisible = false; state.referencePaletteSelectedIndices = []; state.referencePaletteTargetIndex = null; state.referencePaletteSelectionDragging = false; state.referencePaletteSelectionDragStartIndex = null; state.referencePaletteSelectionDragAction = 'select'; state.showSkippedFrames = true; state.displayReferenceUnit = 'percent'; state.displayReferenceLayers = []; state.activeDisplayReferenceId = ''; state.displayReferenceLayerCounter = 0; state.displayReferenceCanvas = null; state.displayReferenceName = ''; state.displayReferenceVisible = false; state.displayReferenceOffsetX = 0; state.displayReferenceOffsetY = 0; state.displayReferenceScale = 100; state.referenceCompositorVisible = false; state.referenceCompositorWidth = REFERENCE_COMPOSITOR_DEFAULT_WIDTH; state.referenceCompositorHeight = REFERENCE_COMPOSITOR_DEFAULT_HEIGHT; state.referenceCompositorMaskOutsideCage = false; state.referenceCompositorAssets = []; state.referenceCompositorAudioAssets = []; state.referenceCompositorFontAssets = []; state.referenceCompositorTracks = []; state.referenceCompositorClips = []; state.activeReferenceCompositorClipId = ''; state.selectedReferenceCompositorClipIds = []; state.activeReferenceCompositorTrackId = ''; state.referenceCompositorCursorFrame = 0; state.referenceCompositorStartFrame = 0; state.referenceCompositorEndFrame = REFERENCE_COMPOSITOR_DEFAULT_LENGTH - 1; state.referenceCompositorPxPerFrame = REFERENCE_COMPOSITOR_PX_PER_FRAME; state.referenceCompositorLoop = true; state.referenceCompositorExportAudio = true; state.referenceCompositorVideoQuality = DEFAULT_COMPOSITOR_VIDEO_QUALITY; state.referenceCompositorPlaying = false; state.referenceCompositorLastTick = 0; state.fontCanvas = null; state.fontName = ''; state.fontConfigSpritesheetName = ''; state.fontRows = 1; state.fontCols = DEFAULT_FONT_COLUMNS; state.fontColsAuto = true; state.fontOrder = DEFAULT_FONT_ORDER; state.fontLetterGap = 0; state.fontSpace = 0; state.fontRowGap = 0; state.fontAlign = 'center'; state.fontForceUppercase = false; state.fontLetterOffsets = {}; state.activeFontLetter = ''; state.fontColor = cloneColor(DEFAULT_FONT_COLOR); state.fontText = ''; state.fontRevision = 0; clearFontGlyphCache(); if (els.displayReferenceLayerHost) els.displayReferenceLayerHost.textContent = ''; state.referenceAnimationPlaying = false; state.referenceAnimationTime = 0; state.referenceAnimationLastTick = 0; state.pivotDark = false; state.offsetXAllHistoryPushed = false; state.offsetYAllHistoryPushed = false; state.undoStack = []; state.redoStack = []; closeFrameContextMenu(); closeReferenceCompositorContextMenu(); closeColorPicker(); closePaletteLayerModal(); closeReferenceFadeModal(); closeReferenceClipModal(); closeReferenceAudioModal(); closeReferenceTextModal(); closePencilColorContextMenu(); stopReferenceCompositorAudio(); applyImportedVideoPlaybackFps(frames); markFrameBitmapsDirty(); updateMetrics(); syncImportFrameSkipMax(); applyVideoFrameSkipFromSlider(); if (preservedPivot) { state.pivotX = clamp(Math.round(preservedPivot.x), 0, state.cageWidth); state.pivotY = clamp(Math.round(preservedPivot.y), 0, state.cageHeight); } else { state.pivotX = defaultPivotX(); state.pivotY = state.cageHeight; } syncAfterDataChange(true, { deferHiddenPalette: true }); restoreReferenceStateAfterSpritesheetLoad(preservedReferenceState);
         state.fontCastShadow = false;
         state.fontShadowColor = cloneColor(DEFAULT_FONT_SHADOW_COLOR);
         state.fontShadowOffsetX = 2;
         state.fontShadowOffsetY = 2;
         state.fontLetterGaps = {};
-        updateInfo();
+        updateInfo({ deferHiddenPalette: true });
       } catch (e) { showError(e.message); }
     }
     async function importFrames(files) {
@@ -12712,7 +12712,7 @@
         state.offsetXAll = preserveLayout.offsetXAll;
         state.offsetYAll = preserveLayout.offsetYAll;
       }
-      state.currentFrame = start; state.selectedFrameIndices = [start]; state.selectionAnchorFrame = start; markFrameBitmapsDirty(); syncImportFrameSkipMax(); applyVideoFrameSkipFromSlider(); syncAfterDataChange(true);
+      state.currentFrame = start; state.selectedFrameIndices = [start]; state.selectionAnchorFrame = start; markFrameBitmapsDirty(); syncImportFrameSkipMax(); applyVideoFrameSkipFromSlider(); syncAfterDataChange(true, { deferHiddenPalette: true });
     }
 
     function imageToDataURL(img) { const c=document.createElement('canvas'); c.width=img.naturalWidth||img.width; c.height=img.naturalHeight||img.height; const cc=c.getContext('2d',{alpha:true}); cc.imageSmoothingEnabled=false; cc.drawImage(img,0,0); return c.toDataURL('image/png'); }
@@ -13275,7 +13275,7 @@
         markFrameBitmapsDirty();
         if (state.paletteLayers.length) reanchorGeneratedPaletteState(uploadedPaletteSourceKey(state.currentFrame));
         els.rowsInput.value=state.rows; els.colsInput.value=state.cols; els.startFrameInput.value=state.startFrame+1; els.endFrameInput.value=state.endFrame+1; els.importFrameSkipInput.max=state.importFrameSkipMax; els.importFrameSkipInput.value=state.importFrameSkip; els.speedInput.value=state.fps; els.pingPongInput.checked=state.pingPongAnimation; els.oneRowPackInput.checked=state.oneRowPack; els.magicToleranceInput.value=state.magicTolerance; els.magicAntialiasInput.checked=state.magicAntialias; els.magicContiguousInput.checked=state.magicContiguous; els.haloToleranceInput.value=state.haloTolerance; els.indexColorsInput.value=state.indexColors; els.indexKeepTransparencyInput.checked=state.indexKeepTransparency; els.indexHighlightColorsInput.checked=state.indexHighlightColors !== false; els.truePixelResolutionInput.value=state.truePixelResolution; els.backgroundInput.value=state.background;
-        syncAfterDataChange(false);
+        syncAfterDataChange(false, { deferHiddenPalette: true });
       } catch(e) { showError(e.message || 'Could not load that project file.'); }
     }
 
@@ -13307,7 +13307,25 @@
     function canvasShortcutTargetActive(active = document.activeElement) {
       return fullscreenElement() === els.canvasShell || !!(els.canvasShell?.matches?.(':hover') || els.canvasShell?.contains?.(active));
     }
-    function setCage(w, h, origin = null) {
+    function restoreSheetCellForFit(i, layout) {
+      const frame = state.frames[i], source = sheetSourceForFrame(frame);
+      const slice = frame.sheetSlice, crop = frame.sheetCrop || slice;
+      const x = Math.min(slice.x, crop.x), y = Math.min(slice.y, crop.y);
+      const right = Math.max(slice.x + slice.width, crop.x + crop.width);
+      const bottom = Math.max(slice.y + slice.height, crop.y + crop.height);
+      const restore = previous => {
+        const canvas = drawSheetCropCanvas(source, x, y, right - x, bottom - y);
+        replaceCropCenter(canvas, previous, crop.x - x, crop.y - y);
+        return canvas;
+      };
+      const scale = frameScale(i);
+      layout.x += (frameFlipX(i) ? crop.x + frame.canvas.width - right : x - crop.x) * scale.x;
+      layout.y += (frameFlipY(i) ? crop.y + frame.canvas.height - bottom : y - crop.y) * scale.y;
+      frame.sourceCanvas = restore(frame.sourceCanvas || frame.canvas);
+      frame.canvas = restore(frame.canvas);
+      frame.sheetCrop = { ...crop, x, y, width: right - x, height: bottom - y };
+    }
+    function setCage(w, h, origin = null, restoreSheetCell = false) {
       if (!hasFrames()) return;
       const oldWidth = state.cageWidth, oldHeight = state.cageHeight;
       const oldMaskLayouts = captureFrameMaskLayouts();
@@ -13316,12 +13334,19 @@
       state.cageWidth = clamp(Math.round(w), 1, 8192);
       state.cageHeight = clamp(Math.round(h), 1, 8192);
       if (origin) {
-        // Move the cage origin without recropping the underlying spritesheet cells.
+        if (restoreSheetCell) restoreSheetCellForFit(state.currentFrame, oldMaskLayouts[state.currentFrame]);
+        // Move the cage origin without trimming the source artwork or resizing its masks.
         reframeAnimationCels(origin, oldWidth, oldHeight);
         state.frameOffsets = oldMaskLayouts.map((before, i) => {
           const after = frameLayoutForCage(i, state.cageWidth, state.cageHeight);
           const offset = state.frameOffsets[i] || { x: 0, y: 0 };
           return { x: offset.x + before.x - after.x - origin.x, y: offset.y + before.y - after.y - origin.y };
+        });
+        state.frameMasks = state.frameMasks.map((mask, i) => {
+          if (!mask || !state.maskDirty[i]) return null;
+          const shifted = makeMask();
+          shifted.getContext('2d').drawImage(mask, -origin.x, -origin.y);
+          return shifted;
         });
         for (const frame of state.frames) {
           for (const layer of frame.pencilLayers || []) {
@@ -13342,29 +13367,71 @@
       if (Number.isFinite(parseFloat(state.pivotX))) state.pivotX = clamp(Math.round(parseFloat(state.pivotX)), 0, state.cageWidth);
       state.pivotY = clamp(state.pivotY, 0, state.cageHeight);
       clampRulers();
-      ensureArrays(oldMaskLayouts);
+      ensureArrays(origin ? null : oldMaskLayouts);
       buildFilmstrip();
       drawFrame(state.currentFrame);
-      updateInfo();
+      updateInfo({ deferHiddenPalette: true });
+    }
+    function baseSpriteFitBounds(i) {
+      const frame = state.frames[i], source = sheetSourceForFrame(frame);
+      const slice = source && frame.sheetSlice, crop = frame.sheetCrop || slice;
+      const offsetX = slice ? slice.x - crop.x : 0, offsetY = slice ? slice.y - crop.y : 0;
+      const restoreSlice = !!slice && (offsetX < 0 || offsetY < 0
+        || offsetX + slice.width > frame.canvas.width || offsetY + slice.height > frame.canvas.height);
+      let canvas = frame.canvas;
+      if (slice && (offsetX || offsetY || slice.width !== canvas.width || slice.height !== canvas.height)) {
+        // Measure the original cell with its current edits, excluding neighboring cells exposed by a larger cage.
+        canvas = drawSheetCropCanvas(source, slice.x, slice.y, slice.width, slice.height);
+        replaceCropCenter(canvas, frame.canvas, -offsetX, -offsetY);
+      }
+      const position = framePos(i), scale = frameScale(i), flipX = frameFlipX(i), flipY = frameFlipY(i);
+      const x = position.x + (flipX ? frame.canvas.width - offsetX : offsetX) * scale.x;
+      const y = position.y + (flipY ? frame.canvas.height - offsetY : offsetY) * scale.y;
+      const sx = flipX ? -scale.x : scale.x, sy = flipY ? -scale.y : scale.y;
+      if (state.maskDirty[i] && state.frameMasks[i]) {
+        if (canvas === frame.canvas) canvas = canvasClone(canvas);
+        const t = canvas.getContext('2d');
+        t.imageSmoothingEnabled = false;
+        t.setTransform(1 / sx, 0, 0, 1 / sy, -x / sx, -y / sy);
+        // The editable mask describes the current cage. Ignore pixels beyond its extent when fitting.
+        t.globalCompositeOperation = 'destination-in';
+        t.fillRect(0, 0, state.cageWidth, state.cageHeight);
+        t.globalCompositeOperation = 'destination-out';
+        t.drawImage(state.frameMasks[i], 0, 0);
+      }
+      const alpha = canvasAlphaBounds(canvas, 1);
+      let bounds = alpha && {
+        left: Math.floor(x + (flipX ? alpha.maxX + 1 : alpha.minX) * sx),
+        top: Math.floor(y + (flipY ? alpha.maxY + 1 : alpha.minY) * sy),
+        right: Math.ceil(x + (flipX ? alpha.minX : alpha.maxX + 1) * sx),
+        bottom: Math.ceil(y + (flipY ? alpha.minY : alpha.maxY + 1) * sy)
+      };
+      if (frame.pencilLayers?.some(layer => layer.visible !== false)) {
+        const pencil = makeMask(), t = pencil.getContext('2d');
+        drawPencilLayers(t, i);
+        applyMask(t, i);
+        const ink = canvasAlphaBounds(pencil, 1);
+        if (ink) bounds = {
+          left: Math.min(bounds?.left ?? Infinity, ink.minX), top: Math.min(bounds?.top ?? Infinity, ink.minY),
+          right: Math.max(bounds?.right ?? -Infinity, ink.maxX + 1), bottom: Math.max(bounds?.bottom ?? -Infinity, ink.maxY + 1)
+        };
+      }
+      return bounds && { ...bounds, restoreSlice };
     }
     function fitCageToCurrentSprite() {
       if (!hasFrames()) return;
-      const layer = activeAnimationLayer();
-      if (layer && !animationLayerUsesBaseFrame(layer)) {
-        const bounds = animationSpriteBounds(layer);
-        if (!bounds) { showError('The selected Animation layer has no visible pixels to fit.'); return; }
-        const width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
-        showError('');
-        if (width === state.cageWidth && height === state.cageHeight && !bounds.left && !bounds.top) return;
-        setCage(width, height, { x: bounds.left, y: bounds.top });
-        return;
-      }
-      const frame = state.frames[state.currentFrame], scale = frameScale(state.currentFrame);
-      if (!frame?.canvas) return;
-      const width = clamp(Math.round(frame.canvas.width * scale.x), 1, 8192);
-      const height = clamp(Math.round(frame.canvas.height * scale.y), 1, 8192);
-      if (width === state.cageWidth && height === state.cageHeight) return;
-      setCage(width, height);
+      let restoreSheetCell = false;
+      const bounds = animationSpriteBounds(activeAnimationLayer(), state.currentFrame, i => {
+        const baseBounds = baseSpriteFitBounds(i);
+        restoreSheetCell = !!baseBounds?.restoreSlice;
+        return baseBounds;
+      });
+      if (!bounds) return showError('The selected sprite has no visible pixels to fit.');
+      const width = clamp(bounds.right - bounds.left, 1, 8192);
+      const height = clamp(bounds.bottom - bounds.top, 1, 8192);
+      showError('');
+      if (width === state.cageWidth && height === state.cageHeight && !bounds.left && !bounds.top) return;
+      setCage(width, height, { x: bounds.left, y: bounds.top }, restoreSheetCell);
     }
     function centerPivotInCage() {
       if (!hasFrames()) return;
@@ -20473,7 +20540,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.6.5-1"></script>
+  <script src="animation.js?v=1.6.5-2"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

@@ -440,21 +440,24 @@ function maskedAnimationCelCanvas(cel) {
   animationMaskedCanvases.set(cel.mask, { canvas, source: cel.canvas, version, revision });
   return canvas;
 }
-function animationSpriteBounds(layer, i = state.currentFrame) {
+function animationLayerAlphaBounds(layer, i) {
+  const cel = animationCel(layer, i), base = animationLayerUsesBaseFrame(layer);
+  const canvas = base ? makeMask() : maskedAnimationCelCanvas(cel);
+  if (base) drawBaseSprite(canvas.getContext('2d'), i, 0, 0, { applyMask: true });
+  const alpha = canvasAlphaBounds(canvas, 1);
+  if (!alpha) return null;
+  const position = base ? { x: 0, y: 0 } : animationCelPosition(cel);
+  const left = position.x + (!base && cel.flipX ? canvas.width - 1 - alpha.maxX : alpha.minX);
+  const top = position.y + (!base && cel.flipY ? canvas.height - 1 - alpha.maxY : alpha.minY);
+  return { left, top, right: left + alpha.maxX - alpha.minX + 1, bottom: top + alpha.maxY - alpha.minY + 1 };
+}
+function animationSpriteBounds(layer, i = state.currentFrame, measureBase = null) {
   let bounds = null;
   for (const item of animationMovementTargets(layer, i)) {
     if (!animationLayerVisible(item, i) || !animationEffectiveOpacity(item)) continue;
-    const cel = animationCel(item, i), base = animationLayerUsesBaseFrame(item);
-    const canvas = base ? makeMask() : maskedAnimationCelCanvas(cel);
-    if (base) drawBaseSprite(canvas.getContext('2d'), i, 0, 0, { applyMask: true });
-    const alpha = canvasAlphaBounds(canvas, 1);
-    if (!alpha) continue;
-    const position = base ? { x: 0, y: 0 } : animationCelPosition(cel);
-    const flipX = !base && cel.flipX, flipY = !base && cel.flipY;
-    const left = position.x + (flipX ? canvas.width - 1 - alpha.maxX : alpha.minX);
-    const top = position.y + (flipY ? canvas.height - 1 - alpha.maxY : alpha.minY);
-    const right = left + alpha.maxX - alpha.minX + 1;
-    const bottom = top + alpha.maxY - alpha.minY + 1;
+    const itemBounds = measureBase && animationLayerUsesBaseFrame(item) ? measureBase(i) : animationLayerAlphaBounds(item, i);
+    if (!itemBounds) continue;
+    const { left, top, right, bottom } = itemBounds;
     bounds = bounds ? {
       left: Math.min(bounds.left, left), top: Math.min(bounds.top, top),
       right: Math.max(bounds.right, right), bottom: Math.max(bounds.bottom, bottom)
@@ -1046,7 +1049,7 @@ async function loadAnimationSprites(files) {
     for (const sprite of sprites) {
       if (!sprite.frames.length) validateAnimationSheetGrid(sprite.canvas, rows, cols);
     }
-    pause(true); pushHistory();
+    pause(true, { updateInfo: false }); pushHistory();
     for (const sprite of sprites) {
       const sheet = !sprite.frames.length;
       const frames = sheet ? applyImportFrameSkip(createSheetFrames(sprite.canvas, rows, cols, sprite.name)) : sprite.frames;
@@ -1074,7 +1077,7 @@ async function loadAnimationSprites(files) {
         state.activeAnimationLayerId = layer.id;
       }
     }
-    resetAnimationTools(); markFrameBitmapsDirty(); syncAfterDataChange(true);
+    resetAnimationTools(); markFrameBitmapsDirty(); syncAfterDataChange(true, { deferHiddenPalette: true });
   } catch (error) { showError(error.message || 'Could not load that sprite.'); }
   finally { animationEls.input.value = ''; }
 }
