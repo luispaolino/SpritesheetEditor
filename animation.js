@@ -526,16 +526,17 @@ function drawAnimationCel(t, cel, x = 0, y = 0, showMask = false) {
   t.restore();
 }
 function drawAnimationSprite(t, i, x, y, opt = {}) {
-  if (!Array.isArray(state.animationLayers)) return false;
+  const pixelMove = opt.animationPixelMove?.frame === i ? opt.animationPixelMove : null;
+  if (!Array.isArray(state.animationLayers) && !pixelMove) return false;
   const maskLayer = opt.maskOverlay ? selectedAnimationMaskLayer() : null;
   const baseOptions = maskLayer ? { ...opt, maskOverlay: false, applyMask: true } : opt;
   t.save(); t.beginPath(); t.rect(x, y, state.cageWidth, state.cageHeight); t.clip();
-  drawAnimationLayers(t, state.animationLayers, i, x, y, { baseOptions, maskLayer });
+  drawAnimationLayers(t, animationLayerList(), i, x, y, { baseOptions, maskLayer, pixelMove });
   t.restore();
   return true;
 }
 function drawAnimationLayers(target, layers, i, x, y, {
-  parentId = '', baseOptions = { applyMask: true }, maskLayer = null,
+  parentId = '', baseOptions = { applyMask: true }, maskLayer = null, pixelMove = null,
   bounds = { left: 0, top: 0, right: state.cageWidth, bottom: state.cageHeight }
 } = {}) {
   const children = new Map();
@@ -560,6 +561,8 @@ function drawAnimationLayers(target, layers, i, x, y, {
         t.drawImage(group, x + bounds.left, y + bounds.top);
       } else if (layer.group) {
         draw(t, layer.id, x, y);
+      } else if (layer.id === pixelMove?.layerId) {
+        t.drawImage(pixelMove.canvas, x, y);
       } else if (animationLayerUsesBaseFrame(layer)) {
         // Isolate the base's masks and blend modes from the other layers.
         const base = makeMask();
@@ -1104,9 +1107,12 @@ async function loadAnimationSprites(files) {
 function animationSelectionMask() {
   return animationSelectionRaster()?.mask || null;
 }
-function animationBakeBase(i) {
-  const frame = state.frames[i], canvas = makeMask(), t = canvas.getContext('2d');
-  drawBaseSprite(t,i,0,0,{applyMask:true});
+function animationBakeBase(i, canvas = null) {
+  if (!canvas) {
+    canvas = makeMask();
+    drawBaseSprite(canvas.getContext('2d'), i, 0, 0, { applyMask: true });
+  }
+  const frame = state.frames[i];
   frame.canvas = canvas; frame.sourceCanvas = canvasClone(canvas); frame.pencilLayers = []; frame.sheetSlice = null; frame.sheetCrop = null;
   state.frameOffsets[i] = {x:0,y:0};
   const scale = allFrameScale(); state.frameScales[i] = {x:1/scale.x,y:1/scale.y}; state.frameFlips[i] = false; state.frameFlipYs[i] = false;
@@ -1149,6 +1155,81 @@ function captureAnimationSelectionCel(layer, mask) {
   cropped.getContext('2d').drawImage(source, -minX, -minY);
   const position = animationCelPosition({ canvas: cropped });
   return { canvas: cropped, offsetX: minX - position.x, offsetY: minY - position.y, flipX: false, flipY: false };
+}
+function prepareAnimationPixelMove(layer) {
+  const frame = state.currentFrame, cel = animationCel(layer, frame);
+  const base = animationLayerUsesBaseFrame(layer);
+  const position = base ? { x: 0, y: 0 } : animationCelPosition(cel);
+  const remaining = base ? makeMask() : makeMask(cel.canvas.width, cel.canvas.height);
+  const context = remaining.getContext('2d');
+  if (base) drawBaseSprite(context, frame, 0, 0, { applyMask: true });
+  else drawAnimationCel(context, cel, -position.x, -position.y);
+
+  const mask = animationSelectionMask();
+  const cut = canvasClone(remaining), cutContext = cut.getContext('2d');
+  cutContext.globalCompositeOperation = 'destination-in';
+  cutContext.drawImage(mask, -position.x, -position.y);
+  const bounds = canvasAlphaBounds(cut, 1);
+  if (!bounds) return null;
+
+  context.globalCompositeOperation = 'destination-out';
+  context.drawImage(mask, -position.x, -position.y);
+  return { layerId: layer.id, frame, base, position, remaining, cut, bounds, canvas: makeMask(), dx: 0, dy: 0 };
+}
+function drawAnimationPixelMove(context, move, left = 0, top = 0) {
+  const { position, remaining, cut, bounds, dx, dy } = move;
+  const { minX, minY, maxX, maxY } = bounds;
+  const width = maxX - minX + 1, height = maxY - minY + 1;
+  const x = position.x - left, y = position.y - top;
+  context.imageSmoothingEnabled = false;
+  context.drawImage(remaining, x, y);
+  context.drawImage(cut, minX, minY, width, height, x + minX + dx, y + minY + dy, width, height);
+}
+function updateAnimationPixelMove(stroke, e) {
+  const move = stroke.pixelMove;
+  const { dx, dy } = pointerDelta(e, stroke.startX, stroke.startY);
+  const x = clamp(Math.round(dx), -state.cageWidth, state.cageWidth);
+  const y = clamp(Math.round(dy), -state.cageHeight, state.cageHeight);
+  if (move.dx === x && move.dy === y) return false;
+  move.dx = x;
+  move.dy = y;
+  animationSelection = x || y ? translateAnimationSelection(stroke.previousSelection, x, y) : stroke.previousSelection;
+  const context = move.canvas.getContext('2d');
+  context.clearRect(0, 0, move.canvas.width, move.canvas.height);
+  drawAnimationPixelMove(context, move);
+  return true;
+}
+function commitAnimationPixelMove(stroke) {
+  const move = stroke.pixelMove;
+  if (!move.dx && !move.dy) return;
+  const layer = animationLayerList().find(item => item.id === move.layerId);
+  const cel = animationCel(layer, move.frame);
+  if (!cel) return;
+  const nextSelection = animationSelection;
+  animationSelection = stroke.previousSelection;
+  pushHistory();
+
+  if (move.base) {
+    animationBakeBase(move.frame, move.canvas);
+  } else {
+    const { position, remaining, bounds, dx, dy } = move;
+    const left = position.x + Math.min(0, bounds.minX + dx);
+    const top = position.y + Math.min(0, bounds.minY + dy);
+    const right = position.x + Math.max(remaining.width, bounds.maxX + dx + 1);
+    const bottom = position.y + Math.max(remaining.height, bounds.maxY + dy + 1);
+    const canvas = makeMask(right - left, bottom - top), context = canvas.getContext('2d');
+    context.translate(cel.flipX ? canvas.width : 0, cel.flipY ? canvas.height : 0);
+    context.scale(cel.flipX ? -1 : 1, cel.flipY ? -1 : 1);
+    drawAnimationPixelMove(context, move, left, top);
+    const center = animationCelPosition({ canvas });
+    Object.assign(cel, { canvas, offsetX: left - center.x, offsetY: top - center.y });
+    delete cel.mask;
+  }
+
+  animationSelection = nextSelection;
+  if (!layer.sharedCel) state.indexedFrames[move.frame] = null;
+  markFrameBitmapsDirty();
+  if (layer.sharedCel || !updateFrameThumb(move.frame)) buildFilmstrip();
 }
 function splitAnimationSelection() {
   const layer = activeAnimationLayer(), mask = animationSelectionMask();
@@ -1319,8 +1400,14 @@ function startAnimationCanvasDrag(e) {
   }
   if(!animationLayerVisible(layer) || !animationLayerOffset(layer) || (layer.group && tool!=='move')) return true;
   const painting=tool==='pencil'||tool==='eraser';
-  pause(false,{updateInfo:!painting});
   let previousSelection=validAnimationSelection()?animationSelection:null,selectionMove=false;
+  let pixelMove = null;
+  if (tool === 'move' && previousSelection && !layer.group) {
+    if (!animationSelectionContainsPoint(e)) return true;
+    pixelMove = prepareAnimationPixelMove(layer);
+    if (!pixelMove) return true;
+  }
+  pause(false,{updateInfo:!painting});
   if(tool==='rectangle'||tool==='lasso') {
     if(e.altKey && !previousSelection)return true;
     selectionMove=!e.altKey && !e.shiftKey && animationSelectionContainsPoint(e);
@@ -1329,18 +1416,18 @@ function startAnimationCanvasDrag(e) {
         subtractFrom:e.altKey?rasterizeAnimationSelection(previousSelection,state.cageWidth,state.cageHeight):null,
         addTo:!e.altKey && e.shiftKey && previousSelection?rasterizeAnimationSelection(previousSelection,state.cageWidth,state.cageHeight):null};
     }
-  } else {
+  } else if (!pixelMove) {
     pushHistory();
     if(painting) {
       if(animationLayerUsesBaseFrame(layer))animationBakeBase(state.currentFrame);
       else animationBakeCel(layer,state.currentFrame);
     }
   }
-  const offset=animationLayerOffset(layer),targets=tool==='move'?animationMovementTargets(layer).map(item=>({id:item.id,x:animationCel(item).offsetX,y:animationCel(item).offsetY})):[];
-  animationStroke={layerId:layer.id,frame:state.currentFrame,tool,last:pointerGuidePoint(e),startX:e.clientX,startY:e.clientY,offsetX:offset.x,offsetY:offset.y,targets,previousSelection,selectionMove};
+  const offset=animationLayerOffset(layer),targets=tool==='move'&&!pixelMove?animationMovementTargets(layer).map(item=>({id:item.id,x:animationCel(item).offsetX,y:animationCel(item).offsetY})):[];
+  animationStroke={layerId:layer.id,frame:state.currentFrame,tool,last:pointerGuidePoint(e),startX:e.clientX,startY:e.clientY,offsetX:offset.x,offsetY:offset.y,targets,previousSelection,selectionMove,pixelMove};
   state.activeAnimationLayerId=layer.id;state.dragging=true;state.dragMode=`animation-${tool}`;state.dragPointerId=e.pointerId;
   els.canvasShell.classList.add('dragging');els.canvasShell.setPointerCapture(e.pointerId);
-  els.canvasShell.classList.toggle('animation-selection-moving',selectionMove);
+  els.canvasShell.classList.toggle('animation-selection-moving',selectionMove || !!pixelMove);
   if(painting) {
     const endpoint = e.shiftKey && animationPaintPixelCenter(animationStroke.last);
     const anchor = endpoint && animationPaintLineAnchor(layer, tool);
@@ -1454,6 +1541,13 @@ function queueAnimationPaintPreview(stroke,e) {
 }
 function moveAnimationCanvasDrag(e) {
   const stroke=animationStroke;if(!stroke)return;
+  if (stroke.pixelMove) {
+    if (updateAnimationPixelMove(stroke, e)) {
+      const move = stroke.pixelMove;
+      drawFrame(state.currentFrame, { fast: true, skipThumb: true, animationPixelMove: move.dx || move.dy ? move : null });
+    }
+    return;
+  }
   if(stroke.selectionMove) {
     const d=pointerDelta(e,stroke.startX,stroke.startY);
     animationSelection=translateAnimationSelection(stroke.previousSelection,d.dx,d.dy);
@@ -1490,6 +1584,16 @@ function finishAnimationCanvasDrag(e) {
   }
   state.dragging=false;state.dragMode='offset';state.dragPointerId=null;els.canvasShell.classList.remove('dragging','animation-selection-moving');
   if(els.canvasShell.hasPointerCapture(e.pointerId))els.canvasShell.releasePointerCapture(e.pointerId);
+  if (stroke?.pixelMove) {
+    if (e.type === 'pointercancel') animationSelection = stroke.previousSelection;
+    else {
+      updateAnimationPixelMove(stroke, e);
+      commitAnimationPixelMove(stroke);
+    }
+    drawFrame(state.currentFrame);
+    updateInfo({ deferHiddenPalette: true });
+    return;
+  }
   if(e.type==='pointercancel')animationSelection=stroke?.previousSelection || null;
   else if(stroke && ['lasso','rectangle'].includes(stroke.tool)) {
     let next=animationSelection;
@@ -1533,6 +1637,11 @@ function handleAnimationKeyDown(e) {
     moveAnimationSelection(e.key==='ArrowLeft'?-distance:e.key==='ArrowRight'?distance:0,e.key==='ArrowUp'?-distance:e.key==='ArrowDown'?distance:0);return true;
   }
   if(e.key==='F2'){e.preventDefault();beginAnimationLayerRename(activeAnimationLayer()?.id);return true;}
+  if (e.key === 'Escape' && animationStroke?.pixelMove) {
+    e.preventDefault();
+    finishAnimationCanvasDrag({ type: 'pointercancel', pointerId: state.dragPointerId });
+    return true;
+  }
   if(e.key==='Escape') {commitAnimationSelection(null);state.animationTool='move';drawFrame(state.currentFrame);updateInfo();e.preventDefault();return true;}
   const tools={m:'move',l:'lasso',r:'rectangle',p:'pencil',d:'dropper',e:'eraser',w:'wand',g:'bucket'};
   if(!e.shiftKey&&tools[key]){e.preventDefault();setAnimationTool(tools[key]);return true;}

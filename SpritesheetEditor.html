@@ -2157,7 +2157,7 @@
         <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups and paste into the current frame</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
-        <div><kbd>Arrows / Shift + Arrows</kbd><span>Move a selection 1 / 10 pixels. Drag inside it to move with the mouse.</span></div>
+        <div><kbd>Arrows / Shift + Arrows</kbd><span>Move the selection outline 1 / 10 pixels with a selection tool. With Move (M), drag inside the selection to move its pixels.</span></div>
         <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active layer while using Lasso, Rectangle, or Magic Wand</span></div>
         <div><kbd>F2</kbd><span>Rename the selected layer or group</span></div>
         <div><kbd>Shift + Arrows</kbd><span>Move the current frame, active layer, or selected Compositor clips</span></div>
@@ -6475,7 +6475,7 @@
       ctx.clearRect(0,0,els.mainCanvas.width,els.mainCanvas.height);
       const brushActive = (state.maskMode && state.brushAction !== 'wand') || state.pencilMode || animationPixelBrushActive();
       if (!brushActive) state.brushCursorVisible = false;
-      const options = visiblePreviewOptions({ guides: false, brush: false, paletteSelectionHighlight: state.indexHighlightColors !== false, castShadow: true });
+      const options = visiblePreviewOptions({ guides: false, brush: false, paletteSelectionHighlight: state.indexHighlightColors !== false, castShadow: true, animationPixelMove: opt.animationPixelMove });
       if (opt.skipIndexPreview) options.indexPreview = false;
       drawSprite(ctx, i, 0, 0, options);
       drawGhostSprites(ctx, i, options);
@@ -20551,7 +20551,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0"></script>
+  <script src="animation.js?v=1.7.0-1"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);
