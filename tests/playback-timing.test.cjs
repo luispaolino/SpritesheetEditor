@@ -35,6 +35,26 @@ function editor(skipped = [], options = {}) {
   }
   return app;
 }
+test('the skip slider keeps GIF source cadence, including after reorder, and restores all GIF frames at zero', () => {
+  const app = editor([], { frames: [
+    { kind: 'gif', sourceIndex: 2 },
+    { kind: 'gif', sourceIndex: 1 },
+    { kind: 'gif', sourceIndex: 0 },
+    { kind: 'video', sourceIndex: 3 },
+    { kind: 'image', skipped: true }
+  ] });
+  let step = 2;
+  app.importFrameStep = () => step;
+  vm.runInContext(sourceFunction('applyAnimatedFrameSkipFromSlider'), app);
+
+  assert.equal(app.applyAnimatedFrameSkipFromSlider(), true);
+  assert.deepEqual(app.state.frames.map(frame => frame.skipped), [false, true, false, true, true]);
+  assert.equal(app.applyAnimatedFrameSkipFromSlider(), false);
+  step = 1;
+  assert.equal(app.applyAnimatedFrameSkipFromSlider(), true);
+  assert.deepEqual(app.state.frames.map(frame => frame.skipped), [false, false, false, false, true]);
+});
+
 function next(app) {
   const result = app.nextPlaybackAdvance();
   assert.equal(result.delayMs, 1000 / app.state.fps);

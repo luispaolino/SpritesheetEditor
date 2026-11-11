@@ -1066,7 +1066,8 @@ async function loadAnimationSprites(files) {
     // Decode before committing, so an invalid file leaves the current project intact.
     const sprites = [];
     for (const file of accepted) {
-      sprites.push(await createDisplayReferenceLayerFromFile(file,{ id: `animation-${Date.now()}-${Math.random().toString(36).slice(2)}` }));
+      const sprite = await createDisplayReferenceLayerFromFile(file, { id: newAnimationId() });
+      sprites.push({ ...sprite, frameKind: isGifFile(file) ? 'gif' : 'webp' });
     }
     const { rows, cols } = state;
     for (const sprite of sprites) {
@@ -1077,7 +1078,15 @@ async function loadAnimationSprites(files) {
       const sheet = !sprite.frames.length;
       const frames = sheet ? applyImportFrameSkip(createSheetFrames(sprite.canvas, rows, cols, sprite.name)) : sprite.frames;
       if (!hasFrames()) {
-        state.frames = sheet ? frames : frames.map(({ canvas },i) => ({ kind:'image', id:`image-${Date.now()}-${state.importedId++}`, name:`${sprite.name} ${i+1}`, canvas:canvasClone(canvas), sourceCanvas:canvasClone(canvas) }));
+        state.frames = sheet ? frames : frames.map(({ canvas, delay }, sourceIndex) => ({
+          kind: sprite.frameKind,
+          id: `${sprite.frameKind}-${Date.now()}-${state.importedId++}`,
+          name: `${sprite.name} ${sourceIndex + 1}`,
+          sourceIndex,
+          sourceFps: Math.max(1, Math.round(100 / delay)),
+          canvas: canvasClone(canvas),
+          sourceCanvas: canvasClone(canvas)
+        }));
         state.imageName = sprite.name;
         state.sheetImage = sheet ? sprite.canvas : null;
         state.sheetImages = sheet ? [{ image: sprite.canvas, name: sprite.name }] : [];
@@ -1100,7 +1109,11 @@ async function loadAnimationSprites(files) {
         state.activeAnimationLayerId = layer.id;
       }
     }
-    resetAnimationTools(); markFrameBitmapsDirty(); syncAfterDataChange(true, { deferHiddenPalette: true });
+    resetAnimationTools();
+    markFrameBitmapsDirty();
+    syncImportFrameSkipMax();
+    applyAnimatedFrameSkipFromSlider();
+    syncAfterDataChange(true, { deferHiddenPalette: true });
   } catch (error) { showError(error.message || 'Could not load that sprite.'); }
   finally { animationEls.input.value = ''; }
 }
