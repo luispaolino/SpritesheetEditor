@@ -192,6 +192,7 @@ Current release notes are split into:
 - `v1.5.0 - 2026-06-12`
 - `v1.6.0 - 2026-10-29`
 - `v1.6.5 - 2026-11-09`
+- `v1.7.0 - 2026-11-11`
 
 Major features:
 

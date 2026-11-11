@@ -50,7 +50,7 @@
 }
 .animation-selection-tool-menu {
   position: absolute; top: calc(100% + 5px); left: 0; z-index: 5;
-  display: grid; gap: 4px; padding: 5px; min-width: 124px;
+  display: grid; gap: 4px; padding: 5px; width: max-content; min-width: 124px;
   border: 1px solid var(--border); border-radius: 12px; background: #171c28; box-shadow: var(--shadow);
 }
 .animation-selection-tool-menu button {

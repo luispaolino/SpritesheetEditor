@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.6.5-2" />
+  <link rel="stylesheet" href="animation.css?v=1.7.0" />
   <style>
     :root {
       --bg: #10131b;
@@ -731,8 +731,6 @@
     .canvas-shell.bg-custom { background-image: none; }
     .canvas-shell:fullscreen,
     .canvas-shell:-webkit-full-screen { width: 100vw; height: 100vh; aspect-ratio: auto; border: 0; border-radius: 0; }
-    .canvas-shell:fullscreen .empty,
-    .canvas-shell:-webkit-full-screen .empty { right: 0; }
     .canvas-shell > canvas { image-rendering: pixelated; max-width: none; max-height: none; width: auto; height: auto; background: transparent; transform-origin: center center; }
     #mainCanvas { position: absolute; left: 0; top: 0; z-index: 10; }
     .thumb canvas { image-rendering: pixelated; display: block; }
@@ -1084,10 +1082,9 @@
     .mask-bake-indicator.show { display: inline-flex; }
 
     .empty {
-      position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+      position: absolute; inset: 0;
       display: grid; place-items: center; padding: 28px; text-align: center; color: var(--muted); line-height: 1.45; pointer-events: none;
     }
-    .stage-card.inspector-open .empty { right: calc(var(--floating-menu-width) + var(--floating-menu-gutter)); }
     .empty strong { display: block; color: var(--text); font-size: 20px; margin-bottom: 8px; }
 
     .timeline-toolbar { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.025); }
@@ -1236,9 +1233,6 @@
       .app.timeline-hidden { grid-template-areas: "left" "center"; }
       .stage-card { --floating-menu-gutter: 24px; }
     }
-    @media (max-width: 900px) {
-      .empty { right: 0; }
-    }
     @media (max-width: 680px) {
       body { padding: 14px; }
       .transport-row { justify-content: start; }
@@ -1287,7 +1281,7 @@
       <div class="app-splash__eyebrow">Made by <a href="https://renderpopstudio.com/" target="_blank" rel="noopener noreferrer">RenderPop Studio</a></div>
       <div class="app-splash__title">Spritesheet Editor</div>
       <div class="app-splash__subtitle">Preparing the sprite editor</div>
-      <div class="app-splash__version">Version 1.6.5</div>
+      <div class="app-splash__version">Version 1.7.0</div>
       <div class="app-splash__road" aria-hidden="true"></div>
     </div>
   </div>
@@ -1296,7 +1290,7 @@
     <section class="card left-panel">
       <div class="brand">
         <img class="brand-logo" src="logo.png" alt="Spritesheet Editor" />
-        <span class="tool-version">v1.6.5</span>
+        <span class="tool-version">v1.7.0</span>
       </div>
       <p class="subtitle">Upload a spritesheet, set its grid, adjust each frame offset, draw removal masks, and export a repacked PNG.</p>
 
@@ -1836,7 +1830,7 @@
             </details>
           </div>
           <div class="group animation-group" id="animationGroup">
-            <p class="group-title"><span>Edit Image</span><span class="group-title-actions"><button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy layers (Ctrl/Cmd+C)" title="Copy selected layers or groups from this frame (Ctrl/Cmd+C)"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button><button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste layers (Ctrl/Cmd+V)" title="Paste layers or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button></span></p>
+            <p class="group-title"><span>Edit Image</span><span class="group-title-actions"><button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy layers" title="Copy selected layers or groups from this frame"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button><button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste into this frame (Ctrl/Cmd+V)" title="Paste copied pixels, layers, or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button></span></p>
             <label class="upload compact" id="animationDropZone">
               <input id="animationFileInput" type="file" accept="image/*,.gif,.webp" multiple />
               <div><strong>Load Sprite</strong><span>Click here or drag image / GIF / WebP file(s)</span></div>
@@ -2160,7 +2154,7 @@
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
         <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick a color with Pencil or Paint Bucket. With other Edit Image tools, pick the topmost visible layer on the canvas. In the layer list, select multiple layers.</span></div>
-        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy / paste layers or groups in the current frame</span></div>
+        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups and paste into the current frame</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
         <div><kbd>Arrows / Shift + Arrows</kbd><span>Move a selection 1 / 10 pixels. Drag inside it to move with the mouse.</span></div>
@@ -2170,7 +2164,7 @@
         <div><kbd>Space</kbd><span>Play/Pause</span></div>
         <div><kbd>Delete</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
         <div><kbd>Backspace</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
-        <div><kbd>Ctrl/Cmd + D</kbd><span>Duplicate selected Compositor clip(s)</span></div>
+        <div><kbd>Ctrl/Cmd + D</kbd><span>Deselect pixels in Edit Image or duplicate selected Compositor clips</span></div>
         <div><kbd>Ctrl/Cmd + Z</kbd><span>Undo</span></div>
         <div><kbd>Ctrl/Cmd + Shift + Z</kbd><span>Redo</span></div>
         <div><kbd>Ctrl/Cmd + Y</kbd><span>Redo</span></div>
@@ -2204,7 +2198,7 @@
           </div>
           <div>
             <strong>Current Release</strong>
-            <span>Version 1.6.5</span>
+            <span>Version 1.7.0</span>
           </div>
         </div>
         <p>Built for animation cleanup, reference matching, palette workflows, bitmap font work, and compositor-driven sprite exports.</p>
@@ -6253,11 +6247,18 @@
       const base = {
         width: shell.width || 0,
         height: Math.max(1, (shell.height || 0) - reservedTop - reservedBottom),
+        reservedTop,
+        reservedBottom,
         centerOffsetX: 0,
         centerOffsetY: (reservedTop - reservedBottom) / 2
       };
       if (!shell.width || isFullscreen || !panels || panels.classList.contains('inspector-hidden')) return base;
-      const panelRect = panels.getBoundingClientRect(), panelLeft = panelRect.left - shell.left;
+      // Use the inspector's layout position so its slide-in animation does not shift the center.
+      const panelHost = panels.offsetParent;
+      const panelX = panelHost
+        ? panelHost.getBoundingClientRect().left + panelHost.clientLeft + panels.offsetLeft
+        : panels.getBoundingClientRect().left;
+      const panelLeft = panelX - shell.left;
       if (panelLeft <= 0 || panelLeft >= shell.width) return base;
       const visibleWidth = clamp(panelLeft, Math.max(1, shell.width * .25), shell.width);
       return { ...base, width: visibleWidth, centerOffsetX: (visibleWidth - shell.width) / 2 };
@@ -6319,6 +6320,7 @@
       const display = canvasDisplaySize(frame);
       const offset = canvasDisplayOffset(visible);
       const shell = els.canvasShell.getBoundingClientRect();
+      els.emptyState.style.inset = `${visible.reservedTop}px ${shell.width - visible.width}px ${visible.reservedBottom}px 0`;
       els.mainCanvas.style.width = `${display.width}px`;
       els.mainCanvas.style.height = `${display.height}px`;
       els.mainCanvas.style.left = `${Math.round((shell.width || 0) / 2 + offset.x - display.width / 2)}px`;
@@ -16729,9 +16731,12 @@
       g.addColorStop(0, '#ff3b30'); g.addColorStop(1 / 6, '#ffcc00'); g.addColorStop(2 / 6, '#34c759'); g.addColorStop(3 / 6, '#5ac8fa'); g.addColorStop(4 / 6, '#007aff'); g.addColorStop(5 / 6, '#af52de'); g.addColorStop(1, '#ff2d55');
       ctx2d.clearRect(0, 0, c.width, c.height);
       ctx2d.fillStyle = g; ctx2d.fillRect(0, 0, c.width, c.height);
-      const x = (colorPicker.h / 360) * c.width;
-      ctx2d.lineWidth = 3; ctx2d.strokeStyle = '#fff'; ctx2d.beginPath(); ctx2d.arc(x, c.height / 2, 7, 0, Math.PI * 2); ctx2d.stroke();
-      ctx2d.lineWidth = 1.5; ctx2d.strokeStyle = 'rgba(0,0,0,.65)'; ctx2d.stroke();
+      const x = clamp((colorPicker.h / 360) * c.width, 2, c.width - 2);
+      ctx2d.beginPath();
+      ctx2d.moveTo(x, 0);
+      ctx2d.lineTo(x, c.height);
+      ctx2d.lineWidth = 4; ctx2d.strokeStyle = 'rgba(0,0,0,.65)'; ctx2d.stroke();
+      ctx2d.lineWidth = 2; ctx2d.strokeStyle = '#fff'; ctx2d.stroke();
     }
     function previewColorPickerTarget() {
       if (!colorPicker.open || colorPicker.pickMode) return;
@@ -19840,7 +19845,10 @@
       }
       ensureArrays();
       const dragTargets = offsetFrameTargets();
-      if (!(state.maskMode && state.brushAction === 'wand') && startAnimationCanvasDrag(e)) return;
+      if (!(state.maskMode && state.brushAction === 'wand') && startAnimationCanvasDrag(e)) {
+        els.canvasShell.focus({ preventScroll: true });
+        return;
+      }
       const dragStartOffset = state.frameOffsets[state.currentFrame] || { x: 0, y: 0 };
       state.dragStartOffsets = dragTargets.map(frame => {
         const offset = state.frameOffsets[frame] || { x: 0, y: 0 };
@@ -20502,7 +20510,10 @@
       setActiveInspectorGroup(null);
       if (els.floatingToolTabs && stageCard) {
         const syncToolbarHeight = () => {
-          stageCard.style.setProperty('--floating-toolbar-height', `${Math.max(44,Math.ceil(els.floatingToolTabs.getBoundingClientRect().height))}px`);
+          const height = `${Math.max(44, Math.ceil(els.floatingToolTabs.getBoundingClientRect().height))}px`;
+          if (stageCard.style.getPropertyValue('--floating-toolbar-height') === height) return;
+          stageCard.style.setProperty('--floating-toolbar-height', height);
+          requestAnimationFrame(updateCanvasZoom);
         };
         new ResizeObserver(syncToolbarHeight).observe(els.floatingToolTabs);
         syncToolbarHeight();
@@ -20540,7 +20551,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.6.5-2"></script>
+  <script src="animation.js?v=1.7.0"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

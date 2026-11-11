@@ -221,6 +221,25 @@ test('Undo restores exact masks before Shift additions, Alt subtractions, moveme
   app.redo();assert.equal(app.validAnimationSelection(),null);assert.equal(app.state.animationTool,'move');
 });
 
+test('Ctrl/Cmd+D clears the pixel selection without changing the active tool', () => {
+  const app = selectionHistoryEditor();
+  const mask = Array.from(selectionDrag(app, [[2, 2], [10, 10]]));
+  let prevented = 0;
+  const press = modifiers => app.handleAnimationKeyDown({key: 'd', preventDefault() { prevented++; }, ...modifiers});
+
+  assert.equal(press({ctrlKey: true, shiftKey: true}), false);
+  assert.equal(press({ctrlKey: true}), true);
+  assert.equal(app.validAnimationSelection(), null);
+  assert.equal(app.state.animationTool, 'rectangle');
+  assert.equal(press({ctrlKey: true, repeat: true}), true);
+  assert.equal(app.state.undoStack.length, 2);
+  app.undo();
+  assert.deepEqual(Array.from(app.animationSelectionRaster().alpha), mask);
+  assert.equal(press({metaKey: true}), true);
+  assert.equal(app.validAnimationSelection(), null);
+  assert.equal(prevented, 3);
+});
+
 test('canceled and unchanged selection drags preserve Undo and Redo history',()=>{
   const app=selectionHistoryEditor();selectionDrag(app,[[2,2],[10,10]]);selectionDrag(app,[[20,20],[25,25]]);app.undo();
   const before=Array.from(app.animationSelectionRaster().alpha),undoCount=app.state.undoStack.length;
@@ -524,8 +543,11 @@ test('Merge does nothing for a single ordinary layer',()=>{
   assert.equal(app.mergeAnimationLayers(),false);assert.equal(history,0);assert.equal(app.state.animationLayers.length,3);
 });
 
-test('New Layer inserts above the selected layer with independent empty cels in every frame', () => {
-  const app=editor();app.createEmptyAnimationLayer();
+test('New Layer keeps the active tool and inserts independent empty cels above the selected layer', () => {
+  const app=editor();
+  app.state.animationTool='pencil';
+  app.createEmptyAnimationLayer();
+  assert.equal(app.state.animationTool,'pencil');
   const id=app.state.activeAnimationLayerId;
   assert.equal(app.state.animationLayers[0].id,id);
   assert.equal(app.state.animationLayers[1].id,'animation-base');

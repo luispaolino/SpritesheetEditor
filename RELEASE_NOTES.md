@@ -1,5 +1,13 @@
 # Release Notes
 
+## v1.7.0 - 2026-11-11
+
+- Copy selected pixels in Edit Image with Ctrl/Cmd+C and paste them into a new layer on the current frame with Ctrl/Cmd+V.
+- Clear the pixel selection with Ctrl/Cmd+D and restore it with Undo.
+- Keep the active tool when creating a new layer in Edit Image.
+- Fixed Delete after a Magic Wand selection and widened the selection tool menu to fit each label on one line.
+- Changed the Pencil Color hue marker to a vertical line.
+
 ## v1.6.5 - 2026-11-09
 
 - Renamed Animation to **Edit Image** and moved its tab next to Transform.

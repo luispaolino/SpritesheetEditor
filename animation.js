@@ -307,7 +307,7 @@ function createEmptyAnimationLayer() {
   layers.splice(Math.max(0,index),0,{id,name,visible:true,base:false,parentId:active?.parentId || ''});
   state.frames.forEach(frame=>{frame.animationCels ||= {};frame.animationCels[id]={canvas:makeMask(),offsetX:0,offsetY:0,flipX:false,flipY:false};});
   state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
-  animationSelection=null;state.animationTool='move';animationChanged();
+  animationSelection=null;animationChanged();
 }
 function captureAnimationCel(layer) {
   const cel = animationCel(layer);
@@ -342,6 +342,21 @@ function copyAnimationLayers() {
       visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),opacity:layer.opacity,cel};
   });
   animationClipboard={records};
+  updateAnimationUi();
+  return true;
+}
+function copyAnimationSelection(layer) {
+  const mask = animationSelectionMask();
+  const cel = mask && animationLayerVisible(layer) && animationCel(layer)
+    ? captureAnimationSelectionCel(layer, mask) : null;
+  if (!cel) {
+    showError('Select some visible pixels on the active layer to copy.');
+    return false;
+  }
+  animationClipboard = { records: [{
+    id: layer.id, name: `${layer.name} selection`, parentId: '', visible: true, opacity: layer.opacity, cel
+  }] };
+  showError('');
   updateAnimationUi();
   return true;
 }
@@ -592,6 +607,11 @@ function commitAnimationSelection(next, previous = animationSelection) {
   if (!same) pushHistory();
   animationSelection = next;
   return !same;
+}
+function clearAnimationSelection() {
+  if (!commitAnimationSelection(null)) return;
+  drawFrame(state.currentFrame);
+  updateAnimationUi();
 }
 function rasterizeAnimationSelection(selection, width, height) {
   if (selection?.subtractFrom || selection?.addTo) {
@@ -1117,28 +1137,34 @@ function animationBakeCel(layer, i) {
   cel.canvas = canvas; cel.offsetX = 0; cel.offsetY = 0; cel.flipX = false; cel.flipY = false;
   delete cel.mask;
 }
+function captureAnimationSelectionCel(layer, mask) {
+  const source = makeMask(), t = source.getContext('2d');
+  if (animationLayerUsesBaseFrame(layer)) drawBaseSprite(t,state.currentFrame,0,0,{applyMask:true});
+  else drawAnimationCel(t,animationCel(layer));
+  t.globalCompositeOperation = 'destination-in'; t.drawImage(mask,0,0); t.globalCompositeOperation = 'source-over';
+  const bounds = canvasAlphaBounds(source, 1);
+  if (!bounds) return null;
+  const { minX, minY, maxX, maxY } = bounds;
+  const cropped = makeMask(maxX - minX + 1, maxY - minY + 1);
+  cropped.getContext('2d').drawImage(source, -minX, -minY);
+  const position = animationCelPosition({ canvas: cropped });
+  return { canvas: cropped, offsetX: minX - position.x, offsetY: minY - position.y, flipX: false, flipY: false };
+}
 function splitAnimationSelection() {
   const layer = activeAnimationLayer(), mask = animationSelectionMask();
   if (!animationLayerVisible(layer) || !mask || !animationCel(layer)) return;
-  const source = makeMask(), t = source.getContext('2d');
-  const base = animationLayerUsesBaseFrame(layer);
-  if (base) drawBaseSprite(t,state.currentFrame,0,0,{applyMask:true});
-  else drawAnimationCel(t,animationCel(layer));
-  t.globalCompositeOperation = 'destination-in'; t.drawImage(mask,0,0); t.globalCompositeOperation = 'source-over';
-  const pixels = t.getImageData(0,0,source.width,source.height); let left=source.width,top=source.height,right=-1,bottom=-1;
-  for (let y=0;y<source.height;y++) for (let x=0;x<source.width;x++) if(pixels.data[(y*source.width+x)*4+3]) {left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);}
-  if (right < left) { showError('Select some visible pixels on the active sprite before splitting.'); return; }
+  const splitCel = captureAnimationSelectionCel(layer, mask);
+  if (!splitCel) { showError('Select some visible pixels on the active sprite before splitting.'); return; }
   pushHistory();
+  const base = animationLayerUsesBaseFrame(layer);
   const target = base ? {canvas:animationBakeBase(state.currentFrame),offsetX:0,offsetY:0,flipX:false,flipY:false} : animationCel(layer);
   const cut = base ? mask : animationLocalMask(mask,target), targetContext = target.canvas.getContext('2d');
   targetContext.save(); targetContext.globalCompositeOperation='destination-out'; targetContext.drawImage(cut,0,0); targetContext.restore();
   if(base) state.frames[state.currentFrame].sourceCanvas = canvasClone(target.canvas);
-  const cropped = makeMask(right-left+1,bottom-top+1); cropped.getContext('2d').drawImage(source,left,top,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
   const id=`animation-${Date.now()}-${Math.random().toString(36).slice(2)}`, layers=ensureAnimationLayers(), index=layers.findIndex(item=>item.id===layer.id);
   const splitLayer = {id,name:`${layer.name} split`,visible:true,base:false,parentId:layer.parentId || '',opacity:layer.opacity};
   layers.splice(index,0,splitLayer);
   const frame=state.frames[state.currentFrame]; frame.animationCels ||= {};
-  const splitCel = {canvas:cropped,offsetX:left-Math.round((state.cageWidth-cropped.width)/2),offsetY:top-Math.round((state.cageHeight-cropped.height)/2),flipX:false,flipY:false};
   frame.animationCels[id] = splitCel;
   if (layer.sharedCel) {
     splitLayer.sharedCel = cloneAnimationCel(splitCel);
@@ -1483,7 +1509,20 @@ function handleAnimationKeyDown(e) {
   if(!animationPanelActive()||e.altKey)return false;
   const key=e.key.toLowerCase();
   if ((e.ctrlKey||e.metaKey) && !e.shiftKey && ['c','v'].includes(key)) {
-    e.preventDefault();if(!e.repeat)(key==='c'?copyAnimationLayers:pasteAnimationLayers)();return true;
+    e.preventDefault();
+    if (e.repeat) return true;
+    if (key === 'v') pasteAnimationLayers();
+    else {
+      const layer = activeAnimationLayer();
+      if (validAnimationSelection() && layer && !layer.group) copyAnimationSelection(layer);
+      else copyAnimationLayers();
+    }
+    return true;
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') {
+    e.preventDefault();
+    if (!e.repeat) clearAnimationSelection();
+    return true;
   }
   if(e.ctrlKey||e.metaKey)return false;
   if(ANIMATION_SELECTION_TOOLS[state.animationTool] && ['Delete','Backspace'].includes(e.key)) {
@@ -1579,7 +1618,7 @@ animationEls.wandSettings.addEventListener('input', () => {
   });
 });
 animationEls.split.addEventListener('click',splitAnimationSelection);
-$('animationClearSelectionButton').addEventListener('click',()=>{commitAnimationSelection(null);drawFrame(state.currentFrame);updateAnimationUi();});
+$('animationClearSelectionButton').addEventListener('click',clearAnimationSelection);
 animationEls.size.addEventListener('input',e=>setAnimationBrushSize(e.target.value));
 animationEls.colors.addEventListener('click',e=>{
   const button=e.target.closest('[data-animation-color]');if(!button)return;const index=Number(button.dataset.animationColor);

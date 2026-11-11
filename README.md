@@ -160,6 +160,11 @@ https://github.com/luispaolino/SpritesheetEditor/
 
 For the full release history, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
+### v1.7.0 - 2026-11-11
+
+- Copy selected pixels in **Edit Image** and paste them as a new layer. Ctrl/Cmd+D clears the pixel selection.
+- New layers keep the active tool, and Delete works after selecting pixels with Magic Wand.
+
 ### v1.6.5 - 2026-11-09
 
 - Combined the image-editing controls in **Edit Image**, immediately after Transform. Edit Colors, Outline, and Pixel Grid sit above the indexed layer PNG export.
