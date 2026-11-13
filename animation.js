@@ -2,6 +2,8 @@
 // so timeline duplication, deletion, and reordering keep artwork with its frame.
 const ANIMATION_BASE_ID = 'animation-base';
 const ANIMATION_GRID_PADDING = 'animation-grid-padding';
+const ANIMATION_BRUSH_MAX_SIZE = 50;
+const ANIMATION_BLANK_SIZE = 256;
 const ANIMATION_SELECTION_TOOLS = {
   lasso: { label: 'Lasso selection (L)', icon: 'selection-lasso.svg' },
   rectangle: { label: 'Rectangle selection (R)', icon: 'selection-rectangle.svg' },
@@ -70,7 +72,7 @@ function setAnimationBrushSize(value) {
     return;
   }
   if (animationStroke?.points?.length) paintAnimationStroke(animationStroke);
-  state.animationBrushSize = clamp(Math.round(Number(value) || 1),1,120);
+  state.animationBrushSize = clamp(Math.round(Number(value) || 1), 1, ANIMATION_BRUSH_MAX_SIZE);
   animationEls.size.value = state.animationBrushSize;
   animationEls.sizeValue.textContent = state.animationBrushSize;
   renderBrushCursorOverlay();
@@ -299,9 +301,33 @@ function uniqueAnimationName(prefix) {
   while (names.has(`${prefix} ${n}`)) n++;
   return `${prefix} ${n}`;
 }
+function initializeAnimationCanvas(canvas, name, withBaseLayer) {
+  state.frames = [{ kind: 'image', id: newAnimationId('frame'), name, canvas, sourceCanvas: canvasClone(canvas) }];
+  state.imageName = name;
+  state.sheetImage = null;
+  state.sheetImages = [];
+  state.frameOffsets = []; state.frameMasks = []; state.maskDirty = []; state.indexedFrames = [];
+  state.frameScales = []; state.frameFlips = []; state.frameFlipYs = [];
+  state.scaleX = 1; state.scaleY = 1; state.offsetXAll = 0; state.offsetYAll = 0;
+  state.cageCustom = false; state.currentFrame = 0; state.selectedFrameIndices = [0]; state.selectionAnchorFrame = 0;
+  state.pivotX = defaultPivotX(canvas.width);
+  state.pivotY = canvas.height;
+  state.animationLayers = withBaseLayer ? [{ id: ANIMATION_BASE_ID, name, visible: true, base: true }] : [];
+  state.activeAnimationLayerId = withBaseLayer ? ANIMATION_BASE_ID : '';
+  state.selectedAnimationLayerIds = withBaseLayer ? [ANIMATION_BASE_ID] : [];
+  state.animationSelectionAnchorId = state.activeAnimationLayerId;
+  animationSelection = null;
+  autoFitGridToFrameCount();
+  updateMetrics();
+}
 function createEmptyAnimationLayer() {
-  if (!hasFrames()) return;
   pause(); pushHistory();
+  if (!hasFrames()) {
+    initializeAnimationCanvas(makeMask(ANIMATION_BLANK_SIZE, ANIMATION_BLANK_SIZE), 'Layer 1', true);
+    markFrameBitmapsDirty();
+    syncAfterDataChange(true, { deferHiddenPalette: true });
+    return;
+  }
   const layers=ensureAnimationLayers(), active=activeAnimationLayer(), id=newAnimationId(), name=uniqueAnimationName('Layer');
   const index=active ? layers.findIndex(layer=>layer.id===active.id) : 0;
   layers.splice(Math.max(0,index),0,{id,name,visible:true,base:false,parentId:active?.parentId || ''});
@@ -341,7 +367,7 @@ function copyAnimationLayers() {
       parentId:rootIds.has(layer.id)?'':layer.parentId,
       visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),opacity:layer.opacity,cel};
   });
-  animationClipboard={records};
+  animationClipboard={records, width: state.cageWidth, height: state.cageHeight};
   updateAnimationUi();
   return true;
 }
@@ -353,21 +379,23 @@ function copyAnimationSelection(layer) {
     showError('Select some visible pixels on the active layer to copy.');
     return false;
   }
-  animationClipboard = { records: [{
+  animationClipboard = { width: state.cageWidth, height: state.cageHeight, records: [{
     id: layer.id, name: `${layer.name} selection`, parentId: '', visible: true, opacity: layer.opacity, cel
   }] };
   showError('');
   updateAnimationUi();
   return true;
 }
-function pasteAnimationLayers() {
-  if (!hasFrames() || !animationClipboard?.records.length) return false;
+function pasteAnimationLayers(clipboard = animationClipboard) {
+  if (!clipboard?.records.length) return false;
   pause();pushHistory();
+  const firstFrame = !hasFrames();
+  if (firstFrame) initializeAnimationCanvas(makeMask(clipboard.width, clipboard.height), clipboard.records[0].name, false);
   const layers=ensureAnimationLayers(), active=activeAnimationLayer(), frame=state.frames[state.currentFrame];
-  const ids=new Map(animationClipboard.records.map(record=>[record.id,newAnimationId(record.group?'group':'layer')]));
+  const ids=new Map(clipboard.records.map(record=>[record.id,newAnimationId(record.group?'group':'layer')]));
   const names=new Set(layers.map(layer=>layer.name)), roots=[];
   frame.animationCels ||= {};frame.animationVisibility ||= {};
-  const copies=animationClipboard.records.map(record=>{
+  const copies=clipboard.records.map(record=>{
     const id=ids.get(record.id);let name=record.name;
     if (names.has(name)) { const prefix=`${name} copy`;name=prefix;let n=2;while(names.has(name))name=`${prefix} ${n++}`; }
     names.add(name);
@@ -381,8 +409,33 @@ function pasteAnimationLayers() {
   layers.splice(Math.max(0,index),0,...copies);
   state.animationLayers=cloneAnimationLayers(layers);
   state.activeAnimationLayerId=roots[0];state.selectedAnimationLayerIds=roots;state.animationSelectionAnchorId=roots[0];
-  animationSelection=null;state.animationTool='move';animationChanged();
+  animationSelection=null;state.animationTool='move';
+  if (firstFrame) {
+    markFrameBitmapsDirty();
+    syncAfterDataChange(true, { deferHiddenPalette: true });
+  } else animationChanged();
   return true;
+}
+function animationClipboardEventAllowed(event) {
+  const target = event.target;
+  return !event.defaultPrevented && animationPanelActive()
+    && !target?.closest?.('input, textarea, select') && !target?.isContentEditable
+    && !document.querySelector('.modal-backdrop.show');
+}
+async function pasteAnimationImage(file) {
+  const frames = state.frames;
+  const destination = frames[state.currentFrame];
+  try {
+    const canvas = makeFrameCanvas(await loadImage(file));
+    if (state.frames !== frames || state.frames[state.currentFrame] !== destination) return;
+    showError('');
+    const name = uniqueAnimationName('Pasted Image');
+    pasteAnimationLayers({ width: canvas.width, height: canvas.height, records: [{
+      id: newAnimationId(), name, visible: true, cel: { canvas, offsetX: 0, offsetY: 0 }
+    }] });
+  } catch (error) {
+    showError(error?.message || 'Could not paste that image.');
+  }
 }
 function createAnimationGroup() {
   const layers=animationLayerList(), selected=new Set(selectedAnimationLayerIds());
@@ -846,8 +899,7 @@ function moveAnimationLayer(id, targetId, after, intoGroup = false) {
 function updateAnimationUi(force = false) {
   const layers = animationLayerList(), active = activeAnimationLayer(), visibleLayers=animationVisibleLayers(), selectedIds=new Set(selectedAnimationLayerIds());
   animationEls.copy.disabled=!hasFrames() || !selectedIds.size;
-  animationEls.paste.disabled=!hasFrames() || !animationClipboard?.records.length;
-  animationEls.newLayer.disabled=!hasFrames();
+  animationEls.paste.disabled=!animationClipboard?.records.length;
   animationEls.newGroup.disabled=!hasFrames() || !selectedIds.size;
   animationEls.merge.disabled=!hasFrames() || (selectedIds.size<2 && !layers.some(layer=>selectedIds.has(layer.id) && layer.group));
   animationEls.exportLayer.disabled = !hasFrames() || !animationLayerVisible(active);
@@ -880,6 +932,7 @@ function updateAnimationUi(force = false) {
   });
   animationEls.sizeField.hidden = !['pencil', 'eraser', 'brush'].includes(tool);
   const size = builder ? state.brushSize : state.animationBrushSize || 1;
+  animationEls.size.max = builder ? 120 : ANIMATION_BRUSH_MAX_SIZE;
   animationEls.size.value = size;
   animationEls.sizeValue.textContent = size;
   animationEls.wandSettings.hidden = tool !== 'wand';
@@ -1626,14 +1679,8 @@ function handleAnimationKeyDown(e) {
   if(!animationPanelActive()||e.altKey)return false;
   const key=e.key.toLowerCase();
   if ((e.ctrlKey||e.metaKey) && !e.shiftKey && ['c','v'].includes(key)) {
-    e.preventDefault();
-    if (e.repeat) return true;
-    if (key === 'v') pasteAnimationLayers();
-    else {
-      const layer = activeAnimationLayer();
-      if (validAnimationSelection() && layer && !layer.group) copyAnimationSelection(layer);
-      else copyAnimationLayers();
-    }
+    if (e.repeat) e.preventDefault();
+    // The browser's clipboard events carry the copied or pasted data.
     return true;
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') {
@@ -1641,8 +1688,22 @@ function handleAnimationKeyDown(e) {
     if (!e.repeat) clearAnimationSelection();
     return true;
   }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'a') {
+    e.preventDefault();
+    const frame = state.frames[state.currentFrame];
+    if (!frame || e.repeat || state.dragging) return true;
+    const { cageWidth, cageHeight } = state;
+    if (commitAnimationSelection({
+      kind: 'rectangle', frameId: frame.id,
+      points: [{ x: 0, y: 0 }, { x: cageWidth, y: cageHeight }]
+    })) {
+      drawFrame(state.currentFrame);
+      updateAnimationUi();
+    }
+    return true;
+  }
   if(e.ctrlKey||e.metaKey)return false;
-  if(ANIMATION_SELECTION_TOOLS[state.animationTool] && ['Delete','Backspace'].includes(e.key)) {
+  if(['Delete','Backspace'].includes(e.key) && (validAnimationSelection() || ANIMATION_SELECTION_TOOLS[state.animationTool])) {
     e.preventDefault();if(!e.repeat)eraseAnimationSelection();return true;
   }
   if(validAnimationSelection() && ANIMATION_SELECTION_TOOLS[state.animationTool] && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
@@ -1673,7 +1734,22 @@ animationEls.newGroup.addEventListener('click',createAnimationGroup);
 animationEls.merge.addEventListener('click',mergeAnimationLayers);
 animationEls.exportLayer.addEventListener('click', exportAnimationLayerPng);
 animationEls.copy.addEventListener('click',copyAnimationLayers);
-animationEls.paste.addEventListener('click',pasteAnimationLayers);
+animationEls.paste.addEventListener('click', () => pasteAnimationLayers());
+document.addEventListener('copy', event => {
+  if (!event.clipboardData || !animationClipboardEventAllowed(event) || !hasFrames()) return;
+  event.preventDefault();
+  const layer = activeAnimationLayer();
+  const copied = validAnimationSelection() && layer && !layer.group ? copyAnimationSelection(layer) : copyAnimationLayers();
+  if (copied) event.clipboardData.setData('application/x-spritesheet-editor', 'layers');
+});
+document.addEventListener('paste', event => {
+  if (!event.clipboardData || !animationClipboardEventAllowed(event)) return;
+  event.preventDefault();
+  const image = [...event.clipboardData.files].find(file => file.type.startsWith('image/'))
+    || [...event.clipboardData.items].find(item => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile();
+  if (image) void pasteAnimationImage(image);
+  else pasteAnimationLayers();
+});
 ['dragenter','dragover'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.add('dragover');}));
 ['dragleave','drop'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.remove('dragover');}));
 animationEls.drop.addEventListener('drop',e=>loadAnimationSprites(e.dataTransfer.files));

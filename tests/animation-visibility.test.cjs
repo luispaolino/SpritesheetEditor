@@ -6,9 +6,11 @@ const { test } = require('node:test');
 
 function editor() {
   const element = { hidden: true, addEventListener() {}, setAttribute() {}, querySelectorAll() { return []; }, classList: { contains() { return false; } } };
+  const documentListeners = {};
   const context = {
     state: { frames: [{ id: 'frame-a', canvas: {width:64,height:64} }, { id: 'frame-b', canvas: {width:64,height:64} }], currentFrame: 0, imageName: 'Imported sheet', cageWidth:64,cageHeight:64,frameOffsets:[{x:0,y:0},{x:0,y:0}],frameFlips:[false,false],frameFlipYs:[false,false] },
-    $() { return element; }, document: { addEventListener() {} },
+    $() { return element; }, documentListeners,
+    document: { addEventListener(type, listener) { documentListeners[type] = listener; }, querySelector() { return null; } },
     sheetBaseName(name) { return name; },
     pause() {}, pushHistory() {}, markFrameBitmapsDirty() {}, buildFilmstrip() {}, drawFrame() {}, updateInfo() {},
     makeMask(width=64,height=64) { return { width,height,getContext() { return {}; } }; }, drawBaseSprite() {},
@@ -79,27 +81,31 @@ test('pasting above a grouped child keeps the new subtree inside the destination
   const ids=Array.from(app.state.animationLayers,layer=>layer.id);assert.equal(ids.indexOf(copy.id),ids.indexOf('b')-1);
 });
 
-test('copy and paste keyboard shortcuts respect modifiers and do not repeat pastes while held',()=>{
+test('copy and paste keyboard shortcuts allow clipboard events and suppress held keys',()=>{
   const app=clipboardEditor();app.animationPanelActive=()=>true;let prevented=0;
   const press=(key,options={})=>app.handleAnimationKeyDown({key,preventDefault(){prevented++;},...options});
-  assert.equal(press('c',{ctrlKey:true}),true);press('v',{metaKey:true});
-  const count=app.state.animationLayers.length;press('v',{ctrlKey:true,repeat:true});
-  assert.equal(app.state.animationLayers.length,count);assert.equal(prevented,3);
+  assert.equal(press('c',{ctrlKey:true}),true);
+  assert.equal(press('v',{metaKey:true}),true);
+  assert.equal(prevented,0);
+  assert.equal(press('v',{ctrlKey:true,repeat:true}),true);
+  assert.equal(prevented,1);
   assert.equal(press('v',{ctrlKey:true,altKey:true}),false);
 });
 
-test('the document keyboard handler routes Animation copy/paste and preserves text-field shortcuts',()=>{
-  const app=clipboardEditor(), modal={classList:{contains(){return false;}}};
-  app.animationPanelActive=()=>true;app.colorPicker={pickMode:false};app.els=new Proxy({}, {get(){return modal;}});
-  app.document.activeElement={tagName:'BUTTON'};app.document.addEventListener=(_type,handler)=>{app.keydown=handler;};
-  app.canvasContentAvailable=()=>true;app.spriteSheetBuilderPreviewHovered=()=>false;app.spriteSheetBuilderTimelineAvailable=()=>false;
-  app.selectSpriteSheetBuilderFrameFromNumberKey=()=>false;
-  const html=fs.readFileSync(path.join(__dirname,'..','SpritesheetEditor.html'),'utf8'),start=html.indexOf("    document.addEventListener('keydown', e => {"),end=html.indexOf("    document.addEventListener('keyup', e => {",start);
-  vm.runInContext(html.slice(start,end),app);
-  const press=key=>app.keydown({key,ctrlKey:true,preventDefault(){}});
-  press('c');press('v');assert.equal(app.state.animationLayers.length,4);
-  app.document.activeElement={tagName:'INPUT'};press('v');assert.equal(app.state.animationLayers.length,4);
-  app.document.activeElement={tagName:'TEXTAREA'};press('c');press('v');assert.equal(app.state.animationLayers.length,4);
+test('clipboard events paste layers and leave input clipboard events available for text',()=>{
+  const app=clipboardEditor();
+  app.animationPanelActive=()=>true;
+  const clipboardData={ files: [], items: [], setData() {} };
+  let prevented=0;
+  const dispatch=(type,target)=>app.documentListeners[type]({ clipboardData, target, preventDefault(){ prevented++; } });
+  dispatch('copy',{});
+  dispatch('paste',{});
+  assert.equal(app.state.animationLayers.length,4);
+  const input={ closest(){ return this; } };
+  dispatch('copy',input);
+  dispatch('paste',input);
+  assert.equal(app.state.animationLayers.length,4);
+  assert.equal(prevented,2);
 });
 
 test('paste without copied artwork has no history or document changes',()=>{
@@ -219,6 +225,41 @@ test('Undo restores exact masks before Shift additions, Alt subtractions, moveme
   app.undo();assert.equal(app.validAnimationSelection(),null);
   for(const mask of masks.reverse()) {app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);}
   app.redo();assert.equal(app.validAnimationSelection(),null);assert.equal(app.state.animationTool,'move');
+});
+
+test('Ctrl/Cmd+A selects the full cage, keeps the active tool, and supports Undo', () => {
+  const app = selectionHistoryEditor('pencil');
+  const modal = { classList: { contains() { return false; } } };
+  app.colorPicker = { pickMode: false };
+  app.els = new Proxy({}, { get() { return modal; } });
+  app.canvasContentAvailable = () => true;
+  app.spriteSheetBuilderPreviewHovered = () => false;
+  app.spriteSheetBuilderTimelineAvailable = () => false;
+  app.selectSpriteSheetBuilderFrameFromNumberKey = () => false;
+  app.document.addEventListener = (_type, handler) => { app.keydown = handler; };
+  const html = fs.readFileSync(path.join(__dirname, '..', 'SpritesheetEditor.html'), 'utf8');
+  const start = html.indexOf("    document.addEventListener('keydown', e => {");
+  vm.runInContext(html.slice(start, html.indexOf("    document.addEventListener('keyup', e => {", start)), app);
+  let prevented = 0;
+  const press = (tagName, modifiers) => {
+    app.document.activeElement = { tagName };
+    app.keydown({ key: 'a', preventDefault() { prevented++; }, ...modifiers });
+  };
+
+  press('INPUT', { ctrlKey: true });
+  assert.equal(prevented, 0);
+  assert.equal(app.validAnimationSelection(), null);
+  press('CANVAS', { ctrlKey: true });
+  assert.equal(prevented, 1);
+  assert.equal(app.state.animationTool, 'pencil');
+  const { alpha } = app.animationSelectionRaster();
+  assert.equal(alpha.length, 64 * 64);
+  assert.ok(alpha.every(value => value === 255));
+  press('CANVAS', { metaKey: true });
+  assert.equal(prevented, 2);
+  assert.equal(app.state.undoStack.length, 1);
+  app.undo();
+  assert.equal(app.validAnimationSelection(), null);
 });
 
 test('Ctrl/Cmd+D clears the pixel selection without changing the active tool', () => {
@@ -466,8 +507,8 @@ test('Shift + Wheel sizes either Edit Image brush without zooming or changing th
     assert.equal(app.state.animationBrushSize, 15);
     assert.equal(app.state.brushSize, 30);
     assert.equal(app.state.zoom, 3);
-    app.state.animationBrushSize = 120; app.scroll(-100);
-    assert.equal(app.state.animationBrushSize, 120);
+    app.state.animationBrushSize = 50; app.scroll(-100);
+    assert.equal(app.state.animationBrushSize, 50);
     app.state.animationBrushSize = 1; app.scroll(100);
     assert.equal(app.state.animationBrushSize, 1);
   }

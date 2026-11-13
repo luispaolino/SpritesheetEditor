@@ -1860,7 +1860,7 @@
             </div>
             <div class="field" id="animationBrushSizeField" hidden>
               <div class="line"><label for="animationBrushSizeInput">Pencil / Eraser Size</label><span class="value-pill"><span id="animationBrushSizeValue">1</span> px</span></div>
-              <input id="animationBrushSizeInput" type="range" min="1" max="120" step="1" value="1" />
+              <input id="animationBrushSizeInput" type="range" min="1" max="50" step="1" value="1" />
             </div>
             <div class="animation-selection-actions" id="animationSelectionActions" hidden><button id="animationClearSelectionButton" class="secondary small-button" type="button">Clear Selection</button></div>
             <div id="animationLayerList" class="reference-layer-list" aria-label="Sprite layers"></div>
@@ -2154,11 +2154,12 @@
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
         <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick a color with Pencil or Paint Bucket. With other Edit Image tools, pick the topmost visible layer on the canvas. In the layer list, select multiple layers.</span></div>
-        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups and paste into the current frame</span></div>
+        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups. Paste copied artwork or a clipboard image in Edit Image.</span></div>
+        <div><kbd>Ctrl/Cmd + A</kbd><span>Select the full canvas in Edit Image</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
         <div><kbd>Arrows / Shift + Arrows</kbd><span>Move the selection outline 1 / 10 pixels with a selection tool. With Move (M), drag inside the selection to move its pixels.</span></div>
-        <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active layer while using Lasso, Rectangle, or Magic Wand</span></div>
+        <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active Edit Image layer</span></div>
         <div><kbd>F2</kbd><span>Rename the selected layer or group</span></div>
         <div><kbd>Shift + Arrows</kbd><span>Move the current frame, active layer, or selected Compositor clips</span></div>
         <div><kbd>Space</kbd><span>Play/Pause</span></div>
@@ -13135,7 +13136,7 @@
         state.activeAnimationLayerId = s.activeAnimationLayerId || "";
         state.selectedAnimationLayerIds=[...(s.selectedAnimationLayerIds || [state.activeAnimationLayerId].filter(Boolean))];
         state.animationSelectionAnchorId=state.activeAnimationLayerId;
-        state.animationBrushSize = clamp(Number(s.animationBrushSize) || 1, 1, 120);
+        state.animationBrushSize = clamp(Math.round(Number(s.animationBrushSize) || 1), 1, ANIMATION_BRUSH_MAX_SIZE);
         state.animationWandSettings = animationWandSettings(s.animationWandSettings || {});
         resetAnimationTools();
         state.spriteSheetBuilderRows = [];
@@ -20553,7 +20554,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-2"></script>
+  <script src="animation.js?v=1.7.0-4"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

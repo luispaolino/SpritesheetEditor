@@ -7,6 +7,10 @@
 - Keep the active tool when creating a new layer in Edit Image.
 - Fixed Delete after a Magic Wand selection and widened the selection tool menu to fit each label on one line.
 - Changed the Pencil Color hue marker to a vertical line.
+- Paste a clipboard image as a layer, even in an empty project. New Layer can also start an empty project with a transparent 256 × 256 px canvas.
+- Ctrl/Cmd+A selects the full canvas in Edit Image. The Pencil and Eraser support sizes up to 50 px.
+- The Move tool can drag selected pixels independently of the rest of the sprite.
+- The Skip frames slider works with GIF and WebP animations.
 
 ## v1.6.5 - 2026-11-09
 
