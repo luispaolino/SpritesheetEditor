@@ -1256,9 +1256,8 @@ function drawAnimationPixelMove(context, move, left = 0, top = 0) {
   if (transformed) context.drawImage(transformed.canvas, transformed.left - left, transformed.top - top);
   else context.drawImage(cut, minX, minY, width, height, x + minX + dx, y + minY + dy, width, height);
 }
-function updateAnimationPixelMove(stroke, e) {
+function updateAnimationPixelMove(stroke, { dx, dy }) {
   const move = stroke.pixelMove;
-  const { dx, dy } = pointerDelta(e, stroke.startX, stroke.startY);
   const x = clamp(Math.round(dx), -state.cageWidth, state.cageWidth);
   const y = clamp(Math.round(dy), -state.cageHeight, state.cageHeight);
   if (move.dx === x && move.dy === y) return false;
@@ -1304,6 +1303,18 @@ function commitAnimationPixelMove(stroke) {
   if (!layer.sharedCel) state.indexedFrames[move.frame] = null;
   markFrameBitmapsDirty();
   if (layer.sharedCel || !updateFrameThumb(move.frame)) buildFilmstrip();
+}
+function nudgeAnimationSelectedPixels(dx, dy) {
+  const layer = activeAnimationLayer();
+  if (state.dragging || layer?.group || !animationLayerVisible(layer) || !animationCel(layer)) return;
+  const pixelMove = prepareAnimationPixelMove(layer);
+  if (!pixelMove) return;
+  const stroke = { pixelMove, previousSelection: animationSelection };
+  pause(false, { updateInfo: false });
+  if (!updateAnimationPixelMove(stroke, { dx, dy })) return;
+  commitAnimationPixelMove(stroke);
+  drawFrame(state.currentFrame);
+  updateInfo({ deferHiddenPalette: true });
 }
 function animationTransformSource(canvas, bounds, x = 0, y = 0) {
   const { minX, minY, maxX, maxY } = bounds;
@@ -1850,7 +1861,7 @@ function queueAnimationPaintPreview(stroke,e) {
 function moveAnimationCanvasDrag(e) {
   const stroke=animationStroke;if(!stroke)return;
   if (stroke.pixelMove) {
-    if (updateAnimationPixelMove(stroke, e)) {
+    if (updateAnimationPixelMove(stroke, pointerDelta(e, stroke.startX, stroke.startY))) {
       const move = stroke.pixelMove;
       drawFrame(state.currentFrame, { fast: true, skipThumb: true, animationPixelMove: move.dx || move.dy ? move : null });
     }
@@ -1895,7 +1906,7 @@ function finishAnimationCanvasDrag(e) {
   if (stroke?.pixelMove) {
     if (e.type === 'pointercancel') animationSelection = stroke.previousSelection;
     else {
-      updateAnimationPixelMove(stroke, e);
+      updateAnimationPixelMove(stroke, pointerDelta(e, stroke.startX, stroke.startY));
       commitAnimationPixelMove(stroke);
     }
     drawFrame(state.currentFrame);
@@ -1973,9 +1984,13 @@ function handleAnimationKeyDown(e) {
   if(['Delete','Backspace'].includes(e.key) && (validAnimationSelection() || ANIMATION_SELECTION_TOOLS[state.animationTool])) {
     e.preventDefault();if(!e.repeat)eraseAnimationSelection();return true;
   }
-  if(validAnimationSelection() && ANIMATION_SELECTION_TOOLS[state.animationTool] && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
-    e.preventDefault();const distance=e.shiftKey?10:1;
-    moveAnimationSelection(e.key==='ArrowLeft'?-distance:e.key==='ArrowRight'?distance:0,e.key==='ArrowUp'?-distance:e.key==='ArrowDown'?distance:0);return true;
+  const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (direction && validAnimationSelection() && (e.shiftKey || ANIMATION_SELECTION_TOOLS[state.animationTool])) {
+    e.preventDefault();
+    const [dx, dy] = direction;
+    if (e.shiftKey) nudgeAnimationSelectedPixels(dx * 10, dy * 10);
+    else moveAnimationSelection(dx, dy);
+    return true;
   }
   if(e.key==='F2'){e.preventDefault();beginAnimationLayerRename(activeAnimationLayer()?.id);return true;}
   if (e.key === 'Escape' && animationStroke?.pixelMove) {

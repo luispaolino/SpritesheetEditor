@@ -2165,6 +2165,7 @@
         <div><kbd>W</kbd><span>Magic Wand tool</span></div>
         <div><kbd>D</kbd><span>Dropper tool</span></div>
         <div><kbd>H</kbd><span>Hide Mask on/off</span></div>
+        <div><kbd>Ctrl + H</kbd><span>Show or hide the cage and rulers together</span></div>
         <div><kbd>F</kbd><span>Reset view, or fit the Compositor timeline when hovering it</span></div>
         <div><kbd>Mouse Wheel</kbd><span>Zoom preview canvas</span></div>
         <div><kbd>Shift + Wheel</kbd><span>Adjust active brush, pencil, or eraser size</span></div>
@@ -2176,10 +2177,10 @@
         <div><kbd>R / S</kbd><span>Rotate / Scale the selection or active layer in Edit Image. Drag to preview, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
-        <div><kbd>Arrows / Shift + Arrows</kbd><span>Move the selection outline 1 / 10 pixels with a selection tool. With Move (M), drag inside the selection to move its pixels.</span></div>
+        <div><kbd>Arrows / Shift + Arrows</kbd><span>Arrows move the outline 1 pixel with a selection tool. Shift + Arrows move the selected pixels 10 pixels in Edit Image.</span></div>
         <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active Edit Image layer</span></div>
         <div><kbd>F2</kbd><span>Rename the selected layer or group</span></div>
-        <div><kbd>Shift + Arrows</kbd><span>Move the current frame, active layer, or selected Compositor clips</span></div>
+        <div><kbd>Shift + Arrows</kbd><span>Move the current frame, selected Compositor clips, or active Edit Image layer when no pixels are selected</span></div>
         <div><kbd>Space</kbd><span>Play/Pause</span></div>
         <div><kbd>Delete</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
         <div><kbd>Backspace</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
@@ -15950,6 +15951,13 @@
       state.showCageOverlay = state.showCageOverlay === false; if (hasFrames()) drawFrame(state.currentFrame); updateInfo();
     }
     function toggleRulerVisibility() { state.showRulerOverlay = state.showRulerOverlay === false; if (hasFrames()) drawFrame(state.currentFrame); updateInfo(); }
+    function toggleCageAndRulerVisibility() {
+      const show = state.showCageOverlay === false && state.showRulerOverlay === false;
+      state.showCageOverlay = show;
+      state.showRulerOverlay = show;
+      drawFrame(state.currentFrame);
+      updateInfo();
+    }
     function togglePivotVisibility() { state.showPivotOverlay = !state.showPivotOverlay; if (spriteSheetBuilderPanelActive()) syncSpriteSheetBuilderCanvasPreview(); else if (hasFrames()) drawFrame(state.currentFrame); updateInfo(); }
     function nextRulerValue(values, max) { const center=Math.round(max/2), step=Math.max(4,Math.round(max/20)); for(let i=0;i<=values.length;i++){const offset=i===0?0:Math.ceil(i/2)*step*(i%2?-1:1), v=clamp(center+offset,0,max); if(!values.some(n=>Math.abs(n-v)<2))return v} return center; }
     function addRuler(kind) { if (!hasFrames()) return; pushHistory(); if (kind === 'v') state.rulersV.push(nextRulerValue(state.rulersV,Math.max(0,state.cageWidth-guideThickness()))); else state.rulersH.push(nextRulerValue(state.rulersH,Math.max(0,state.cageHeight-guideThickness()))); drawFrame(state.currentFrame); updateInfo(); }
@@ -20205,6 +20213,12 @@
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
       const active = document.activeElement, typing = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
+      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && k === 'h'
+        && (hasFrames() || state.referenceCompositorVisible) && !spriteSheetBuilderPanelActive()) {
+        e.preventDefault();
+        if (!e.repeat) toggleCageAndRulerVisibility();
+        return;
+      }
       if (handleAnimationTransformKeyDown(e, typing)) return;
       if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space') {
         e.preventDefault();
@@ -20585,7 +20599,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-7"></script>
+  <script src="animation.js?v=1.7.0-8"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

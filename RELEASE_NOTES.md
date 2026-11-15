@@ -14,6 +14,8 @@
 - Hold Move to choose Move, Rotate (R), or Scale (S). Rotate and Scale preview the transformation without antialiasing. Alt-click sets the pivot, and Enter applies the change.
 - The transform pivot appears above the sprite in the cage color. Ctrl/Cmd+D cancels a pending transform and clears the selection.
 - Selection and transform menu items highlight yellow on hover. Shift+R selects Rectangle.
+- Shift+Arrow moves selected pixels and their outline by 10 pixels in Edit Image.
+- Ctrl+H toggles the cage and rulers together.
 
 ## v1.6.5 - 2026-11-09
 

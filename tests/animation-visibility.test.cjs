@@ -196,16 +196,28 @@ test('Shift and Alt drags inside a selection change its area instead of moving i
   alpha=selectionDrag(app,[[3,3],[5,5]],{altKey:true});assert.equal(alpha.filter(value=>value).length,80);assert.equal(alpha[3*64+3],0);
 });
 
-test('selection arrows move only the outline, use Shift for 10 pixels, and retain off-canvas pixels',()=>{
+test('plain selection arrows move only the outline and retain off-canvas selections',()=>{
   const app=selectionEditor();selectionDrag(app,[[2,2],[5,5]]);let history=0;app.pushHistory=()=>history++;
   const canvas=app.state.frames[0].canvas,offset=app.state.frameOffsets[0];
   app.handleAnimationKeyDown({key:'ArrowRight',preventDefault(){}});
   assert.equal(app.animationSelectionRaster().alpha[2*64+3],255);assert.equal(app.state.currentFrame,0);
-  app.handleAnimationKeyDown({key:'ArrowDown',shiftKey:true,preventDefault(){}});
-  assert.equal(app.animationSelectionRaster().alpha[12*64+3],255);
+  app.handleAnimationKeyDown({key:'ArrowDown',preventDefault(){}});
+  assert.equal(app.animationSelectionRaster().alpha[3*64+3],255);
   app.moveAnimationSelection(-100,0);assert.equal(app.animationSelectionRaster().alpha.some(value=>value),false);
   app.moveAnimationSelection(100,0);assert.equal(app.animationSelectionRaster().alpha.filter(value=>value).length,9);
   assert.equal(app.state.frames[0].canvas,canvas);assert.equal(app.state.frameOffsets[0],offset);assert.equal(history,4);
+});
+
+test('Shift+Arrows nudge the selected pixels by 10 pixels across Edit Image tools', () => {
+  const app = selectionEditor();
+  selectionDrag(app, [[2, 2], [5, 5]]);
+  const moves = [];
+  app.nudgeAnimationSelectedPixels = (dx, dy) => moves.push([dx, dy]);
+  for (const [tool, key] of [['rectangle', 'ArrowRight'], ['move', 'ArrowDown'], ['pencil', 'ArrowLeft']]) {
+    app.state.animationTool = tool;
+    assert.equal(app.handleAnimationKeyDown({ key, shiftKey: true, preventDefault() {} }), true);
+  }
+  assert.deepEqual(moves, [[10, 0], [0, 10], [-10, 0]]);
 });
 
 function selectionHistoryEditor(tool='rectangle') {
