@@ -6,13 +6,19 @@ const ANIMATION_BRUSH_MAX_SIZE = 50;
 const ANIMATION_BLANK_SIZE = 256;
 const ANIMATION_SELECTION_TOOLS = {
   lasso: { label: 'Lasso selection (L)', icon: 'selection-lasso.svg' },
-  rectangle: { label: 'Rectangle selection (R)', icon: 'selection-rectangle.svg' },
+  rectangle: { label: 'Rectangle selection (Shift+R)', icon: 'selection-rectangle.svg' },
   wand: { label: 'Magic Wand (W)', icon: 'wand.svg' }
+};
+const ANIMATION_TRANSFORM_TOOLS = {
+  move: { label: 'Move sprite (M)', icon: 'move.svg' },
+  rotate: { label: 'Rotate (R)', icon: 'cursor-rotate.svg?v=2' },
+  scale: { label: 'Scale (S)', icon: 'scale.svg' }
 };
 const animationEls = {
   group: $('animationGroup'), input: $('animationFileInput'), drop: $('animationDropZone'),
   list: $('animationLayerList'), split: $('animationSplitButton'), colors: $('animationColorStrip'),
   size: $('animationBrushSizeInput'), sizeValue: $('animationBrushSizeValue'), sizeField: $('animationBrushSizeField'),
+  moveButton: $('animationMoveButton'), moveMenu: $('animationMoveToolMenu'),
   selectionButton: $('animationSelectionToolButton'), selectionMenu: $('animationSelectionToolMenu'),
   wandSettings: $('animationWandSettings'), wandAntialias: $('animationWandAntialias'),
   wandContiguous: $('animationWandContiguous'), wandTolerance: $('animationWandTolerance'),
@@ -22,7 +28,7 @@ const animationEls = {
 };
 let animationSelection = null;
 let animationStroke = null;
-let animationRotation = null;
+let animationTransform = null;
 let animationPaintAnchor = null;
 let animationPaintShiftHeld = false;
 let animationLayerDrag = null;
@@ -32,8 +38,6 @@ let animationSelectionRasterCache = null;
 let animationSelectionOverlay = null;
 let animationSelectionAnimationId = null;
 let animationSelectionLastPaint = 0;
-let animationSelectionHold = null;
-let animationSelectionHeld = false;
 
 function animationWandSettings(saved = state.animationWandSettings) {
   const tolerance = Number(saved?.tolerance);
@@ -42,18 +46,6 @@ function animationWandSettings(saved = state.animationWandSettings) {
     contiguous: saved?.contiguous !== false,
     tolerance: Number.isFinite(tolerance) ? clamp(Math.round(tolerance), 0, 255) : 32
   };
-}
-
-function cancelAnimationSelectionHold() {
-  if (animationSelectionHold !== null) clearTimeout(animationSelectionHold);
-  animationSelectionHold = null;
-}
-function setAnimationSelectionMenuOpen(open) {
-  if (!open) cancelAnimationSelectionHold();
-  if (animationEls.selectionMenu.hidden !== !open) {
-    animationEls.selectionMenu.hidden = !open;
-    animationEls.selectionButton.setAttribute('aria-expanded', String(open));
-  }
 }
 
 function animationPanelActive() {
@@ -221,8 +213,9 @@ async function restoreAnimationCels(cels = {}) {
   return restored;
 }
 function resetAnimationTools() {
-  endAnimationRotation();
+  endAnimationTransform();
   setAnimationSelectionMenuOpen(false);
+  setAnimationMoveMenuOpen(false);
   state.animationTool = 'move';
   animationSelection = null;
   animationStroke = null;
@@ -420,7 +413,7 @@ function pasteAnimationLayers(clipboard = animationClipboard) {
 }
 function animationClipboardEventAllowed(event) {
   const target = event.target;
-  return !event.defaultPrevented && animationPanelActive() && !animationRotation
+  return !event.defaultPrevented && animationPanelActive() && !animationTransform
     && !target?.closest?.('input, textarea, select') && !target?.isContentEditable
     && !document.querySelector('.modal-backdrop.show');
 }
@@ -769,12 +762,12 @@ function queueAnimationSelectionOverlay() {
   }
 }
 function renderAnimationSelectionOverlay(force = true) {
-  const rotation = activeAnimationRotation();
-  renderAnimationRotationPivot(rotation);
-  if (!animationPanelActive() || (!rotation && !validAnimationSelection())) { hideAnimationSelectionOverlay(); return; }
+  const transform = activeAnimationTransform();
+  renderAnimationTransformPivot(transform);
+  if (!animationPanelActive() || (!transform && !validAnimationSelection())) { hideAnimationSelectionOverlay(); return; }
   // Keep the ants moving while idle without repainting the whole editor at 60 FPS.
   if (!force && performance.now() - animationSelectionLastPaint < 80) { queueAnimationSelectionOverlay(); return; }
-  const raster = animationSelectionRaster(rotation?.selection || animationSelection);
+  const raster = animationSelectionRaster(transform?.selection || animationSelection);
   if (!raster) { hideAnimationSelectionOverlay(); return; }
   if (!animationSelectionOverlay) {
     animationSelectionOverlay = document.createElement('canvas');
@@ -916,6 +909,14 @@ function updateAnimationUi(force = false) {
   const builder = animationBuilderCompanionActive();
   const builderReady = builder && spriteSheetBuilderEditingAvailable();
   const tool = builder ? spriteSheetBuilderPaintTool() : state.animationTool || 'move';
+  const transform = !builder && activeAnimationTransform();
+  const moveButton = animationEls.moveButton;
+  const moveTool = ANIMATION_TRANSFORM_TOOLS[transform?.mode || 'move'];
+  if (moveButton.getAttribute('aria-label') !== moveTool.label) {
+    moveButton.querySelector('img').src = `icons/${moveTool.icon}`;
+    moveButton.title = `${moveTool.label}. Hold to change tools.`;
+    moveButton.setAttribute('aria-label', moveTool.label);
+  }
   const selectionButton = animationEls.selectionButton;
   const selectionTool = ANIMATION_SELECTION_TOOLS[tool];
   if (selectionTool && selectionButton.dataset.animationTool !== tool) {
@@ -927,7 +928,7 @@ function updateAnimationUi(force = false) {
   }
   animationEls.group.querySelectorAll('[data-animation-tool]').forEach(button => {
     const buttonTool = button.dataset.animationTool;
-    const on = buttonTool === tool;
+    const on = transform ? button === moveButton : buttonTool === tool;
     button.classList.toggle('active',on); button.setAttribute('aria-pressed',String(on));
     if (buttonTool === 'brush') button.hidden = !builder;
     const selection = ANIMATION_SELECTION_TOOLS[buttonTool];
@@ -1246,13 +1247,13 @@ function prepareAnimationPixelMove(layer, mask = animationSelectionMask()) {
   return { layerId: layer.id, frame, base, position, remaining, cut, bounds, canvas: makeMask(), dx: 0, dy: 0 };
 }
 function drawAnimationPixelMove(context, move, left = 0, top = 0) {
-  const { position, remaining, cut, bounds, dx, dy, rotated } = move;
+  const { position, remaining, cut, bounds, dx, dy, transformed } = move;
   const { minX, minY, maxX, maxY } = bounds;
   const width = maxX - minX + 1, height = maxY - minY + 1;
   const x = position.x - left, y = position.y - top;
   context.imageSmoothingEnabled = false;
   context.drawImage(remaining, x, y);
-  if (rotated) context.drawImage(rotated.canvas, rotated.left - left, rotated.top - top);
+  if (transformed) context.drawImage(transformed.canvas, transformed.left - left, transformed.top - top);
   else context.drawImage(cut, minX, minY, width, height, x + minX + dx, y + minY + dy, width, height);
 }
 function updateAnimationPixelMove(stroke, e) {
@@ -1271,7 +1272,7 @@ function updateAnimationPixelMove(stroke, e) {
 }
 function commitAnimationPixelMove(stroke) {
   const move = stroke.pixelMove;
-  if (!move.dx && !move.dy && !move.rotated) return;
+  if (!move.dx && !move.dy && !move.transformed) return;
   const layer = animationLayerList().find(item => item.id === move.layerId);
   const cel = animationCel(layer, move.frame);
   if (!cel) return;
@@ -1282,11 +1283,11 @@ function commitAnimationPixelMove(stroke) {
   if (move.base) {
     animationBakeBase(move.frame, move.canvas);
   } else {
-    const { position, remaining, bounds, dx, dy, rotated } = move;
-    const movedLeft = rotated?.left ?? position.x + bounds.minX + dx;
-    const movedTop = rotated?.top ?? position.y + bounds.minY + dy;
-    const movedRight = rotated ? rotated.left + rotated.canvas.width : position.x + bounds.maxX + dx + 1;
-    const movedBottom = rotated ? rotated.top + rotated.canvas.height : position.y + bounds.maxY + dy + 1;
+    const { position, remaining, bounds, dx, dy, transformed } = move;
+    const movedLeft = transformed?.left ?? position.x + bounds.minX + dx;
+    const movedTop = transformed?.top ?? position.y + bounds.minY + dy;
+    const movedRight = transformed ? transformed.left + transformed.canvas.width : position.x + bounds.maxX + dx + 1;
+    const movedBottom = transformed ? transformed.top + transformed.canvas.height : position.y + bounds.maxY + dy + 1;
     const left = Math.min(position.x, movedLeft), top = Math.min(position.y, movedTop);
     const right = Math.max(position.x + remaining.width, movedRight);
     const bottom = Math.max(position.y + remaining.height, movedBottom);
@@ -1304,17 +1305,17 @@ function commitAnimationPixelMove(stroke) {
   markFrameBitmapsDirty();
   if (layer.sharedCel || !updateFrameThumb(move.frame)) buildFilmstrip();
 }
-function animationRotationSource(canvas, bounds, x = 0, y = 0) {
+function animationTransformSource(canvas, bounds, x = 0, y = 0) {
   const { minX, minY, maxX, maxY } = bounds;
   const image = canvas.getContext('2d').getImageData(minX, minY, maxX - minX + 1, maxY - minY + 1);
   return { image, left: x + minX, top: y + minY };
 }
-function rotateAnimationPixels(source, pivot, angle, sourcePivot = pivot) {
+function transformAnimationPixels(source, pivot, angle, sourcePivot = pivot, scale = 1) {
   const { image, left, top } = source;
   const { width, height, data } = image;
   const sin = Math.sin(angle), cos = Math.cos(angle);
   const corners = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => {
-    const dx = left + x - sourcePivot.x, dy = top + y - sourcePivot.y;
+    const dx = (left + x - sourcePivot.x) * scale, dy = (top + y - sourcePivot.y) * scale;
     return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos };
   });
   const x = Math.floor(Math.min(...corners.map(point => point.x)) + 1e-8);
@@ -1325,9 +1326,9 @@ function rotateAnimationPixels(source, pivot, angle, sourcePivot = pivot) {
   const output = context.createImageData(canvas.width, canvas.height);
   // Sample the nearest source pixel to each destination pixel center.
   for (let row = 0; row < output.height; row++) {
-    const dy = y + row + .5 - pivot.y;
+    const dy = (y + row + .5 - pivot.y) / scale;
     for (let col = 0; col < output.width; col++) {
-      const dx = x + col + .5 - pivot.x;
+      const dx = (x + col + .5 - pivot.x) / scale;
       const sx = Math.floor(sourcePivot.x - left + dx * cos + dy * sin + 1e-8);
       const sy = Math.floor(sourcePivot.y - top - dx * sin + dy * cos + 1e-8);
       if (sx < 0 || sx >= width || sy < 0 || sy >= height) continue;
@@ -1341,90 +1342,95 @@ function rotateAnimationPixels(source, pivot, angle, sourcePivot = pivot) {
   context.putImageData(output, 0, 0);
   return { canvas, left: x, top: y, image: output };
 }
-function openAnimationRotationMessage(message) {
+function openAnimationTransformMessage(mode, message) {
+  $('animationRotationTitle').textContent = mode === 'scale' ? 'Scale Selection' : 'Rotate Selection';
   $('animationRotationMessage').textContent = message;
   $('animationRotationDialog').classList.add('show');
   $('animationRotationOk').focus();
 }
-function closeAnimationRotationMessage() {
+function closeAnimationTransformMessage() {
   $('animationRotationDialog').classList.remove('show');
   els.canvasShell.focus({ preventScroll: true });
 }
-function startAnimationRotation() {
-  if (activeAnimationRotation() || state.dragging) return;
+function startAnimationTransform(mode) {
+  if (state.dragging || activeAnimationTransform()?.mode === mode) return;
+  finishAnimationTransform();
+  setAnimationSelectionMenuOpen(false);
+  setAnimationMoveMenuOpen(false);
   const layer = activeAnimationLayer();
   if (layer?.group || (layer && !animationLayerVisible(layer))) {
-    showError('Select a visible sprite layer to rotate.');
+    showError(`Select a visible sprite layer to ${mode}.`);
     return;
   }
-  if (!animationCel(layer)) return openAnimationRotationMessage('The layer is empty.');
+  if (!animationCel(layer)) return openAnimationTransformMessage(mode, 'The layer is empty.');
   const previousSelection = validAnimationSelection() ? animationSelection : null;
   const fullMask = makeMask(), context = fullMask.getContext('2d');
   context.fillRect(0, 0, fullMask.width, fullMask.height);
   const move = prepareAnimationPixelMove(layer, previousSelection ? animationSelectionMask() : fullMask);
   if (!move) {
     const layerHasPixels = previousSelection && prepareAnimationPixelMove(layer, fullMask);
-    return openAnimationRotationMessage(layerHasPixels ? 'The selection contains no pixels on this layer.' : 'The layer is empty.');
+    return openAnimationTransformMessage(mode, layerHasPixels ? 'The selection contains no pixels on this layer.' : 'The layer is empty.');
   }
-  const pixels = animationRotationSource(move.cut, move.bounds, move.position.x, move.position.y);
+  const pixels = animationTransformSource(move.cut, move.bounds, move.position.x, move.position.y);
   const initialSelection = previousSelection || {
     kind: 'rectangle', frameId: state.frames[move.frame].id,
     points: [{ x: pixels.left, y: pixels.top }, { x: pixels.left + pixels.image.width, y: pixels.top + pixels.image.height }]
   };
   const mask = previousSelection ? animationSelectionMask() : animationSelectionRaster(initialSelection).mask;
-  const maskSource = animationRotationSource(mask, canvasAlphaBounds(mask, 1));
+  const maskSource = animationTransformSource(mask, canvasAlphaBounds(mask, 1));
   const pivot = { x: maskSource.left + maskSource.image.width / 2, y: maskSource.top + maskSource.image.height / 2 };
   pause(false, { updateInfo: false });
   showError('');
-  animationRotation = { move, frame: state.frames[move.frame], pixels, maskSource, pivot, sourcePivot: pivot, angle: 0,
+  animationTransform = { mode, move, frame: state.frames[move.frame], pixels, maskSource, pivot, sourcePivot: pivot, angle: 0, scale: 1,
     initialSelection, selection: initialSelection, previousSelection, pointerId: null, previewFrame: null };
-  els.canvasShell.classList.add('animation-rotation-cursor');
+  els.canvasShell.classList.add(mode === 'scale' ? 'animation-scale-cursor' : 'animation-rotation-cursor');
   els.canvasShell.focus({ preventScroll: true });
   drawFrame(move.frame, { fast: true, skipThumb: true });
+  updateAnimationUi();
 }
-function activeAnimationRotation() {
-  const rotation = animationRotation;
-  if (rotation && (!animationPanelActive() || rotation.frame !== state.frames[state.currentFrame]
-    || rotation.move.layerId !== activeAnimationLayer()?.id)) endAnimationRotation();
-  return animationRotation;
+function activeAnimationTransform() {
+  const transform = animationTransform;
+  if (transform && (!animationPanelActive() || transform.frame !== state.frames[state.currentFrame]
+    || transform.move.layerId !== activeAnimationLayer()?.id)) endAnimationTransform();
+  return animationTransform;
 }
-function endAnimationRotation() {
-  const rotation = animationRotation;
-  if (!rotation) return;
-  animationRotation = null;
-  if (rotation.previewFrame !== null) cancelAnimationFrame(rotation.previewFrame);
-  if (rotation.pointerId !== null && els.canvasShell.hasPointerCapture(rotation.pointerId)) {
-    els.canvasShell.releasePointerCapture(rotation.pointerId);
+function endAnimationTransform() {
+  const transform = animationTransform;
+  if (!transform) return;
+  animationTransform = null;
+  if (transform.previewFrame !== null) cancelAnimationFrame(transform.previewFrame);
+  if (transform.pointerId !== null && els.canvasShell.hasPointerCapture(transform.pointerId)) {
+    els.canvasShell.releasePointerCapture(transform.pointerId);
   }
-  els.canvasShell.classList.remove('animation-rotation-cursor', 'animation-rotation-pivot-cursor');
-  $('animationRotationPivot').hidden = true;
-  $('animationRotationPivotPreview').hidden = true;
+  els.canvasShell.classList.remove('animation-rotation-cursor', 'animation-scale-cursor', 'animation-rotation-pivot-cursor');
+  $('animationRotationPivot').setAttribute('hidden', '');
+  $('animationRotationPivotPreview').setAttribute('hidden', '');
 }
-function renderAnimationRotationPivot(rotation) {
-  if (!rotation) return;
+function renderAnimationTransformPivot(transform) {
+  if (!transform) return;
   const shell = els.canvasShell.getBoundingClientRect(), canvas = els.mainCanvas.getBoundingClientRect();
   const position = (id, point) => {
     const marker = $(id);
-    marker.hidden = !point;
+    marker.toggleAttribute('hidden', !point);
     if (!point) return;
     marker.style.left = `${canvas.left - shell.left - els.canvasShell.clientLeft + point.x * canvas.width / state.cageWidth}px`;
     marker.style.top = `${canvas.top - shell.top - els.canvasShell.clientTop + point.y * canvas.height / state.cageHeight}px`;
   };
-  position('animationRotationPivot', rotation.pivot);
-  position('animationRotationPivotPreview', rotation.hover);
+  position('animationRotationPivot', transform.pivot);
+  position('animationRotationPivotPreview', transform.hover);
 }
-function updateAnimationRotationPreview(rotation) {
-  const { move, pixels, maskSource, pivot, sourcePivot, angle } = rotation;
-  if (Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) < 1e-8
+function updateAnimationTransformPreview(transform) {
+  const { move, pixels, maskSource, pivot, sourcePivot, angle, scale } = transform;
+  if (scale === 1 && Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) < 1e-8
     && Math.hypot(pivot.x - sourcePivot.x, pivot.y - sourcePivot.y) < 1e-8) {
-    move.rotated = null;
-    rotation.selection = rotation.initialSelection;
+    move.transformed = null;
+    transform.selection = transform.initialSelection;
   } else {
-    move.rotated = rotateAnimationPixels(pixels, pivot, angle, sourcePivot);
-    const { image, left, top } = rotateAnimationPixels(maskSource, pivot, angle, sourcePivot);
+    move.transformed = transformAnimationPixels(pixels, pivot, angle, sourcePivot, scale);
+    const { image, left, top } = transformAnimationPixels(maskSource, pivot, angle, sourcePivot, scale);
     const alpha = new Uint8Array(image.width * image.height);
     for (let i = 0; i < alpha.length; i++) alpha[i] = image.data[i * 4 + 3];
-    rotation.selection = { kind: 'mask', frameId: rotation.frame.id, width: image.width, height: image.height,
+    transform.selection = { kind: 'mask', frameId: transform.frame.id, width: image.width, height: image.height,
       offsetX: left, offsetY: top, alpha };
     const context = move.canvas.getContext('2d');
     context.clearRect(0, 0, move.canvas.width, move.canvas.height);
@@ -1432,86 +1438,100 @@ function updateAnimationRotationPreview(rotation) {
   }
   drawFrame(move.frame, { fast: true, skipThumb: true });
 }
-function finishAnimationRotation(apply = false) {
-  const rotation = activeAnimationRotation();
-  if (!rotation) return false;
-  if (apply && rotation.previewFrame !== null) updateAnimationRotationPreview(rotation);
-  endAnimationRotation();
+function finishAnimationTransform(apply = false) {
+  const transform = activeAnimationTransform();
+  if (!transform) return false;
+  if (apply && transform.previewFrame !== null) updateAnimationTransformPreview(transform);
+  endAnimationTransform();
   if (apply) {
-    if (rotation.move.rotated) {
-      animationSelection = rotation.selection;
-      commitAnimationPixelMove({ pixelMove: rotation.move, previousSelection: rotation.previousSelection });
-    } else commitAnimationSelection(rotation.initialSelection);
+    if (transform.move.transformed) {
+      animationSelection = transform.selection;
+      commitAnimationPixelMove({ pixelMove: transform.move, previousSelection: transform.previousSelection });
+    } else commitAnimationSelection(transform.initialSelection);
   }
   drawFrame(state.currentFrame);
   updateAnimationUi();
   return true;
 }
-function updateAnimationRotationHover(rotation, event) {
-  const pointer = rotation.lastPointer;
-  rotation.hover = event.altKey && pointer && rotation.pointerId === null ? {
+function updateAnimationTransformHover(transform, event) {
+  const pointer = transform.lastPointer;
+  transform.hover = event.altKey && pointer && transform.pointerId === null ? {
     x: Math.round(pointer.x * 2) / 2, y: Math.round(pointer.y * 2) / 2
   } : null;
-  els.canvasShell.classList.toggle('animation-rotation-pivot-cursor', !!rotation.hover);
-  renderAnimationRotationPivot(rotation);
+  els.canvasShell.classList.toggle('animation-rotation-pivot-cursor', !!transform.hover);
+  renderAnimationTransformPivot(transform);
 }
-function animationRotationAngle(point, pivot) {
+function animationTransformAngle(point, pivot) {
   return Math.atan2(point.y - pivot.y, point.x - pivot.x);
 }
-function startAnimationRotationDrag(rotation, event) {
-  rotation.lastPointer = pointerGuidePoint(event);
-  updateAnimationRotationHover(rotation, event);
-  if (rotation.hover) {
-    const pivot = rotation.hover;
-    const dx = pivot.x - rotation.pivot.x, dy = pivot.y - rotation.pivot.y;
-    const sin = Math.sin(rotation.angle), cos = Math.cos(rotation.angle);
-    rotation.sourcePivot = { x: rotation.sourcePivot.x + dx * cos + dy * sin,
-      y: rotation.sourcePivot.y - dx * sin + dy * cos };
-    rotation.pivot = pivot;
-    updateAnimationRotationHover(rotation, { altKey: false });
+function startAnimationTransformDrag(transform, event) {
+  transform.lastPointer = pointerGuidePoint(event);
+  updateAnimationTransformHover(transform, event);
+  if (transform.hover) {
+    const pivot = transform.hover;
+    const dx = (pivot.x - transform.pivot.x) / transform.scale, dy = (pivot.y - transform.pivot.y) / transform.scale;
+    const sin = Math.sin(transform.angle), cos = Math.cos(transform.angle);
+    transform.sourcePivot = { x: transform.sourcePivot.x + dx * cos + dy * sin,
+      y: transform.sourcePivot.y - dx * sin + dy * cos };
+    transform.pivot = pivot;
+    updateAnimationTransformHover(transform, { altKey: false });
     return;
   }
-  if (rotation.pointerId !== null) return;
-  rotation.startAngle = animationRotationAngle(rotation.lastPointer, rotation.pivot);
-  rotation.angleBeforeDrag = rotation.angle;
-  rotation.pointerId = event.pointerId;
+  if (transform.pointerId !== null) return;
+  const distance = Math.hypot(transform.lastPointer.x - transform.pivot.x, transform.lastPointer.y - transform.pivot.y);
+  if (transform.mode === 'scale' && distance < .5) return;
+  transform.startAngle = animationTransformAngle(transform.lastPointer, transform.pivot);
+  transform.angleBeforeDrag = transform.angle;
+  transform.startDistance = distance;
+  transform.scaleBeforeDrag = transform.scale;
+  transform.pointerId = event.pointerId;
   els.canvasShell.setPointerCapture(event.pointerId);
 }
-function moveAnimationRotationPointer(event) {
-  const rotation = activeAnimationRotation();
-  if (!rotation || state.dragging) return false;
-  rotation.lastPointer = pointerGuidePoint(event);
-  if (rotation.pointerId === null) updateAnimationRotationHover(rotation, event);
-  else if (event.pointerId === rotation.pointerId) {
-    const angle = rotation.angleBeforeDrag + animationRotationAngle(rotation.lastPointer, rotation.pivot) - rotation.startAngle;
-    if (angle === rotation.angle) return true;
-    rotation.angle = angle;
-    if (rotation.previewFrame === null) rotation.previewFrame = requestAnimationFrame(() => {
-      rotation.previewFrame = null;
-      updateAnimationRotationPreview(rotation);
+function moveAnimationTransformPointer(event) {
+  const transform = activeAnimationTransform();
+  if (!transform || state.dragging) return false;
+  transform.lastPointer = pointerGuidePoint(event);
+  if (transform.pointerId === null) updateAnimationTransformHover(transform, event);
+  else if (event.pointerId === transform.pointerId) {
+    if (transform.mode === 'scale') {
+      const distance = Math.hypot(transform.lastPointer.x - transform.pivot.x, transform.lastPointer.y - transform.pivot.y);
+      const maxDimension = Math.max(transform.maskSource.image.width, transform.maskSource.image.height);
+      const scale = clamp(transform.scaleBeforeDrag * distance / transform.startDistance, 1 / maxDimension, 8192 / maxDimension);
+      if (scale === transform.scale) return true;
+      transform.scale = scale;
+    } else {
+      const angle = transform.angleBeforeDrag + animationTransformAngle(transform.lastPointer, transform.pivot) - transform.startAngle;
+      if (angle === transform.angle) return true;
+      transform.angle = angle;
+    }
+    if (transform.previewFrame === null) transform.previewFrame = requestAnimationFrame(() => {
+      transform.previewFrame = null;
+      updateAnimationTransformPreview(transform);
     });
   }
   return true;
 }
-function releaseAnimationRotationPointer(event) {
-  const rotation = activeAnimationRotation();
-  if (!rotation || rotation.pointerId === null || rotation.pointerId !== event.pointerId) return;
+function releaseAnimationTransformPointer(event) {
+  const transform = activeAnimationTransform();
+  if (!transform || transform.pointerId === null || transform.pointerId !== event.pointerId) return;
   const canceled = event.type === 'pointercancel';
-  if (canceled) rotation.angle = rotation.angleBeforeDrag;
-  else moveAnimationRotationPointer(event);
-  const pending = rotation.previewFrame !== null;
-  if (pending) cancelAnimationFrame(rotation.previewFrame);
-  rotation.previewFrame = null;
-  rotation.pointerId = null;
+  if (canceled) {
+    transform.angle = transform.angleBeforeDrag;
+    transform.scale = transform.scaleBeforeDrag;
+  } else moveAnimationTransformPointer(event);
+  const pending = transform.previewFrame !== null;
+  if (pending) cancelAnimationFrame(transform.previewFrame);
+  transform.previewFrame = null;
+  transform.pointerId = null;
   if (els.canvasShell.hasPointerCapture(event.pointerId)) els.canvasShell.releasePointerCapture(event.pointerId);
-  if (pending || canceled) updateAnimationRotationPreview(rotation);
-  updateAnimationRotationHover(rotation, event);
+  if (pending || canceled) updateAnimationTransformPreview(transform);
+  updateAnimationTransformHover(transform, event);
 }
-function setAnimationRotationAlt(held, clearPointer = false) {
-  const rotation = activeAnimationRotation();
-  if (!rotation) return false;
-  if (clearPointer) rotation.lastPointer = null;
-  updateAnimationRotationHover(rotation, { altKey: held });
+function setAnimationTransformAlt(held, clearPointer = false) {
+  const transform = activeAnimationTransform();
+  if (!transform) return false;
+  if (clearPointer) transform.lastPointer = null;
+  updateAnimationTransformHover(transform, { altKey: held });
   return true;
 }
 function splitAnimationSelection() {
@@ -1651,9 +1671,9 @@ function paintAnimationBucket(layer, point, i = state.currentFrame) {
 }
 function startAnimationCanvasDrag(e) {
   if(!animationPanelActive() || !hasFrames()) return false;
-  const rotation = activeAnimationRotation();
-  if (rotation) {
-    startAnimationRotationDrag(rotation, e);
+  const transform = activeAnimationTransform();
+  if (transform) {
+    startAnimationTransformDrag(transform, e);
     return true;
   }
   if (temporaryPencilColorPickerActive(e)) {
@@ -1897,19 +1917,28 @@ function finishAnimationCanvasDrag(e) {
   } else if(stroke?.tool==='move')animationChanged();
   else {drawFrame(state.currentFrame);updateAnimationUi();}
 }
-function handleAnimationRotationKeyDown(event) {
-  if (animationPanelActive() && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'r') {
+function handleAnimationTransformKeyDown(event, typing) {
+  const command = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
+  const key = event.key.toLowerCase();
+  if (!typing && animationPanelActive() && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+    && (key === 'r' || key === 's')) {
     event.preventDefault();
-    if (!event.repeat) startAnimationRotation();
+    if (!event.repeat) startAnimationTransform(key === 'r' ? 'rotate' : 'scale');
     return true;
   }
-  if (!activeAnimationRotation()) return false;
-  if (event.key === 'Enter' || event.key === 'Escape') {
+  if (!activeAnimationTransform()) return false;
+  if (command && key === 'd') {
     event.preventDefault();
-    finishAnimationRotation(event.key === 'Enter');
+    if (!event.repeat) {
+      finishAnimationTransform();
+      clearAnimationSelection();
+    }
+  } else if (event.key === 'Enter' || event.key === 'Escape') {
+    event.preventDefault();
+    finishAnimationTransform(event.key === 'Enter');
   } else if (event.key === 'Alt') {
     event.preventDefault();
-    setAnimationRotationAlt(true);
+    setAnimationTransformAlt(true);
   } else if (event.code === 'Space' || event.key.startsWith('Arrow')) event.preventDefault();
   return true;
 }
@@ -1955,7 +1984,8 @@ function handleAnimationKeyDown(e) {
     return true;
   }
   if(e.key==='Escape') {commitAnimationSelection(null);state.animationTool='move';drawFrame(state.currentFrame);updateInfo();e.preventDefault();return true;}
-  const tools={m:'move',l:'lasso',r:'rectangle',p:'pencil',d:'dropper',e:'eraser',w:'wand',g:'bucket'};
+  if (e.shiftKey && key === 'r') { e.preventDefault(); setAnimationTool('rectangle'); return true; }
+  const tools={m:'move',l:'lasso',p:'pencil',d:'dropper',e:'eraser',w:'wand',g:'bucket'};
   if(!e.shiftKey&&tools[key]){e.preventDefault();setAnimationTool(tools[key]);return true;}
   if(!e.shiftKey&&['b','h'].includes(key)){e.preventDefault();return true;}
   if(e.shiftKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
@@ -1971,11 +2001,11 @@ animationEls.newLayer.addEventListener('click',createEmptyAnimationLayer);
 animationEls.newGroup.addEventListener('click',createAnimationGroup);
 animationEls.merge.addEventListener('click',mergeAnimationLayers);
 animationEls.exportLayer.addEventListener('click', exportAnimationLayerPng);
-$('animationRotationOk').addEventListener('click', closeAnimationRotationMessage);
+$('animationRotationOk').addEventListener('click', closeAnimationTransformMessage);
 document.addEventListener('pointerdown', event => {
-  if (animationRotation && event.button === 0 && (!els.canvasShell.contains(event.target)
+  if (animationTransform && event.button === 0 && (!els.canvasShell.contains(event.target)
     || event.target.closest?.('.side-panels, .canvas-info-row, #floatingToolTabs, button, input'))) {
-    finishAnimationRotation();
+    finishAnimationTransform();
   }
 }, true);
 animationEls.copy.addEventListener('click',copyAnimationLayers);
@@ -1999,59 +2029,81 @@ document.addEventListener('paste', event => {
 ['dragleave','drop'].forEach(type=>animationEls.drop.addEventListener(type,e=>{e.preventDefault();animationEls.drop.classList.remove('dragover');}));
 animationEls.drop.addEventListener('drop',e=>loadAnimationSprites(e.dataTransfer.files));
 animationEls.group.querySelectorAll('[data-animation-tool]').forEach(button => {
-  if (button !== animationEls.selectionButton) button.addEventListener('click', () => setAnimationTool(button.dataset.animationTool));
-});
-animationEls.selectionButton.addEventListener('pointerdown', e => {
-  if (e.button !== 0) return;
-  cancelAnimationSelectionHold();
-  animationSelectionHeld = false;
-  animationSelectionHold = setTimeout(() => {
-    animationSelectionHold = null;
-    animationSelectionHeld = true;
-    setAnimationSelectionMenuOpen(true);
-  }, 400);
-});
-['pointerup', 'pointercancel', 'pointerleave'].forEach(type => {
-  animationEls.selectionButton.addEventListener(type, cancelAnimationSelectionHold);
-});
-animationEls.selectionButton.addEventListener('click', e => {
-  if (animationSelectionHeld && e.detail) {
-    animationSelectionHeld = false;
-    return;
+  if (button !== animationEls.selectionButton && button !== animationEls.moveButton) {
+    button.addEventListener('click', () => setAnimationTool(button.dataset.animationTool));
   }
-  if (!animationEls.selectionMenu.hidden) setAnimationSelectionMenuOpen(false);
-  else setAnimationTool(animationEls.selectionButton.dataset.animationTool);
 });
-animationEls.selectionButton.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  setAnimationSelectionMenuOpen(true);
-});
-animationEls.selectionButton.addEventListener('keydown', e => {
-  if (e.key === 'ArrowDown') {
+function bindAnimationToolPicker(button, menu, chooseTool) {
+  let hold = null;
+  let held = false;
+  const cancelHold = () => {
+    if (hold !== null) clearTimeout(hold);
+    hold = null;
+  };
+  const setOpen = open => {
+    if (!open) cancelHold();
+    menu.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+  };
+  button.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || animationBuilderCompanionActive()) return;
+    cancelHold();
+    held = false;
+    hold = setTimeout(() => {
+      hold = null;
+      held = true;
+      setOpen(true);
+    }, 400);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => button.addEventListener(type, cancelHold));
+  button.addEventListener('click', e => {
+    if (held && e.detail) {
+      held = false;
+      return;
+    }
+    if (!menu.hidden) setOpen(false);
+    else setAnimationTool(button.dataset.animationTool);
+  });
+  button.addEventListener('contextmenu', e => {
+    if (animationBuilderCompanionActive()) return;
     e.preventDefault();
+    setOpen(true);
+  });
+  button.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' && !animationBuilderCompanionActive()) {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(true);
+      menu.querySelector('button').focus();
+    } else if (e.key === 'Escape' && !menu.hidden) {
+      e.stopPropagation();
+      setOpen(false);
+    }
+  });
+  menu.addEventListener('click', e => {
+    const tool = e.target.closest('[data-animation-menu-tool]')?.dataset.animationMenuTool;
+    if (!tool) return;
+    setOpen(false);
+    button.focus();
+    chooseTool(tool);
+  });
+  menu.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
     e.stopPropagation();
-    setAnimationSelectionMenuOpen(true);
-    animationEls.selectionMenu.querySelector('button').focus();
-  } else if (e.key === 'Escape' && !animationEls.selectionMenu.hidden) {
-    e.stopPropagation();
-    setAnimationSelectionMenuOpen(false);
-  }
-});
-animationEls.selectionMenu.addEventListener('click', e => {
-  const tool = e.target.closest('[data-animation-selection-tool]')?.dataset.animationSelectionTool;
-  if (!tool) return;
-  setAnimationSelectionMenuOpen(false);
+    setOpen(false);
+    button.focus();
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!button.contains(e.target) && !menu.contains(e.target)) setOpen(false);
+  });
+  return setOpen;
+}
+const setAnimationSelectionMenuOpen = bindAnimationToolPicker(animationEls.selectionButton, animationEls.selectionMenu, tool => {
   if (state.animationTool !== tool) setAnimationTool(tool);
-  animationEls.selectionButton.focus();
 });
-animationEls.selectionMenu.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  e.stopPropagation();
-  setAnimationSelectionMenuOpen(false);
-  animationEls.selectionButton.focus();
-});
-document.addEventListener('pointerdown', e => {
-  if (!e.target.closest?.('.animation-selection-tool')) setAnimationSelectionMenuOpen(false);
+const setAnimationMoveMenuOpen = bindAnimationToolPicker(animationEls.moveButton, animationEls.moveMenu, tool => {
+  if (tool === 'move') setAnimationTool('move');
+  else startAnimationTransform(tool);
 });
 animationEls.wandSettings.addEventListener('input', () => {
   state.animationWandSettings = animationWandSettings({

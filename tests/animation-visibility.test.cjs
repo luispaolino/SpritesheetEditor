@@ -150,7 +150,7 @@ function selectionEditor(tool='rectangle') {
   app.els={canvasShell:{classList:{add(){},remove(){},toggle(){}},setPointerCapture(){},hasPointerCapture(){return false;}}};
   return app;
 }
-test('rotation preserves source pixel values without creating antialiased edges', () => {
+test('rotation and scaling preserve source pixel values without creating antialiased edges', () => {
   const app = selectionEditor();
   const red = [255, 0, 0, 255], blue = [0, 0, 255, 128], clear = [0, 0, 0, 0];
   const source = {
@@ -158,14 +158,18 @@ test('rotation preserves source pixel values without creating antialiased edges'
     image: { width: 2, height: 2, data: new Uint8ClampedArray([...red, ...blue, ...clear, ...clear]) }
   };
   const pivot = { x: 6, y: 8 };
-  const quarterTurn = app.rotateAnimationPixels(source, pivot, Math.PI / 2);
+  const quarterTurn = app.transformAnimationPixels(source, pivot, Math.PI / 2);
   assert.deepEqual([quarterTurn.left, quarterTurn.top], [5, 7]);
   assert.deepEqual(Array.from(quarterTurn.image.data), [...clear, ...red, ...clear, ...blue]);
-  const angled = app.rotateAnimationPixels(source, pivot, Math.PI / 5).image.data;
+  const angled = app.transformAnimationPixels(source, pivot, Math.PI / 5).image.data;
   assert.ok(angled.some(value => value !== 0));
   for (let i = 0; i < angled.length; i += 4) {
     assert.ok([red, blue, clear].some(pixel => pixel.every((value, channel) => value === angled[i + channel])));
   }
+  const scaled = app.transformAnimationPixels(source, pivot, 0, pivot, 2);
+  assert.deepEqual([scaled.left, scaled.top, scaled.image.width, scaled.image.height], [4, 6, 4, 4]);
+  const scaledRow = [...red, ...red, ...blue, ...blue];
+  assert.deepEqual(Array.from(scaled.image.data), [...scaledRow, ...scaledRow, ...Array(32).fill(0)]);
 });
 
 function selectionDrag(app,points,modifiers={}) {

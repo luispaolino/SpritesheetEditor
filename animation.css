@@ -42,21 +42,27 @@
 .animation-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
 .side-panels .animation-tools .tool-icon-button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; }
 .animation-tools .tool-button.active { color: #071018; background: var(--warning); border-color: transparent; }
-.animation-selection-tool { position: relative; }
-#animationSelectionToolButton { position: relative; touch-action: manipulation; }
-#animationSelectionToolButton::after {
+.animation-tool-picker { position: relative; }
+.animation-tool-picker > .tool-button { position: relative; touch-action: manipulation; }
+.animation-group:not(.sprite-sheet-builder-tool-panel) .animation-tool-picker > .tool-button::after {
   content: ''; position: absolute; right: 4px; bottom: 4px;
   border: 3px solid transparent; border-bottom-color: currentColor; border-right-color: currentColor;
 }
-.animation-selection-tool-menu {
+.animation-tool-picker-menu {
   position: absolute; top: calc(100% + 5px); left: 0; z-index: 5;
   display: grid; gap: 4px; padding: 5px; width: max-content; min-width: 124px;
   border: 1px solid var(--border); border-radius: 12px; background: #171c28; box-shadow: var(--shadow);
 }
-.animation-selection-tool-menu button {
+.animation-tool-picker-menu button {
   display: flex; align-items: center; gap: 8px; padding: 6px 9px; text-align: left;
 }
-.animation-selection-tool-menu .tool-icon-image { width: 16px; height: 16px; }
+.animation-tool-picker-menu .tool-icon-image { width: 16px; height: 16px; }
+.animation-tool-picker-menu button:is(:hover, :focus-visible) {
+  color: #071018; background: var(--warning); border-color: transparent;
+}
+.animation-tool-picker-menu button:is(:hover, :focus-visible) .tool-icon-image {
+  filter: brightness(0) saturate(100%);
+}
 .animation-wand-settings {
   display: grid; grid-template-columns: max-content max-content minmax(0, 1fr);
   align-items: center; gap: 5px; margin-bottom: 10px;
@@ -89,13 +95,15 @@
   pointer-events: none; background: transparent; image-rendering: pixelated; transform: none;
 }
 .canvas-shell.animation-rotation-cursor:not(.panning) {
-  cursor: url('icons/cursor-rotate.svg') 12 12, crosshair;
+  cursor: url('icons/cursor-rotate.svg?v=2') 12 12, crosshair;
 }
+.canvas-shell.animation-scale-cursor:not(.panning) { cursor: nwse-resize; }
 .canvas-shell.animation-rotation-pivot-cursor:not(.panning) { cursor: crosshair; }
 .animation-rotation-pivot {
   position: absolute; z-index: 321; width: 24px; height: 24px;
   transform: translate(-50%, -50%); pointer-events: none;
-  fill: none; stroke: white; stroke-width: 1.5; filter: drop-shadow(0 0 1px black) drop-shadow(0 0 2px black);
+  fill: none; stroke: var(--pivot); stroke-width: 2; filter: drop-shadow(0 0 1px black) drop-shadow(0 0 2px black);
 }
 .animation-rotation-pivot[hidden] { display: none; }
-.animation-rotation-pivot.preview { stroke: var(--accent); stroke-dasharray: 2 2; }
+.animation-rotation-pivot .pivot-dot { fill: var(--pivot); stroke: none; }
+.animation-rotation-pivot.preview { stroke-dasharray: 3 2; }

@@ -11,7 +11,9 @@
 - Ctrl/Cmd+A selects the full canvas in Edit Image. The Pencil and Eraser support sizes up to 50 px.
 - The Move tool can drag selected pixels independently of the rest of the sprite.
 - The Skip frames slider works with GIF and WebP animations.
-- Rotate selected pixels in Edit Image with Ctrl/Cmd+R. Alt-click relocates the pivot, and Enter applies the rotation without antialiasing.
+- Hold Move to choose Move, Rotate (R), or Scale (S). Rotate and Scale preview the transformation without antialiasing. Alt-click sets the pivot, and Enter applies the change.
+- The transform pivot appears above the sprite in the cage color. Ctrl/Cmd+D cancels a pending transform and clears the selection.
+- Selection and transform menu items highlight yellow on hover. Shift+R selects Rectangle.
 
 ## v1.6.5 - 2026-11-09
 

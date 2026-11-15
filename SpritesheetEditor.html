@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.7.0-1" />
+  <link rel="stylesheet" href="animation.css?v=1.7.0-3" />
   <style>
     :root {
       --bg: #10131b;
@@ -1380,8 +1380,8 @@
           <canvas id="compositorFadeOverlay" class="compositor-fade-overlay" aria-hidden="true"></canvas>
           <canvas id="brushCursorOverlay" class="brush-cursor-overlay" aria-hidden="true"></canvas>
           <canvas id="pivotOverlay" class="pivot-overlay" aria-hidden="true"></canvas>
-          <svg id="animationRotationPivot" class="animation-rotation-pivot" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="5"/><path d="M12 2v20M2 12h20"/></svg>
-          <svg id="animationRotationPivotPreview" class="animation-rotation-pivot preview" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="5"/><path d="M12 2v20M2 12h20"/></svg>
+          <svg id="animationRotationPivot" class="animation-rotation-pivot" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="8"/><circle class="pivot-dot" cx="12" cy="12" r="3"/></svg>
+          <svg id="animationRotationPivotPreview" class="animation-rotation-pivot preview" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="8"/><circle class="pivot-dot" cx="12" cy="12" r="3"/></svg>
           <div id="maskBakeIndicator" class="mask-bake-indicator" aria-hidden="true">Mask Not Baked</div>
           <div class="canvas-info-row">
             <div class="zoom-indicator" id="zoomIndicator">100%</div>
@@ -1838,13 +1838,20 @@
               <div><strong>Load Sprite</strong><span>Click here or drag image / GIF / WebP file(s)</span></div>
             </label>
             <div class="animation-tools" aria-label="Edit Image tools">
-              <button id="animationMoveButton" class="tool-button icon-button tool-icon-button active" type="button" data-animation-tool="move" title="Move sprite (M)" aria-label="Move sprite (M)"><img class="tool-icon-image" src="icons/move.svg" alt="" /></button>
-              <div class="animation-selection-tool">
+              <div class="animation-tool-picker">
+                <button id="animationMoveButton" class="tool-button icon-button tool-icon-button active" type="button" data-animation-tool="move" title="Move sprite (M). Hold to change tools." aria-label="Move sprite (M)" aria-expanded="false" aria-controls="animationMoveToolMenu"><img class="tool-icon-image" src="icons/move.svg" alt="" draggable="false" /></button>
+                <div id="animationMoveToolMenu" class="animation-tool-picker-menu" role="group" aria-label="Transform tools" hidden>
+                  <button class="secondary" type="button" data-animation-menu-tool="move"><img class="tool-icon-image" src="icons/move.svg" alt="" /> Move</button>
+                  <button class="secondary" type="button" data-animation-menu-tool="rotate"><img class="tool-icon-image" src="icons/cursor-rotate.svg?v=2" alt="" /> Rotate</button>
+                  <button class="secondary" type="button" data-animation-menu-tool="scale"><img class="tool-icon-image" src="icons/scale.svg" alt="" /> Scale</button>
+                </div>
+              </div>
+              <div class="animation-tool-picker animation-selection-tool">
                 <button id="animationSelectionToolButton" class="tool-button icon-button tool-icon-button" type="button" data-animation-tool="lasso" title="Lasso selection (L). Hold to change selection tool." aria-label="Lasso selection (L)" aria-expanded="false" aria-controls="animationSelectionToolMenu"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" draggable="false" /></button>
-                <div id="animationSelectionToolMenu" class="animation-selection-tool-menu" role="group" aria-label="Selection tools" hidden>
-                  <button class="secondary" type="button" data-animation-selection-tool="lasso"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" /> Lasso</button>
-                  <button class="secondary" type="button" data-animation-selection-tool="rectangle"><img class="tool-icon-image" src="icons/selection-rectangle.svg" alt="" /> Rectangle</button>
-                  <button class="secondary" type="button" data-animation-selection-tool="wand"><img class="tool-icon-image" src="icons/wand.svg" alt="" /> Magic Wand</button>
+                <div id="animationSelectionToolMenu" class="animation-tool-picker-menu" role="group" aria-label="Selection tools" hidden>
+                  <button class="secondary" type="button" data-animation-menu-tool="lasso"><img class="tool-icon-image" src="icons/selection-lasso.svg" alt="" /> Lasso</button>
+                  <button class="secondary" type="button" data-animation-menu-tool="rectangle"><img class="tool-icon-image" src="icons/selection-rectangle.svg" alt="" /> Rectangle</button>
+                  <button class="secondary" type="button" data-animation-menu-tool="wand"><img class="tool-icon-image" src="icons/wand.svg" alt="" /> Magic Wand</button>
                 </div>
               </div>
               <button id="animationSplitButton" class="secondary icon-button tool-icon-button" type="button" title="Split selection into a new layer" aria-label="Split selection into a new layer" disabled><img class="tool-icon-image" src="icons/split.svg" alt="" /></button>
@@ -2162,11 +2169,11 @@
         <div><kbd>Mouse Wheel</kbd><span>Zoom preview canvas</span></div>
         <div><kbd>Shift + Wheel</kbd><span>Adjust active brush, pencil, or eraser size</span></div>
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
-        <div><kbd>M / L / R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
+        <div><kbd>M / L / Shift + R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick a color with Pencil or Paint Bucket. With other Edit Image tools, pick the topmost visible layer on the canvas. In the layer list, select multiple layers.</span></div>
         <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups. Paste copied artwork or a clipboard image in Edit Image.</span></div>
         <div><kbd>Ctrl/Cmd + A</kbd><span>Select the full canvas in Edit Image</span></div>
-        <div><kbd>Ctrl/Cmd + R</kbd><span>Rotate the selection or active layer in Edit Image. Drag to rotate, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
+        <div><kbd>R / S</kbd><span>Rotate / Scale the selection or active layer in Edit Image. Drag to preview, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
         <div><kbd>Arrows / Shift + Arrows</kbd><span>Move the selection outline 1 / 10 pixels with a selection tool. With Move (M), drag inside the selection to move its pixels.</span></div>
@@ -4332,7 +4339,7 @@
       state.restoring = false;
     }
     function cancelActiveDrag() {
-      finishAnimationRotation();
+      finishAnimationTransform();
       if (!state.dragging) return;
       if (state.dragMode?.startsWith('animation-')) { finishAnimationCanvasDrag({ type: 'pointercancel', pointerId: state.dragPointerId }); return; }
       state.dragging = false;
@@ -6490,10 +6497,10 @@
       }
       if (!opt.fast) updateCanvasZoom();
       ctx.clearRect(0,0,els.mainCanvas.width,els.mainCanvas.height);
-      const rotation = activeAnimationRotation();
+      const rotation = activeAnimationTransform();
       const brushActive = !rotation && ((state.maskMode && state.brushAction !== 'wand') || state.pencilMode || animationPixelBrushActive());
       if (!brushActive) state.brushCursorVisible = false;
-      const options = visiblePreviewOptions({ guides: false, brush: false, paletteSelectionHighlight: state.indexHighlightColors !== false, castShadow: true, animationPixelMove: rotation?.move.rotated ? rotation.move : opt.animationPixelMove });
+      const options = visiblePreviewOptions({ guides: false, brush: false, paletteSelectionHighlight: state.indexHighlightColors !== false, castShadow: true, animationPixelMove: rotation?.move.transformed ? rotation.move : opt.animationPixelMove });
       if (opt.skipIndexPreview) options.indexPreview = false;
       drawSprite(ctx, i, 0, 0, options);
       drawGhostSprites(ctx, i, options);
@@ -19921,7 +19928,7 @@
     });
     els.canvasShell.addEventListener('pointermove', e => {
       if (eventInsideReferenceCompositor(e)) return;
-      if (moveAnimationRotationPointer(e)) return;
+      if (moveAnimationTransformPointer(e)) return;
       if (!canvasContentAvailable()) return;
       if (!state.dragging) {
         if (spriteSheetBuilderPanelActive()) {
@@ -20010,9 +20017,9 @@
       if (mode === 'pan') syncBrushCursorFromEvent(e);
       updateInfo();
     }
-    els.canvasShell.addEventListener('pointerup', e => releaseAnimationRotationPointer(e));
-    els.canvasShell.addEventListener('pointercancel', e => releaseAnimationRotationPointer(e));
-    els.canvasShell.addEventListener('pointerleave', () => setAnimationRotationAlt(false, true));
+    els.canvasShell.addEventListener('pointerup', e => releaseAnimationTransformPointer(e));
+    els.canvasShell.addEventListener('pointercancel', e => releaseAnimationTransformPointer(e));
+    els.canvasShell.addEventListener('pointerleave', () => setAnimationTransformAlt(false, true));
     els.canvasShell.addEventListener('pointerup',endDrag); els.canvasShell.addEventListener('pointercancel',endDrag); els.canvasShell.addEventListener('pointerleave',e=>{hideSpriteSheetBuilderCellActions();if(state.dragging)endDrag(e); else if(!syncBrushCursorFromEvent(e) && state.brushCursorVisible)hideBrushCursor(false);});
     document.addEventListener('pointermove', e => {
       if (referenceCompositorTrackDrag && e.pointerId === referenceCompositorTrackDrag.pointerId) {
@@ -20171,7 +20178,7 @@
       if (e.key === 'Escape' && els.newProjectModal.classList.contains('show')) { e.preventDefault(); closeNewProjectModal(); return; }
       if (els.newProjectModal.classList.contains('show')) return;
       if ($('animationRotationDialog').classList.contains('show')) {
-        if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeAnimationRotationMessage(); }
+        if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeAnimationTransformMessage(); }
         return;
       }
       if (e.key === 'Escape' && colorPicker.pickMode) { e.preventDefault(); cancelColorPickerCanvasPick(); return; }
@@ -20198,7 +20205,7 @@
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
       const active = document.activeElement, typing = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
-      if (handleAnimationRotationKeyDown(e)) return;
+      if (handleAnimationTransformKeyDown(e, typing)) return;
       if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space') {
         e.preventDefault();
         if (!e.repeat) playbackControlsActive() ? pause(true) : play();
@@ -20298,7 +20305,7 @@
       if (e.key === 'ArrowRight') { e.preventDefault(); step(1, { fast: true }); }
     });
     document.addEventListener('keyup', e => {
-      if (e.key === 'Alt') setAnimationRotationAlt(false);
+      if (e.key === 'Alt') setAnimationTransformAlt(false);
       if (e.key === 'Shift') setAnimationPaintShiftHeld(false);
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishReferenceCompositorKeyboardNudge();
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishKeyboardNudge();
@@ -20308,7 +20315,7 @@
       if ((e.key === 'Control' || e.key === 'Meta') && state.pencilCtrlPickMode) setPencilCtrlPickMode(e.ctrlKey || e.metaKey);
     });
     window.addEventListener('blur', () => {
-      setAnimationRotationAlt(false, true);
+      setAnimationTransformAlt(false, true);
       setAnimationPaintShiftHeld(false);
       finishReferenceCompositorKeyboardNudge();
       finishKeyboardNudge();
@@ -20578,7 +20585,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-5"></script>
+  <script src="animation.js?v=1.7.0-7"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);
