@@ -144,12 +144,30 @@ test('brush preview hides over menus and outside the canvas and returns on the c
 
 function selectionEditor(tool='rectangle') {
   const app=editor();app.animationPanelActive=()=>true;app.updateAnimationUi=()=>{};app.state.animationTool=tool;
-  app.makeMask=(width=64,height=64)=>({width,height,getContext(){return {createImageData(w,h){return {data:new Uint8ClampedArray(w*h*4)};},putImageData(){}};}});
+  app.makeMask=(width=64,height=64)=>({width,height,getContext(){return {createImageData(w,h){return {width:w,height:h,data:new Uint8ClampedArray(w*h*4)};},putImageData(){}};}});
   app.pointerGuidePoint=e=>({x:e.clientX,y:e.clientY});app.pointerCagePoint=e=>({x:Math.floor(e.clientX),y:Math.floor(e.clientY)});
   app.pointerDelta=(e,x,y)=>({dx:e.clientX-x,dy:e.clientY-y});
   app.els={canvasShell:{classList:{add(){},remove(){},toggle(){}},setPointerCapture(){},hasPointerCapture(){return false;}}};
   return app;
 }
+test('rotation preserves source pixel values without creating antialiased edges', () => {
+  const app = selectionEditor();
+  const red = [255, 0, 0, 255], blue = [0, 0, 255, 128], clear = [0, 0, 0, 0];
+  const source = {
+    left: 5, top: 7,
+    image: { width: 2, height: 2, data: new Uint8ClampedArray([...red, ...blue, ...clear, ...clear]) }
+  };
+  const pivot = { x: 6, y: 8 };
+  const quarterTurn = app.rotateAnimationPixels(source, pivot, Math.PI / 2);
+  assert.deepEqual([quarterTurn.left, quarterTurn.top], [5, 7]);
+  assert.deepEqual(Array.from(quarterTurn.image.data), [...clear, ...red, ...clear, ...blue]);
+  const angled = app.rotateAnimationPixels(source, pivot, Math.PI / 5).image.data;
+  assert.ok(angled.some(value => value !== 0));
+  for (let i = 0; i < angled.length; i += 4) {
+    assert.ok([red, blue, clear].some(pixel => pixel.every((value, channel) => value === angled[i + channel])));
+  }
+});
+
 function selectionDrag(app,points,modifiers={}) {
   const event=point=>({clientX:point[0],clientY:point[1],pointerId:1,...modifiers});
   app.startAnimationCanvasDrag(event(points[0]));

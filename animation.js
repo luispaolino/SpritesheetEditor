@@ -22,6 +22,7 @@ const animationEls = {
 };
 let animationSelection = null;
 let animationStroke = null;
+let animationRotation = null;
 let animationPaintAnchor = null;
 let animationPaintShiftHeld = false;
 let animationLayerDrag = null;
@@ -220,6 +221,7 @@ async function restoreAnimationCels(cels = {}) {
   return restored;
 }
 function resetAnimationTools() {
+  endAnimationRotation();
   setAnimationSelectionMenuOpen(false);
   state.animationTool = 'move';
   animationSelection = null;
@@ -418,7 +420,7 @@ function pasteAnimationLayers(clipboard = animationClipboard) {
 }
 function animationClipboardEventAllowed(event) {
   const target = event.target;
-  return !event.defaultPrevented && animationPanelActive()
+  return !event.defaultPrevented && animationPanelActive() && !animationRotation
     && !target?.closest?.('input, textarea, select') && !target?.isContentEditable
     && !document.querySelector('.modal-backdrop.show');
 }
@@ -731,12 +733,12 @@ function animationSelectionContainsPoint(e) {
   const p=pointerCagePoint(e);
   return !!(p && animationSelectionRaster()?.alpha[p.y*state.cageWidth+p.x]);
 }
-function animationSelectionRaster() {
-  if (!validAnimationSelection()) return null;
+function animationSelectionRaster(selection = animationSelection) {
+  if (!selection || selection.frameId !== state.frames[state.currentFrame]?.id) return null;
   const width = state.cageWidth, height = state.cageHeight;
-  const key = JSON.stringify([width,height,animationSelection.kind,animationSelection.points]);
-  if (animationSelectionRasterCache?.selection === animationSelection && animationSelectionRasterCache?.key === key) return animationSelectionRasterCache;
-  const alpha = rasterizeAnimationSelection(animationSelection,width,height), mask = makeMask(), fill = makeMask();
+  const key = JSON.stringify([width,height,selection.kind,selection.points]);
+  if (animationSelectionRasterCache?.selection === selection && animationSelectionRasterCache?.key === key) return animationSelectionRasterCache;
+  const alpha = rasterizeAnimationSelection(selection,width,height), mask = makeMask(), fill = makeMask();
   const mc = mask.getContext('2d'), fc = fill.getContext('2d'), maskImage = mc.createImageData(width,height), fillImage = fc.createImageData(width,height), edges = [];
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const index = y * width + x;
@@ -752,7 +754,7 @@ function animationSelectionRaster() {
     if (x === width-1 || !alpha[index+1]) edges.push([x+1,y,x+1,y+1]);
   }
   mc.putImageData(maskImage,0,0); fc.putImageData(fillImage,0,0);
-  animationSelectionRasterCache = {key,selection:animationSelection,alpha,mask,fill,edges};
+  animationSelectionRasterCache = {key,selection,alpha,mask,fill,edges};
   return animationSelectionRasterCache;
 }
 function hideAnimationSelectionOverlay() {
@@ -767,10 +769,12 @@ function queueAnimationSelectionOverlay() {
   }
 }
 function renderAnimationSelectionOverlay(force = true) {
-  if (!animationPanelActive() || !validAnimationSelection()) { hideAnimationSelectionOverlay(); return; }
+  const rotation = activeAnimationRotation();
+  renderAnimationRotationPivot(rotation);
+  if (!animationPanelActive() || (!rotation && !validAnimationSelection())) { hideAnimationSelectionOverlay(); return; }
   // Keep the ants moving while idle without repainting the whole editor at 60 FPS.
   if (!force && performance.now() - animationSelectionLastPaint < 80) { queueAnimationSelectionOverlay(); return; }
-  const raster = animationSelectionRaster();
+  const raster = animationSelectionRaster(rotation?.selection || animationSelection);
   if (!raster) { hideAnimationSelectionOverlay(); return; }
   if (!animationSelectionOverlay) {
     animationSelectionOverlay = document.createElement('canvas');
@@ -1222,7 +1226,7 @@ function captureAnimationSelectionCel(layer, mask) {
   const position = animationCelPosition({ canvas: cropped });
   return { canvas: cropped, offsetX: minX - position.x, offsetY: minY - position.y, flipX: false, flipY: false };
 }
-function prepareAnimationPixelMove(layer) {
+function prepareAnimationPixelMove(layer, mask = animationSelectionMask()) {
   const frame = state.currentFrame, cel = animationCel(layer, frame);
   const base = animationLayerUsesBaseFrame(layer);
   const position = base ? { x: 0, y: 0 } : animationCelPosition(cel);
@@ -1231,7 +1235,6 @@ function prepareAnimationPixelMove(layer) {
   if (base) drawBaseSprite(context, frame, 0, 0, { applyMask: true });
   else drawAnimationCel(context, cel, -position.x, -position.y);
 
-  const mask = animationSelectionMask();
   const cut = canvasClone(remaining), cutContext = cut.getContext('2d');
   cutContext.globalCompositeOperation = 'destination-in';
   cutContext.drawImage(mask, -position.x, -position.y);
@@ -1243,13 +1246,14 @@ function prepareAnimationPixelMove(layer) {
   return { layerId: layer.id, frame, base, position, remaining, cut, bounds, canvas: makeMask(), dx: 0, dy: 0 };
 }
 function drawAnimationPixelMove(context, move, left = 0, top = 0) {
-  const { position, remaining, cut, bounds, dx, dy } = move;
+  const { position, remaining, cut, bounds, dx, dy, rotated } = move;
   const { minX, minY, maxX, maxY } = bounds;
   const width = maxX - minX + 1, height = maxY - minY + 1;
   const x = position.x - left, y = position.y - top;
   context.imageSmoothingEnabled = false;
   context.drawImage(remaining, x, y);
-  context.drawImage(cut, minX, minY, width, height, x + minX + dx, y + minY + dy, width, height);
+  if (rotated) context.drawImage(rotated.canvas, rotated.left - left, rotated.top - top);
+  else context.drawImage(cut, minX, minY, width, height, x + minX + dx, y + minY + dy, width, height);
 }
 function updateAnimationPixelMove(stroke, e) {
   const move = stroke.pixelMove;
@@ -1267,7 +1271,7 @@ function updateAnimationPixelMove(stroke, e) {
 }
 function commitAnimationPixelMove(stroke) {
   const move = stroke.pixelMove;
-  if (!move.dx && !move.dy) return;
+  if (!move.dx && !move.dy && !move.rotated) return;
   const layer = animationLayerList().find(item => item.id === move.layerId);
   const cel = animationCel(layer, move.frame);
   if (!cel) return;
@@ -1278,11 +1282,14 @@ function commitAnimationPixelMove(stroke) {
   if (move.base) {
     animationBakeBase(move.frame, move.canvas);
   } else {
-    const { position, remaining, bounds, dx, dy } = move;
-    const left = position.x + Math.min(0, bounds.minX + dx);
-    const top = position.y + Math.min(0, bounds.minY + dy);
-    const right = position.x + Math.max(remaining.width, bounds.maxX + dx + 1);
-    const bottom = position.y + Math.max(remaining.height, bounds.maxY + dy + 1);
+    const { position, remaining, bounds, dx, dy, rotated } = move;
+    const movedLeft = rotated?.left ?? position.x + bounds.minX + dx;
+    const movedTop = rotated?.top ?? position.y + bounds.minY + dy;
+    const movedRight = rotated ? rotated.left + rotated.canvas.width : position.x + bounds.maxX + dx + 1;
+    const movedBottom = rotated ? rotated.top + rotated.canvas.height : position.y + bounds.maxY + dy + 1;
+    const left = Math.min(position.x, movedLeft), top = Math.min(position.y, movedTop);
+    const right = Math.max(position.x + remaining.width, movedRight);
+    const bottom = Math.max(position.y + remaining.height, movedBottom);
     const canvas = makeMask(right - left, bottom - top), context = canvas.getContext('2d');
     context.translate(cel.flipX ? canvas.width : 0, cel.flipY ? canvas.height : 0);
     context.scale(cel.flipX ? -1 : 1, cel.flipY ? -1 : 1);
@@ -1296,6 +1303,216 @@ function commitAnimationPixelMove(stroke) {
   if (!layer.sharedCel) state.indexedFrames[move.frame] = null;
   markFrameBitmapsDirty();
   if (layer.sharedCel || !updateFrameThumb(move.frame)) buildFilmstrip();
+}
+function animationRotationSource(canvas, bounds, x = 0, y = 0) {
+  const { minX, minY, maxX, maxY } = bounds;
+  const image = canvas.getContext('2d').getImageData(minX, minY, maxX - minX + 1, maxY - minY + 1);
+  return { image, left: x + minX, top: y + minY };
+}
+function rotateAnimationPixels(source, pivot, angle, sourcePivot = pivot) {
+  const { image, left, top } = source;
+  const { width, height, data } = image;
+  const sin = Math.sin(angle), cos = Math.cos(angle);
+  const corners = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => {
+    const dx = left + x - sourcePivot.x, dy = top + y - sourcePivot.y;
+    return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos };
+  });
+  const x = Math.floor(Math.min(...corners.map(point => point.x)) + 1e-8);
+  const y = Math.floor(Math.min(...corners.map(point => point.y)) + 1e-8);
+  const right = Math.ceil(Math.max(...corners.map(point => point.x)) - 1e-8);
+  const bottom = Math.ceil(Math.max(...corners.map(point => point.y)) - 1e-8);
+  const canvas = makeMask(right - x, bottom - y), context = canvas.getContext('2d');
+  const output = context.createImageData(canvas.width, canvas.height);
+  // Sample the nearest source pixel to each destination pixel center.
+  for (let row = 0; row < output.height; row++) {
+    const dy = y + row + .5 - pivot.y;
+    for (let col = 0; col < output.width; col++) {
+      const dx = x + col + .5 - pivot.x;
+      const sx = Math.floor(sourcePivot.x - left + dx * cos + dy * sin + 1e-8);
+      const sy = Math.floor(sourcePivot.y - top - dx * sin + dy * cos + 1e-8);
+      if (sx < 0 || sx >= width || sy < 0 || sy >= height) continue;
+      const from = (sy * width + sx) * 4, to = (row * output.width + col) * 4;
+      output.data[to] = data[from];
+      output.data[to + 1] = data[from + 1];
+      output.data[to + 2] = data[from + 2];
+      output.data[to + 3] = data[from + 3];
+    }
+  }
+  context.putImageData(output, 0, 0);
+  return { canvas, left: x, top: y, image: output };
+}
+function openAnimationRotationMessage(message) {
+  $('animationRotationMessage').textContent = message;
+  $('animationRotationDialog').classList.add('show');
+  $('animationRotationOk').focus();
+}
+function closeAnimationRotationMessage() {
+  $('animationRotationDialog').classList.remove('show');
+  els.canvasShell.focus({ preventScroll: true });
+}
+function startAnimationRotation() {
+  if (activeAnimationRotation() || state.dragging) return;
+  const layer = activeAnimationLayer();
+  if (layer?.group || (layer && !animationLayerVisible(layer))) {
+    showError('Select a visible sprite layer to rotate.');
+    return;
+  }
+  if (!animationCel(layer)) return openAnimationRotationMessage('The layer is empty.');
+  const previousSelection = validAnimationSelection() ? animationSelection : null;
+  const fullMask = makeMask(), context = fullMask.getContext('2d');
+  context.fillRect(0, 0, fullMask.width, fullMask.height);
+  const move = prepareAnimationPixelMove(layer, previousSelection ? animationSelectionMask() : fullMask);
+  if (!move) {
+    const layerHasPixels = previousSelection && prepareAnimationPixelMove(layer, fullMask);
+    return openAnimationRotationMessage(layerHasPixels ? 'The selection contains no pixels on this layer.' : 'The layer is empty.');
+  }
+  const pixels = animationRotationSource(move.cut, move.bounds, move.position.x, move.position.y);
+  const initialSelection = previousSelection || {
+    kind: 'rectangle', frameId: state.frames[move.frame].id,
+    points: [{ x: pixels.left, y: pixels.top }, { x: pixels.left + pixels.image.width, y: pixels.top + pixels.image.height }]
+  };
+  const mask = previousSelection ? animationSelectionMask() : animationSelectionRaster(initialSelection).mask;
+  const maskSource = animationRotationSource(mask, canvasAlphaBounds(mask, 1));
+  const pivot = { x: maskSource.left + maskSource.image.width / 2, y: maskSource.top + maskSource.image.height / 2 };
+  pause(false, { updateInfo: false });
+  showError('');
+  animationRotation = { move, frame: state.frames[move.frame], pixels, maskSource, pivot, sourcePivot: pivot, angle: 0,
+    initialSelection, selection: initialSelection, previousSelection, pointerId: null, previewFrame: null };
+  els.canvasShell.classList.add('animation-rotation-cursor');
+  els.canvasShell.focus({ preventScroll: true });
+  drawFrame(move.frame, { fast: true, skipThumb: true });
+}
+function activeAnimationRotation() {
+  const rotation = animationRotation;
+  if (rotation && (!animationPanelActive() || rotation.frame !== state.frames[state.currentFrame]
+    || rotation.move.layerId !== activeAnimationLayer()?.id)) endAnimationRotation();
+  return animationRotation;
+}
+function endAnimationRotation() {
+  const rotation = animationRotation;
+  if (!rotation) return;
+  animationRotation = null;
+  if (rotation.previewFrame !== null) cancelAnimationFrame(rotation.previewFrame);
+  if (rotation.pointerId !== null && els.canvasShell.hasPointerCapture(rotation.pointerId)) {
+    els.canvasShell.releasePointerCapture(rotation.pointerId);
+  }
+  els.canvasShell.classList.remove('animation-rotation-cursor', 'animation-rotation-pivot-cursor');
+  $('animationRotationPivot').hidden = true;
+  $('animationRotationPivotPreview').hidden = true;
+}
+function renderAnimationRotationPivot(rotation) {
+  if (!rotation) return;
+  const shell = els.canvasShell.getBoundingClientRect(), canvas = els.mainCanvas.getBoundingClientRect();
+  const position = (id, point) => {
+    const marker = $(id);
+    marker.hidden = !point;
+    if (!point) return;
+    marker.style.left = `${canvas.left - shell.left - els.canvasShell.clientLeft + point.x * canvas.width / state.cageWidth}px`;
+    marker.style.top = `${canvas.top - shell.top - els.canvasShell.clientTop + point.y * canvas.height / state.cageHeight}px`;
+  };
+  position('animationRotationPivot', rotation.pivot);
+  position('animationRotationPivotPreview', rotation.hover);
+}
+function updateAnimationRotationPreview(rotation) {
+  const { move, pixels, maskSource, pivot, sourcePivot, angle } = rotation;
+  if (Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) < 1e-8
+    && Math.hypot(pivot.x - sourcePivot.x, pivot.y - sourcePivot.y) < 1e-8) {
+    move.rotated = null;
+    rotation.selection = rotation.initialSelection;
+  } else {
+    move.rotated = rotateAnimationPixels(pixels, pivot, angle, sourcePivot);
+    const { image, left, top } = rotateAnimationPixels(maskSource, pivot, angle, sourcePivot);
+    const alpha = new Uint8Array(image.width * image.height);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = image.data[i * 4 + 3];
+    rotation.selection = { kind: 'mask', frameId: rotation.frame.id, width: image.width, height: image.height,
+      offsetX: left, offsetY: top, alpha };
+    const context = move.canvas.getContext('2d');
+    context.clearRect(0, 0, move.canvas.width, move.canvas.height);
+    drawAnimationPixelMove(context, move);
+  }
+  drawFrame(move.frame, { fast: true, skipThumb: true });
+}
+function finishAnimationRotation(apply = false) {
+  const rotation = activeAnimationRotation();
+  if (!rotation) return false;
+  if (apply && rotation.previewFrame !== null) updateAnimationRotationPreview(rotation);
+  endAnimationRotation();
+  if (apply) {
+    if (rotation.move.rotated) {
+      animationSelection = rotation.selection;
+      commitAnimationPixelMove({ pixelMove: rotation.move, previousSelection: rotation.previousSelection });
+    } else commitAnimationSelection(rotation.initialSelection);
+  }
+  drawFrame(state.currentFrame);
+  updateAnimationUi();
+  return true;
+}
+function updateAnimationRotationHover(rotation, event) {
+  const pointer = rotation.lastPointer;
+  rotation.hover = event.altKey && pointer && rotation.pointerId === null ? {
+    x: Math.round(pointer.x * 2) / 2, y: Math.round(pointer.y * 2) / 2
+  } : null;
+  els.canvasShell.classList.toggle('animation-rotation-pivot-cursor', !!rotation.hover);
+  renderAnimationRotationPivot(rotation);
+}
+function animationRotationAngle(point, pivot) {
+  return Math.atan2(point.y - pivot.y, point.x - pivot.x);
+}
+function startAnimationRotationDrag(rotation, event) {
+  rotation.lastPointer = pointerGuidePoint(event);
+  updateAnimationRotationHover(rotation, event);
+  if (rotation.hover) {
+    const pivot = rotation.hover;
+    const dx = pivot.x - rotation.pivot.x, dy = pivot.y - rotation.pivot.y;
+    const sin = Math.sin(rotation.angle), cos = Math.cos(rotation.angle);
+    rotation.sourcePivot = { x: rotation.sourcePivot.x + dx * cos + dy * sin,
+      y: rotation.sourcePivot.y - dx * sin + dy * cos };
+    rotation.pivot = pivot;
+    updateAnimationRotationHover(rotation, { altKey: false });
+    return;
+  }
+  if (rotation.pointerId !== null) return;
+  rotation.startAngle = animationRotationAngle(rotation.lastPointer, rotation.pivot);
+  rotation.angleBeforeDrag = rotation.angle;
+  rotation.pointerId = event.pointerId;
+  els.canvasShell.setPointerCapture(event.pointerId);
+}
+function moveAnimationRotationPointer(event) {
+  const rotation = activeAnimationRotation();
+  if (!rotation || state.dragging) return false;
+  rotation.lastPointer = pointerGuidePoint(event);
+  if (rotation.pointerId === null) updateAnimationRotationHover(rotation, event);
+  else if (event.pointerId === rotation.pointerId) {
+    const angle = rotation.angleBeforeDrag + animationRotationAngle(rotation.lastPointer, rotation.pivot) - rotation.startAngle;
+    if (angle === rotation.angle) return true;
+    rotation.angle = angle;
+    if (rotation.previewFrame === null) rotation.previewFrame = requestAnimationFrame(() => {
+      rotation.previewFrame = null;
+      updateAnimationRotationPreview(rotation);
+    });
+  }
+  return true;
+}
+function releaseAnimationRotationPointer(event) {
+  const rotation = activeAnimationRotation();
+  if (!rotation || rotation.pointerId === null || rotation.pointerId !== event.pointerId) return;
+  const canceled = event.type === 'pointercancel';
+  if (canceled) rotation.angle = rotation.angleBeforeDrag;
+  else moveAnimationRotationPointer(event);
+  const pending = rotation.previewFrame !== null;
+  if (pending) cancelAnimationFrame(rotation.previewFrame);
+  rotation.previewFrame = null;
+  rotation.pointerId = null;
+  if (els.canvasShell.hasPointerCapture(event.pointerId)) els.canvasShell.releasePointerCapture(event.pointerId);
+  if (pending || canceled) updateAnimationRotationPreview(rotation);
+  updateAnimationRotationHover(rotation, event);
+}
+function setAnimationRotationAlt(held, clearPointer = false) {
+  const rotation = activeAnimationRotation();
+  if (!rotation) return false;
+  if (clearPointer) rotation.lastPointer = null;
+  updateAnimationRotationHover(rotation, { altKey: held });
+  return true;
 }
 function splitAnimationSelection() {
   const layer = activeAnimationLayer(), mask = animationSelectionMask();
@@ -1434,6 +1651,11 @@ function paintAnimationBucket(layer, point, i = state.currentFrame) {
 }
 function startAnimationCanvasDrag(e) {
   if(!animationPanelActive() || !hasFrames()) return false;
+  const rotation = activeAnimationRotation();
+  if (rotation) {
+    startAnimationRotationDrag(rotation, e);
+    return true;
+  }
   if (temporaryPencilColorPickerActive(e)) {
     pickPencilColorFromCanvasEvent(e);
     return true;
@@ -1675,6 +1897,22 @@ function finishAnimationCanvasDrag(e) {
   } else if(stroke?.tool==='move')animationChanged();
   else {drawFrame(state.currentFrame);updateAnimationUi();}
 }
+function handleAnimationRotationKeyDown(event) {
+  if (animationPanelActive() && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'r') {
+    event.preventDefault();
+    if (!event.repeat) startAnimationRotation();
+    return true;
+  }
+  if (!activeAnimationRotation()) return false;
+  if (event.key === 'Enter' || event.key === 'Escape') {
+    event.preventDefault();
+    finishAnimationRotation(event.key === 'Enter');
+  } else if (event.key === 'Alt') {
+    event.preventDefault();
+    setAnimationRotationAlt(true);
+  } else if (event.code === 'Space' || event.key.startsWith('Arrow')) event.preventDefault();
+  return true;
+}
 function handleAnimationKeyDown(e) {
   if(!animationPanelActive()||e.altKey)return false;
   const key=e.key.toLowerCase();
@@ -1733,6 +1971,13 @@ animationEls.newLayer.addEventListener('click',createEmptyAnimationLayer);
 animationEls.newGroup.addEventListener('click',createAnimationGroup);
 animationEls.merge.addEventListener('click',mergeAnimationLayers);
 animationEls.exportLayer.addEventListener('click', exportAnimationLayerPng);
+$('animationRotationOk').addEventListener('click', closeAnimationRotationMessage);
+document.addEventListener('pointerdown', event => {
+  if (animationRotation && event.button === 0 && (!els.canvasShell.contains(event.target)
+    || event.target.closest?.('.side-panels, .canvas-info-row, #floatingToolTabs, button, input'))) {
+    finishAnimationRotation();
+  }
+}, true);
 animationEls.copy.addEventListener('click',copyAnimationLayers);
 animationEls.paste.addEventListener('click', () => pasteAnimationLayers());
 document.addEventListener('copy', event => {

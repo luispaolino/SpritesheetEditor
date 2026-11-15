@@ -88,3 +88,14 @@
   width: 100%; height: 100%; max-width: none; max-height: none;
   pointer-events: none; background: transparent; image-rendering: pixelated; transform: none;
 }
+.canvas-shell.animation-rotation-cursor:not(.panning) {
+  cursor: url('icons/cursor-rotate.svg') 12 12, crosshair;
+}
+.canvas-shell.animation-rotation-pivot-cursor:not(.panning) { cursor: crosshair; }
+.animation-rotation-pivot {
+  position: absolute; z-index: 321; width: 24px; height: 24px;
+  transform: translate(-50%, -50%); pointer-events: none;
+  fill: none; stroke: white; stroke-width: 1.5; filter: drop-shadow(0 0 1px black) drop-shadow(0 0 2px black);
+}
+.animation-rotation-pivot[hidden] { display: none; }
+.animation-rotation-pivot.preview { stroke: var(--accent); stroke-dasharray: 2 2; }
