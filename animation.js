@@ -4,6 +4,7 @@ const ANIMATION_BASE_ID = 'animation-base';
 const ANIMATION_GRID_PADDING = 'animation-grid-padding';
 const ANIMATION_BRUSH_MAX_SIZE = 50;
 const ANIMATION_BLANK_SIZE = 256;
+const DEFAULT_SECONDARY_PENCIL_COLOR = { r: 0, g: 0, b: 0, a: 255 };
 const ANIMATION_SELECTION_TOOLS = {
   lasso: { label: 'Lasso selection (L)', icon: 'selection-lasso.svg' },
   rectangle: { label: 'Rectangle selection (Shift+R)', icon: 'selection-rectangle.svg' },
@@ -1057,14 +1058,59 @@ function updateAnimationUi(force = false) {
     }
     item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); if(layer.group)button.removeAttribute('aria-pressed');else button.setAttribute('aria-pressed',String(flip)); button.disabled = !offset; });
   });
-  const colorsEnabled = builder ? builderReady : hasFrames();
-  const colorKey = JSON.stringify([state.pencilColors,state.activePencilColorIndex,colorsEnabled]);
-  if (animationEls.colors.dataset.colorKey !== colorKey) {
-    animationEls.colors.dataset.colorKey = colorKey; animationEls.colors.replaceChildren();
-    (state.pencilColors || [state.pencilColor]).forEach((color,index) => {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'swatch-button pencil-color-button'; button.dataset.animationColor = index; button.disabled = !colorsEnabled; button.setAttribute('aria-label',`Pencil color ${index+1}`); button.classList.toggle('active',index === state.activePencilColorIndex); button.setAttribute('aria-pressed',String(index === state.activePencilColorIndex));
-      const chip = document.createElement('span'); chip.className = 'swatch-chip'; const background = pencilColorSwatchBackground(color); chip.style.backgroundImage = background.image; chip.style.backgroundSize = background.size; chip.style.backgroundPosition = background.position; button.append(chip); animationEls.colors.append(button);
-    });
+  updateAnimationColorUi(builder, builderReady);
+}
+function animationSecondaryPencilIndex() {
+  return state.activePencilColorIndex === 0 ? 1 : 0;
+}
+function swapAnimationPencilColors() {
+  const index = animationSecondaryPencilIndex(), primary = state.pencilColor;
+  setPencilColorAt(state.activePencilColorIndex, state.pencilColors[index] || DEFAULT_SECONDARY_PENCIL_COLOR, { refresh: false });
+  state.pencilColors[index] = cloneColor(primary);
+  updateAnimationColorUi(false, false);
+  renderBrushCursorOverlay();
+}
+function updateAnimationColorUi(builder, builderReady) {
+  const strip = animationEls.colors, colors = state.pencilColors, primary = state.activePencilColorIndex;
+  const secondary = animationSecondaryPencilIndex();
+  const key = JSON.stringify([colors, primary, builder, builderReady]);
+  if (strip.dataset.colorKey === key) return;
+  strip.dataset.colorKey = key;
+  const focused = strip.contains(document.activeElement) ? document.activeElement.dataset.animationColor : null;
+  strip.replaceChildren();
+  const indices = [...colors.keys()];
+  const ordered = builder ? indices : [primary, ...indices.filter(index => index !== primary && index !== secondary)];
+  for (const index of ordered) {
+    const split = !builder && index === primary;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'swatch-button pencil-color-button';
+    button.dataset.animationColor = index;
+    button.disabled = builder && !builderReady;
+    button.classList.toggle('active', index === primary);
+    if (split) {
+      button.dataset.animationPrimary = '';
+      button.title = 'Edit primary color. Press C to swap primary and secondary.';
+      button.setAttribute('aria-label', 'Edit primary paint color');
+      button.setAttribute('aria-description', 'Press C to swap primary and secondary.');
+    } else {
+      button.setAttribute('aria-label', `Pencil color ${index + 1}`);
+      button.setAttribute('aria-pressed', String(index === primary));
+    }
+    const chip = document.createElement('span');
+    chip.className = split ? 'swatch-chip animation-color-split' : 'swatch-chip';
+    chip.setAttribute('aria-hidden', 'true');
+    const halves = split ? [colors[index], colors[secondary] || DEFAULT_SECONDARY_PENCIL_COLOR] : [colors[index]];
+    for (const color of halves) {
+      const swatch = split ? chip.appendChild(document.createElement('span')) : chip;
+      const background = pencilColorSwatchBackground(color);
+      swatch.style.backgroundImage = background.image;
+      swatch.style.backgroundSize = background.size;
+      swatch.style.backgroundPosition = background.position;
+    }
+    button.append(chip);
+    strip.append(button);
+    if (focused === button.dataset.animationColor && !button.disabled) button.focus({ preventScroll: true });
   }
 }
 function validateAnimationSheetGrid(canvas, rows, cols) {
@@ -2241,14 +2287,17 @@ $('animationClearSelectionButton').addEventListener('click',clearAnimationSelect
 animationEls.size.addEventListener('input',e=>setAnimationBrushSize(e.target.value));
 animationEls.colors.addEventListener('click',e=>{
   const button=e.target.closest('[data-animation-color]');if(!button)return;const index=Number(button.dataset.animationColor);
-  if(index===state.activePencilColorIndex)openColorPicker({type:'pencil',index},state.pencilColors[index]||state.pencilColor,'Pencil Color');
+  if(index===state.activePencilColorIndex)openColorPicker({type:'pencil',index},state.pencilColors[index]||state.pencilColor,
+    animationBuilderCompanionActive() ? 'Pencil Color' : 'Primary Color');
   else selectPencilColor(index);
 });
 animationEls.colors.addEventListener('contextmenu', e => {
   const button = e.target.closest('[data-animation-color]');
   if (!button || button.disabled) return;
   e.preventDefault();
-  openPencilColorContextMenu(Number(button.dataset.animationColor), e.clientX, e.clientY);
+  const index = Number(button.dataset.animationColor);
+  if (!animationBuilderCompanionActive() && index === state.activePencilColorIndex) return;
+  openPencilColorContextMenu(index, e.clientX, e.clientY);
 });
 animationEls.list.addEventListener('click',e=>{
   if(animationLayerDrag?.active)return;

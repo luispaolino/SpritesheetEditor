@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.7.0-5" />
+  <link rel="stylesheet" href="animation.css?v=1.7.0-6" />
   <style>
     :root {
       --bg: #10131b;
@@ -2180,6 +2180,7 @@
         <div><kbd>M / L / Shift + R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Select a layer’s visible pixels from the Edit Image layer list. On the canvas, pick a color with Pencil or Paint Bucket, or pick the topmost visible layer with other tools.</span></div>
         <div><kbd>Ctrl/Cmd + Alt + Click</kbd><span>Toggle a layer in the Edit Image layer selection. Shift-click selects a range of layers.</span></div>
+        <div><kbd>C</kbd><span>Swap primary and secondary paint colors in Edit Image</span></div>
         <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups. Paste copied artwork or a clipboard image in Edit Image.</span></div>
         <div><kbd>Ctrl/Cmd + A</kbd><span>Select the full canvas in Edit Image</span></div>
         <div><kbd>R / S</kbd><span>Rotate / Scale the selection or active layer in Edit Image. Drag to preview, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
@@ -17012,7 +17013,9 @@
       colorPicker.dragging = false;
       colorModalBox()?.classList.remove('dragging');
       els.colorModal.classList.remove('show');
-      if (targetType === 'ruler') {
+      if (targetType === 'pencil' && animationPanelActive()) {
+        animationEls.colors.querySelector('[data-animation-primary]')?.focus({ preventScroll: true });
+      } else if (targetType === 'ruler') {
         if (hasFrames()) drawFrame(state.currentFrame);
         updateInfo();
       } else if (targetType === 'reference-fade') {
@@ -20438,6 +20441,12 @@
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
       const active = document.activeElement, typing = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
+      if (!typing && !active?.isContentEditable && k === 'c' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey
+        && animationPanelActive() && !colorPicker.pickMode) {
+        e.preventDefault();
+        if (!e.repeat && !state.dragging) swapAnimationPencilColors();
+        return;
+      }
       if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && k === 'h'
         && (hasFrames() || state.referenceCompositorVisible) && !spriteSheetBuilderPanelActive()) {
         e.preventDefault();
@@ -20824,7 +20833,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-11"></script>
+  <script src="animation.js?v=1.7.0-12"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

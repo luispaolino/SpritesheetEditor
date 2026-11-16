@@ -79,6 +79,12 @@
 .side-panels #animationColorStrip { flex: 0 0 auto; max-width: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; }
 .side-panels #animationColorStrip .swatch-button { width: 34px; height: 34px; min-width: 34px; min-height: 34px; padding: 0; display: grid; place-items: center; }
 .side-panels #animationColorStrip .swatch-chip { width: 22px; height: 22px; }
+#animationColorStrip .animation-color-split {
+  display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; background-color: #202638;
+}
+#animationColorStrip .animation-color-split > span + span {
+  border-left: 1px solid rgba(255,255,255,.24);
+}
 .animation-group [hidden] { display: none !important; }
 .animation-clipboard-button .tool-icon-image { width: 16px; height: 16px; }
 .canvas-shell.animation-move-cursor,
