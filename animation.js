@@ -31,6 +31,7 @@ let animationStroke = null;
 let animationTransform = null;
 let animationPaintAnchor = null;
 let animationPaintShiftHeld = false;
+let animationSpriteMaskPreview = null;
 let animationLayerDrag = null;
 let animationInputHistory = null;
 let animationClipboard = null;
@@ -100,6 +101,7 @@ function cloneAnimationLayers(layers, copySharedCel = cloneAnimationCel, copyShe
   const copy = layers.map(layer => {
     const record = { id: String(layer.id), name: String(layer.name || (layer.group ? 'Group' : 'Sprite')), visible: layer.visible !== false,
       base: layer.id === ANIMATION_BASE_ID, group: !!layer.group && layer.id !== ANIMATION_BASE_ID, parentId: String(layer.parentId || ''), collapsed: !!layer.collapsed, opacity: normalizeAnimationOpacity(layer.opacity) };
+    if (!record.group && layer.spriteMask) record.spriteMask = true;
     if (!record.group && layer.sharedCel) record.sharedCel = copySharedCel(layer.sharedCel);
     if (!record.group && !record.base && layer.sheetCanvas) record.sheetCanvas = copySheet(layer.sheetCanvas);
     if (!record.group && layer.sourceFrameCount > 1) record.sourceFrameCount = layer.sourceFrameCount;
@@ -360,7 +362,7 @@ function copyAnimationLayers() {
     const cel = captureAnimationCel(layer);
     return {id:layer.id,name:layer.name,group:!!layer.group,collapsed:!!layer.collapsed,
       parentId:rootIds.has(layer.id)?'':layer.parentId,
-      visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),opacity:layer.opacity,cel};
+      visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),opacity:layer.opacity,spriteMask:layer.spriteMask,cel};
   });
   animationClipboard={records, width: state.cageWidth, height: state.cageHeight};
   updateAnimationUi();
@@ -397,7 +399,7 @@ function pasteAnimationLayers(clipboard = animationClipboard) {
     if (!record.parentId) roots.push(id);
     if (!record.group) frame.animationCels[id]=record.cel ? cloneAnimationCels({source:record.cel}).source : {canvas:makeMask(),offsetX:0,offsetY:0,flipX:false,flipY:false};
     frame.animationVisibility[id]=record.visible;
-    return {id,name,base:false,group:record.group,collapsed:record.collapsed,visible:true,opacity:record.opacity,
+    return {id,name,base:false,group:record.group,collapsed:record.collapsed,visible:true,opacity:record.opacity,spriteMask:record.spriteMask,
       parentId:ids.get(record.parentId) || active?.parentId || ''};
   });
   const index=active ? layers.findIndex(layer=>layer.id===active.id) : 0;
@@ -664,6 +666,29 @@ function clearAnimationSelection() {
   drawFrame(state.currentFrame);
   updateAnimationUi();
 }
+function selectAnimationLayerPixels(layer) {
+  if (!layer || layer.group) return;
+  const frame = state.currentFrame;
+  let selection = null;
+  if (animationCel(layer, frame) && animationLayerVisible(layer, frame) && animationEffectiveOpacity(layer)) {
+    const canvas = makeMask(), { width, height } = canvas;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    drawAnimationLayerPixels(context, layer, frame);
+    const { data } = context.getImageData(0, 0, width, height);
+    const alpha = new Uint8Array(width * height);
+    let hasContent = false;
+    for (let i = 0; i < alpha.length; i++) {
+      if (data[i * 4 + 3]) {
+        alpha[i] = 255;
+        hasContent = true;
+      }
+    }
+    if (hasContent) selection = { kind: 'mask', alpha, width, height, frameId: state.frames[frame].id };
+  }
+  commitAnimationSelection(selection);
+  selectAnimationLayer(layer.id);
+  els.canvasShell.focus({ preventScroll: true });
+}
 function rasterizeAnimationSelection(selection, width, height) {
   if (selection?.subtractFrom || selection?.addTo) {
     const shape=rasterizeAnimationSelection({...selection,subtractFrom:null,addTo:null},width,height);
@@ -901,7 +926,7 @@ function updateAnimationUi(force = false) {
   animationEls.merge.disabled=!hasFrames() || (selectedIds.size<2 && !layers.some(layer=>selectedIds.has(layer.id) && layer.group));
   animationEls.exportLayer.disabled = !hasFrames() || !animationLayerVisible(active);
   animationEls.merge.title='Merge selected layers or flatten a selected group across its frames';
-  animationEls.newGroup.title='Group selected layers (Ctrl/Cmd-click or Shift-click layer names to select several)';
+  animationEls.newGroup.title='Group selected layers (Ctrl/Cmd+Alt-click or Shift-click to select several)';
   if (!validAnimationSelection()) animationSelection = null;
   const selected = !!animationSelection;
   animationEls.split.disabled = !selected || active?.group || !animationLayerVisible(active);
@@ -958,7 +983,7 @@ function updateAnimationUi(force = false) {
       const name = document.createElement('button'); name.type = 'button'; name.className = 'reference-layer-name animation-layer-name secondary';
       if(layer.group) {const arrow=document.createElement('span');arrow.className='animation-group-arrow';arrow.textContent=layer.collapsed?'▸':'▾';arrow.setAttribute('aria-hidden','true');name.append(arrow);name.setAttribute('aria-expanded',String(!layer.collapsed));}
       name.append(layer.name);
-      name.title = layer.group ? 'Double-click to expand/collapse; Ctrl/Cmd-click to select multiple; F2 to rename' : 'Drag to reorder; double-click to rename; Ctrl/Cmd-click or Shift-click to select multiple';
+      name.title = layer.group ? 'Double-click to expand or collapse. F2 to rename.' : 'Ctrl/Cmd-click to select layer pixels. Drag to reorder. Double-click to rename.';
       name.setAttribute('aria-label', `Select ${layer.name}`);
       heading.append(name);
       if (!layer.group) {
@@ -991,6 +1016,16 @@ function updateAnimationUi(force = false) {
       opacity.title = 'Layer opacity (0–100%)';
       opacity.setAttribute('aria-label', `Opacity (%) for ${layer.name}`);
       opacityField.append(opacity); controls.append(opacityField);
+      if (!layer.group) {
+        const spriteMask = document.createElement('button');
+        spriteMask.type = 'button';
+        spriteMask.className = 'tool-button reference-flip-button';
+        spriteMask.dataset.animationAction = 'sprite-mask';
+        spriteMask.title = 'Sprite Mask';
+        spriteMask.setAttribute('aria-label', 'Sprite Mask');
+        spriteMask.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="2 3"/><path d="M8 11h8v6H8zM10 11V8a2 2 0 0 1 4 0v3"/></svg>';
+        controls.append(spriteMask);
+      }
       ['x','y'].forEach(axis => {
         const flip = document.createElement('button'); flip.type = 'button'; flip.className = 'secondary reference-flip-button'; flip.dataset.animationFlip = axis;
         const label = axis === 'x' ? 'Flip horizontal' : 'Flip vertical'; flip.title = label; flip.setAttribute('aria-label',`${label} for ${layer.name}`);
@@ -1015,6 +1050,11 @@ function updateAnimationUi(force = false) {
     item.querySelectorAll('[data-animation-offset]').forEach(input => { if (document.activeElement !== input || input.hasAttribute('data-numeric-committing')) input.value = Math.round(offset?.[input.dataset.animationOffset] || 0); input.disabled = !offset; });
     const opacity = item.querySelector('[data-animation-opacity]');
     if (state.restoring || document.activeElement !== opacity || opacity.hasAttribute('data-numeric-committing')) opacity.value = normalizeAnimationOpacity(layer.opacity);
+    const spriteMask = item.querySelector('[data-animation-action="sprite-mask"]');
+    if (spriteMask) {
+      spriteMask.classList.toggle('active', !!layer.spriteMask);
+      spriteMask.setAttribute('aria-pressed', String(!!layer.spriteMask));
+    }
     item.querySelectorAll('[data-animation-flip]').forEach(button => { const flip = !!cel?.[button.dataset.animationFlip === 'x' ? 'flipX' : 'flipY']; button.classList.toggle('active',flip); if(layer.group)button.removeAttribute('aria-pressed');else button.setAttribute('aria-pressed',String(flip)); button.disabled = !offset; });
   });
   const colorsEnabled = builder ? builderReady : hasFrames();
@@ -1214,10 +1254,13 @@ function animationBakeCel(layer, i) {
   cel.canvas = canvas; cel.offsetX = 0; cel.offsetY = 0; cel.flipX = false; cel.flipY = false;
   delete cel.mask;
 }
+function drawAnimationLayerPixels(context, layer, frame = state.currentFrame) {
+  if (animationLayerUsesBaseFrame(layer)) drawBaseSprite(context, frame, 0, 0, { applyMask: true });
+  else drawAnimationCel(context, animationCel(layer, frame));
+}
 function captureAnimationSelectionCel(layer, mask) {
   const source = makeMask(), t = source.getContext('2d');
-  if (animationLayerUsesBaseFrame(layer)) drawBaseSprite(t,state.currentFrame,0,0,{applyMask:true});
-  else drawAnimationCel(t,animationCel(layer));
+  drawAnimationLayerPixels(t, layer);
   t.globalCompositeOperation = 'destination-in'; t.drawImage(mask,0,0); t.globalCompositeOperation = 'source-over';
   const bounds = canvasAlphaBounds(source, 1);
   if (!bounds) return null;
@@ -1413,7 +1456,7 @@ function endAnimationTransform() {
   if (transform.pointerId !== null && els.canvasShell.hasPointerCapture(transform.pointerId)) {
     els.canvasShell.releasePointerCapture(transform.pointerId);
   }
-  els.canvasShell.classList.remove('animation-rotation-cursor', 'animation-scale-cursor', 'animation-rotation-pivot-cursor');
+  els.canvasShell.classList.remove('animation-rotation-cursor', 'animation-scale-cursor', 'animation-scale-move-cursor', 'animation-rotation-pivot-cursor');
   $('animationRotationPivot').setAttribute('hidden', '');
   $('animationRotationPivotPreview').setAttribute('hidden', '');
 }
@@ -1498,13 +1541,30 @@ function startAnimationTransformDrag(transform, event) {
   transform.pointerId = event.pointerId;
   els.canvasShell.setPointerCapture(event.pointerId);
 }
+function startAnimationScaleMove(event) {
+  const transform = activeAnimationTransform();
+  if (transform?.mode !== 'scale') return false;
+  if (transform.pointerId !== null || state.dragging) return true;
+  transform.pointerId = event.pointerId;
+  transform.translationDrag = { x: event.clientX, y: event.clientY, pivot: transform.pivot };
+  updateAnimationTransformHover(transform, { altKey: false });
+  els.canvasShell.classList.add('animation-scale-move-cursor');
+  els.canvasShell.setPointerCapture(event.pointerId);
+  return true;
+}
 function moveAnimationTransformPointer(event) {
   const transform = activeAnimationTransform();
   if (!transform || state.dragging) return false;
   transform.lastPointer = pointerGuidePoint(event);
   if (transform.pointerId === null) updateAnimationTransformHover(transform, event);
   else if (event.pointerId === transform.pointerId) {
-    if (transform.mode === 'scale') {
+    if (transform.translationDrag) {
+      const start = transform.translationDrag;
+      const { dx, dy } = pointerDelta(event, start.x, start.y);
+      const x = start.pivot.x + Math.round(dx), y = start.pivot.y + Math.round(dy);
+      if (x === transform.pivot.x && y === transform.pivot.y) return true;
+      transform.pivot = { x, y };
+    } else if (transform.mode === 'scale') {
       const distance = Math.hypot(transform.lastPointer.x - transform.pivot.x, transform.lastPointer.y - transform.pivot.y);
       const maxDimension = Math.max(transform.maskSource.image.width, transform.maskSource.image.height);
       const scale = clamp(transform.scaleBeforeDrag * distance / transform.startDistance, 1 / maxDimension, 8192 / maxDimension);
@@ -1527,13 +1587,18 @@ function releaseAnimationTransformPointer(event) {
   if (!transform || transform.pointerId === null || transform.pointerId !== event.pointerId) return;
   const canceled = event.type === 'pointercancel';
   if (canceled) {
-    transform.angle = transform.angleBeforeDrag;
-    transform.scale = transform.scaleBeforeDrag;
+    if (transform.translationDrag) transform.pivot = transform.translationDrag.pivot;
+    else {
+      transform.angle = transform.angleBeforeDrag;
+      transform.scale = transform.scaleBeforeDrag;
+    }
   } else moveAnimationTransformPointer(event);
   const pending = transform.previewFrame !== null;
   if (pending) cancelAnimationFrame(transform.previewFrame);
   transform.previewFrame = null;
   transform.pointerId = null;
+  transform.translationDrag = null;
+  els.canvasShell.classList.remove('animation-scale-move-cursor');
   if (els.canvasShell.hasPointerCapture(event.pointerId)) els.canvasShell.releasePointerCapture(event.pointerId);
   if (pending || canceled) updateAnimationTransformPreview(transform);
   updateAnimationTransformHover(transform, event);
@@ -1623,8 +1688,7 @@ function selectAnimationWandRegion(layer, point, e) {
   const i = state.currentFrame;
   if (!animationLayerVisible(layer, i) || !animationCel(layer, i)) return;
   const canvas = makeMask(), { width, height } = canvas, context = canvas.getContext('2d');
-  if (animationLayerUsesBaseFrame(layer)) drawBaseSprite(context, i, 0, 0, { applyMask: true });
-  else drawAnimationCel(context, animationCel(layer, i));
+  drawAnimationLayerPixels(context, layer, i);
   const previous = animationSelectionRaster()?.alpha;
   if (e.altKey && !previous) return;
   let alpha = magicWandAlpha(context.getImageData(0, 0, width, height), point.x, point.y, animationWandSettings());
@@ -1645,21 +1709,41 @@ function paintAnimationBucket(layer, point, i = state.currentFrame) {
   const context = canvas.getContext('2d'), image = context.getImageData(0, 0, width, height);
   const { r, g, b, a } = cloneColor(state.pencilColor), color = a ? [r, g, b, a] : [0, 0, 0, 0];
   const seed = (pixel.y * width + pixel.x) * 4;
+  if (layer.spriteMask && (!a || !image.data[seed + 3])) return false;
   if (color.every((value, channel) => image.data[seed + channel] === value)) return false;
   const mask = animationSelectionMask();
-  let canVisit = null;
+  let selected = null;
   if (mask) {
     const local = base ? makeMask(width, height) : animationLocalMask(mask, cel);
     const localContext = local.getContext('2d');
     if (base) drawCageLayerIntoSource(localContext, mask, i);
-    const selected = localContext.getImageData(0, 0, width, height).data;
-    canVisit = id => selected[id * 4 + 3] > 0;
+    selected = localContext.getImageData(0, 0, width, height).data;
   }
+  let removed = null;
+  if (layer.spriteMask && (base ? state.maskDirty[i] : cel.mask)) {
+    const local = base ? makeMask(width, height) : cel.mask;
+    const localContext = local.getContext('2d');
+    if (base) drawCageLayerIntoSource(localContext, state.frameMasks[i], i);
+    removed = localContext.getImageData(0, 0, width, height).data;
+  }
+  const canVisit = selected || removed ? id => {
+    const alpha = id * 4 + 3;
+    return (!selected || selected[alpha] > 0) && (!removed || removed[alpha] < 255);
+  } : null;
   const region = magicWandAlpha(image, pixel.x, pixel.y, { contiguous: true, tolerance: 0 }, canVisit);
   if (!region.some(Boolean)) return false;
   const fill = pixels => {
+    const opacity = a / 255;
     for (let id = 0; id < region.length; id++) {
-      if (region[id]) pixels.data.set(color, id * 4);
+      if (!region[id]) continue;
+      const offset = id * 4;
+      if (layer.spriteMask) {
+        if (!pixels.data[offset + 3]) continue;
+        for (let channel = 0; channel < 3; channel++) {
+          const index = offset + channel;
+          pixels.data[index] += (color[channel] - pixels.data[index]) * opacity;
+        }
+      } else pixels.data.set(color, offset);
     }
   };
   pushHistory();
@@ -1765,19 +1849,39 @@ function animationPaintClip() {
   const raster = animationSelectionRaster();
   if (!raster) return null;
   if (raster.paintClip) return raster.paintClip;
-  const { alpha } = raster;
-  const path=new Path2D(), width=state.cageWidth, height=state.cageHeight;
+  raster.paintClip = animationPaintPixelClip(state.cageWidth, state.cageHeight, index => raster.alpha[index]);
+  return raster.paintClip;
+}
+function animationPaintPixelClip(width, height, includes) {
+  const path = new Path2D();
   for(let y=0;y<height;y++) {
     const row=y*width;
     for(let x=0;x<width;) {
-      if(!alpha[row+x]) {x++;continue;}
+      if(!includes(row+x)) {x++;continue;}
       const left=x++;
-      while(x<width&&alpha[row+x])x++;
+      while(x<width&&includes(row+x))x++;
       path.rect(left,y,x-left,1);
     }
   }
-  raster.paintClip = path;
   return path;
+}
+function animationSpriteMaskPreviewClip(layer) {
+  const i = state.currentFrame, cel = animationCel(layer, i);
+  if (!cel) return null;
+  const { cageWidth: width, cageHeight: height } = state;
+  const base = animationLayerUsesBaseFrame(layer);
+  const position = base ? frameLayoutForCage(i, width, height) : animationCelPosition(cel);
+  const mask = base ? state.frameMasks[i] : cel.mask;
+  const key = [state.frameBitmapRevision, i, width, height, position.x, position.y,
+    position.width, position.height, cel.flipX, cel.flipY, maskVersion(mask)].join('|');
+  const cached = animationSpriteMaskPreview;
+  if (cached?.canvas === cel.canvas && cached.mask === mask && cached.key === key) return cached.clip;
+  const canvas = makeMask(width, height), context = canvas.getContext('2d');
+  drawAnimationLayerPixels(context, layer, i);
+  const { data } = context.getImageData(0, 0, width, height);
+  const clip = animationPaintPixelClip(width, height, index => data[index * 4 + 3]);
+  animationSpriteMaskPreview = { canvas: cel.canvas, mask, key, clip };
+  return clip;
 }
 function forEachAnimationPaintPixel(start, end, visit) {
   const dx = end.x - start.x, dy = end.y - start.y;
@@ -1822,6 +1926,10 @@ function renderAnimationPaintLinePreview(t, rect, zoomX, zoomY) {
   t.scale(zoomX, zoomY);
   const clip = animationPaintClip();
   if (clip) t.clip(clip);
+  if (layer.spriteMask && tool === 'pencil') {
+    const spriteClip = animationSpriteMaskPreviewClip(layer);
+    if (spriteClip) t.clip(spriteClip);
+  }
   t.fillStyle = 'rgba(255,255,255,.45)';
   t.fill(path);
   t.restore();
@@ -1836,6 +1944,7 @@ function paintAnimationStroke(stroke) {
   t.save();
   if(stroke.clip)t.clip(stroke.clip);
   if(eraser)t.globalCompositeOperation='destination-out';
+  else if (layer.spriteMask) t.globalCompositeOperation = 'source-atop';
   const stamp = (x, y) => stampHardPencil(t, x + .5, y + .5, size, color, !eraser);
   let a=stroke.last;
   for(const b of stroke.points) {
@@ -2148,8 +2257,26 @@ animationEls.list.addEventListener('click',e=>{
   if(action==='remove'){removeAnimationLayer(id);return;}
   if(action==='visible'){toggleAnimationVisibility(id);return;}
   if(action==='all-frames'){toggleAnimationAllFrames(id);return;}
+  if (action === 'sprite-mask') {
+    const layer = ensureAnimationLayers().find(item => item.id === id);
+    if (layer && !layer.group) {
+      pushHistory();
+      layer.spriteMask = !layer.spriteMask;
+      updateAnimationUi();
+      renderBrushCursorOverlay();
+    }
+    return;
+  }
   const flip=e.target.closest('[data-animation-flip]');if(flip){toggleAnimationFlip(id,flip.dataset.animationFlip);return;}
-  selectAnimationLayer(id,{toggle:e.ctrlKey||e.metaKey,range:e.shiftKey});
+  const command = e.ctrlKey || e.metaKey;
+  if (command && !e.altKey && !e.shiftKey) {
+    const layer = animationLayerList().find(layer => layer.id === id);
+    if (layer && !layer.group) {
+      selectAnimationLayerPixels(layer);
+      return;
+    }
+  }
+  selectAnimationLayer(id, { toggle: command, range: e.shiftKey });
 });
 function beginAnimationLayerRename(id) {
   const item=[...animationEls.list.querySelectorAll('[data-animation-id]')].find(item=>item.dataset.animationId===id),name=item?.querySelector('.animation-layer-name');

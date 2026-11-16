@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.7.0-3" />
+  <link rel="stylesheet" href="animation.css?v=1.7.0-5" />
   <style>
     :root {
       --bg: #10131b;
@@ -349,7 +349,7 @@
       border-color: rgba(255,255,255,.13);
     }
     .stage-card.preview-bg-light .side-panels button.secondary,
-    .stage-card.preview-bg-light .side-panels .tool-button,
+    .stage-card.preview-bg-light .side-panels .tool-button:not(.active),
     .stage-card.preview-bg-light .side-panels .check-field,
     .stage-card.preview-bg-light .side-panels .swatch-button,
     .stage-card.preview-bg-light .side-panels .lock-button,
@@ -725,6 +725,11 @@
     .canvas-shell.dragging { cursor: grabbing; border-color: var(--accent); }
     .canvas-shell.mask-mode { cursor: crosshair; border-color: var(--warning); }
     .canvas-shell.brush-cursor-mode { cursor: none; }
+    #canvasShell[data-cage-resize="x"] { cursor: ew-resize; }
+    #canvasShell[data-cage-resize="y"] { cursor: ns-resize; }
+    .stage-card.preview-bg-light .side-panels :is(#lockCageButton, #dimOutsideCageButton).active {
+      color: #071018; background: var(--warning); border-color: transparent;
+    }
     .canvas-shell.bg-dark { background-color: #071018; background-image: none; }
     .canvas-shell.bg-light { background-color: #d3d3d3; background-image: none; }
     .canvas-shell.bg-transparent { background-color: transparent; background-image: none; }
@@ -1223,7 +1228,8 @@
     }
     .context-menu button:disabled { opacity: .45; cursor: not-allowed; }
     #referenceCompositorContextMenu,
-    #referenceCompositorTrackContextMenu { z-index: 11000; }
+    #referenceCompositorTrackContextMenu,
+    #canvasImageContextMenu { z-index: 11000; }
     #paletteOrderMenu { z-index: 11010; gap: 2px; padding: 6px; }
     #paletteOrderMenu button { padding: 8px 10px; background: transparent; border-color: transparent; }
     #paletteOrderMenu button:hover, #paletteOrderMenu button:focus-visible { background: rgba(112,205,248,.16); }
@@ -1505,8 +1511,9 @@
               </div>
               <div class="two-buttons">
                 <button id="fitCageToSpriteButton" class="secondary small-button" type="button" disabled>Fit Cage to Sprite</button>
-                <button id="dimOutsideCageButton" class="secondary small-button" type="button" aria-pressed="false" disabled>Dim Outside Cage</button>
+                <button id="dimOutsideCageButton" class="secondary small-button active" type="button" aria-pressed="true" disabled>Dim Outside Cage</button>
               </div>
+              <button id="lockCageButton" class="secondary small-button active" type="button" aria-pressed="true" title="Unlock to drag the cage borders">Lock Cage</button>
               <div class="field-row">
                 <div class="field">
                   <label for="pivotOnlyXInput">Offset X Pivot</label>
@@ -2171,10 +2178,12 @@
         <div><kbd>Shift + Wheel</kbd><span>Adjust active brush, pencil, or eraser size</span></div>
         <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
         <div><kbd>M / L / Shift + R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
-        <div><kbd>Ctrl/Cmd + Click</kbd><span>Pick a color with Pencil or Paint Bucket. With other Edit Image tools, pick the topmost visible layer on the canvas. In the layer list, select multiple layers.</span></div>
+        <div><kbd>Ctrl/Cmd + Click</kbd><span>Select a layer’s visible pixels from the Edit Image layer list. On the canvas, pick a color with Pencil or Paint Bucket, or pick the topmost visible layer with other tools.</span></div>
+        <div><kbd>Ctrl/Cmd + Alt + Click</kbd><span>Toggle a layer in the Edit Image layer selection. Shift-click selects a range of layers.</span></div>
         <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups. Paste copied artwork or a clipboard image in Edit Image.</span></div>
         <div><kbd>Ctrl/Cmd + A</kbd><span>Select the full canvas in Edit Image</span></div>
         <div><kbd>R / S</kbd><span>Rotate / Scale the selection or active layer in Edit Image. Drag to preview, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
+        <div><kbd>Middle Mouse Drag</kbd><span>Move the sprite during a Scale preview</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
         <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
         <div><kbd>Arrows / Shift + Arrows</kbd><span>Arrows move the outline 1 pixel with a selection tool. Shift + Arrows move the selected pixels 10 pixels in Edit Image.</span></div>
@@ -2241,6 +2250,10 @@
     <button id="ghostFrameMenuButton" type="button" role="menuitem">Ghost Sprite</button>
     <button id="skipFrameMenuButton" type="button" role="menuitem">Skip Frame</button>
     <button id="deleteFrameMenuButton" type="button" role="menuitem">Delete Frame</button>
+  </div>
+  <div class="context-menu" id="canvasImageContextMenu" role="menu" aria-label="Canvas image actions">
+    <button id="saveCanvasImageMenuButton" type="button" role="menuitem">Save image as…</button>
+    <button id="copyCanvasImageMenuButton" type="button" role="menuitem">Copy image</button>
   </div>
   <div class="context-menu" id="referenceCompositorContextMenu" role="menu" aria-label="Compositor clip actions">
     <button id="toggleReferenceCompositorLoopMenuButton" type="button" role="menuitem">Play once</button>
@@ -2531,6 +2544,7 @@
     const els = {
       referenceFadeMirrorInput: $('referenceFadeMirrorInput'),
       canvasHistoryButtons: $('canvasHistoryButtons'), canvasExpandButton: $('canvasExpandButton'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'), timelineVisibilityButton: $('timelineVisibilityButton'),
+      canvasImageContextMenu: $('canvasImageContextMenu'), saveCanvasImageMenuButton: $('saveCanvasImageMenuButton'), copyCanvasImageMenuButton: $('copyCanvasImageMenuButton'),
       fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), referencePaletteFileInput: $('referencePaletteFileInput'), dropZone: $('dropZone'), importFrameSkipInput: $('importFrameSkipInput'), importFrameSkipValue: $('importFrameSkipValue'), importVideoInfo: $('importVideoInfo'),
       rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'), pingPongInput: $('pingPongInput'), oneRowPackInput: $('oneRowPackInput'),
       frameInput: $('frameInput'), frameValue: $('frameValue'), totalFramesValue: $('totalFramesValue'), reverseOrderButton: $('reverseOrderButton'), showSkippedFramesInput: $('showSkippedFramesInput'), deleteSkippedButton: $('deleteSkippedButton'), backgroundInput: $('backgroundInput'), scanlinesInput: $('scanlinesInput'), scanlineOpacityInput: $('scanlineOpacityInput'), scanlineOpacityValue: $('scanlineOpacityValue'), rulersBeyondCageInput: $('rulersBeyondCageInput'), rulerColorButton: $('rulerColorButton'), rulerColorSwatch: $('rulerColorSwatch'), referenceShadowInput: $('referenceShadowInput'), referenceShadowColorButton: $('referenceShadowColorButton'), referenceShadowColorSwatch: $('referenceShadowColorSwatch'), referenceShadowHeightInput: $('referenceShadowHeightInput'), referenceShadowHeightValue: $('referenceShadowHeightValue'), referenceShadowOffsetYInput: $('referenceShadowOffsetYInput'),
@@ -2560,7 +2574,7 @@
       referenceCompositorExportProgressTrack: $('referenceCompositorExportProgressTrack'),
       referenceCompositorExportProgressBar: $('referenceCompositorExportProgressBar'),
       referenceCompositorResolutionPresetInput: $('referenceCompositorResolutionPresetInput'),
-      cageResolutionPresetInput: $('cageResolutionPresetInput'), dimOutsideCageButton: $('dimOutsideCageButton'),
+      cageResolutionPresetInput: $('cageResolutionPresetInput'), dimOutsideCageButton: $('dimOutsideCageButton'), lockCageButton: $('lockCageButton'),
       referenceClipReverseInput: $('referenceClipReverseInput'),
       referenceClipHoldLastFrameInput: $('referenceClipHoldLastFrameInput'),
       referenceClipHoldFramesInput: $('referenceClipHoldFramesInput')
@@ -2666,7 +2680,7 @@
       rows: 1, cols: 4, totalFrames: 0, currentFrame: 0, startFrame: 0, endFrame: 0, importFrameSkip: 0, importFrameSkipMax: 60,
       fps: 12, pingPongAnimation: false, loopPlayback: true, playing: false, animationId: null, lastTick: 0, playbackDirection: 1, referenceAnimationPlaying: false, referenceAnimationTime: 0, referenceAnimationLastTick: 0,
       frameWidth: 0, frameHeight: 0, cageWidth: 1, cageHeight: 1, cageCustom: false,
-      scaleX: 1, scaleY: 1, scaleLocked: true, scaleAll: true, scaleUnit: 'percent', frameScales: [], frameFlips: [], frameFlipYs: [], offsetXAll: 0, offsetYAll: 0, pivotX: null, pivotY: 0, rulersV: [], rulersH: [], rulersBeyondCage: false, rulerColor: cloneColor(DEFAULT_RULER_COLOR), showCageOverlay: true, dimOutsideCage: false, showRulerOverlay: true, showPivotOverlay: true, pivotDark: false,
+      scaleX: 1, scaleY: 1, scaleLocked: true, scaleAll: true, scaleUnit: 'percent', frameScales: [], frameFlips: [], frameFlipYs: [], offsetXAll: 0, offsetYAll: 0, pivotX: null, pivotY: 0, rulersV: [], rulersH: [], rulersBeyondCage: false, rulerColor: cloneColor(DEFAULT_RULER_COLOR), showCageOverlay: true, dimOutsideCage: true, cageLocked: true, showRulerOverlay: true, showPivotOverlay: true, pivotDark: false,
       background: 'checker', scanlinesVisible: false, scanlineOpacity: DEFAULT_SCANLINE_OPACITY, referenceCastShadow: false, referenceShadowColor: cloneColor(DEFAULT_REFERENCE_SHADOW_COLOR), referenceShadowHeight: DEFAULT_REFERENCE_SHADOW_HEIGHT, referenceShadowOffsetY: DEFAULT_REFERENCE_SHADOW_OFFSET_Y, spriteOutline: false, spriteOutlineWidth: DEFAULT_REFERENCE_CLIP_OUTLINE_WIDTH, spriteOutlineColor: cloneColor(DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR), oneRowPack: false, showSkippedFrames: true, backgroundCustomColor: { r: 32, g: 40, b: 52, a: 255 }, displayReferenceUnit: 'percent', displayReferenceLayers: [], activeDisplayReferenceId: '', displayReferenceLayerCounter: 0, displayReferenceCanvas: null, displayReferenceName: '', displayReferenceVisible: false, displayReferenceOffsetX: 0, displayReferenceOffsetY: 0, displayReferenceScale: 100, referenceCompositorVisible: false, referenceCompositorWidth: REFERENCE_COMPOSITOR_DEFAULT_WIDTH, referenceCompositorHeight: REFERENCE_COMPOSITOR_DEFAULT_HEIGHT, referenceCompositorMaskOutsideCage: false, referenceCompositorAssets: [], referenceCompositorAudioAssets: [], referenceCompositorFontAssets: [], referenceCompositorTracks: [], referenceCompositorClips: [], activeReferenceCompositorClipId: '', selectedReferenceCompositorClipIds: [], activeReferenceCompositorTrackId: '', referenceCompositorCursorFrame: 0, referenceCompositorStartFrame: 0, referenceCompositorEndFrame: REFERENCE_COMPOSITOR_DEFAULT_LENGTH - 1, referenceCompositorPxPerFrame: REFERENCE_COMPOSITOR_PX_PER_FRAME, referenceCompositorLoop: true, referenceCompositorExportAudio: true, referenceCompositorVideoQuality: DEFAULT_COMPOSITOR_VIDEO_QUALITY, referenceCompositorVideoBitrate: DEFAULT_COMPOSITOR_VIDEO_BITRATE_MBPS, referenceCompositorAudioBitrate: DEFAULT_COMPOSITOR_AUDIO_BITRATE_KBPS, referenceCompositorExporting: false, referenceCompositorPlaying: false, referenceCompositorLastTick: 0, fontCanvas: null, fontName: '', fontConfigSpritesheetName: '', fontRows: 1, fontCols: DEFAULT_FONT_COLUMNS, fontColsAuto: true, fontOrder: DEFAULT_FONT_ORDER, fontLetterGap: 0, fontSpace: 0, fontRowGap: 0, fontAlign: 'center', fontForceUppercase: false, fontCastShadow: false, fontShadowColor: cloneColor(DEFAULT_FONT_SHADOW_COLOR), fontShadowOffsetX: 2, fontShadowOffsetY: 2, fontLetterOffsets: {}, fontLetterGaps: {}, activeFontLetter: '', fontColor: cloneColor(DEFAULT_FONT_COLOR), fontText: '', fontRevision: 0, frameOffsets: [], frameMasks: [], maskDirty: [], indexedFrames: [],
       maskMode: false, hideMask: false, pencilMode: false, pencilCtrlPickMode: false, paintBucketMode: false, eyedropperMode: false, brushAction: 'mask', brushSize: 18, pencilToolMode: 'pencil', pencilEraserPixelMode: false, pencilHardness: 100, pencilColor: cloneColor(DEFAULT_PENCIL_COLOR), pencilColors: [cloneColor(DEFAULT_PENCIL_COLOR)], activePencilColorIndex: 0, pencilColorContextIndex: null, activePencilLayerId: '', magicTolerance: 32, magicAntialias: true, magicContiguous: true, haloTolerance: 12, showHalo: false, indexColors: 256, indexKeepTransparency: true, indexHighlightColors: true, indexHighlightColor: cloneColor(DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible: false, indexResetPendingAll: false, indexChannelMode: 'none', importedPaletteInfo: null, importedPaletteRevision: 0, frameBitmapRevision: 0, indexPreviewKey: '', indexPreviewResult: null, uploadedPaletteKey: '', uploadedPaletteInfo: null, indexColorSelectMode: false, paletteDropperMode: false, paletteMergeTargetIndices: [], selectedPaletteIndices: [], paletteLayers: [], activePaletteLayerId: '', paletteLayerCounter: 0, paletteSelectionDragging: false, paletteSelectionDragStartIndex: null, paletteSelectionDragAction: 'select', paletteAdjust: { h: 0, s: 0, l: 0, b: 0, c: 0 }, paletteAdjustBasePalette: null, paletteAdjustHistoryPushed: false, spriteEditMode: false, spriteEditAdjust: { h: 0, s: 0, l: 0, b: 0, c: 0, sharp: 0 }, spriteEditBaseFrames: null, spriteEditHistoryPushed: false, spriteEditApplyToken: 0, spriteEditApplyScheduled: false, spriteEditApplying: false, spriteEditClosePendingReset: false, referencePaletteInfo: null, referencePaletteVisible: false, referencePaletteSelectedIndices: [], referencePaletteTargetIndex: null, referencePaletteSelectionDragging: false, referencePaletteSelectionDragStartIndex: null, referencePaletteSelectionDragAction: 'select', spriteSheetBuilderRows: [], spriteSheetBuilderRowCounter: 0, spriteSheetBuilderSourceRows: 1, spriteSheetBuilderSourceCols: 1, spriteSheetBuilderCageWidth: 0, spriteSheetBuilderCageHeight: 0, spriteSheetBuilderPivotX: 0, spriteSheetBuilderPivotY: 0, spriteSheetBuilderGlobalScale: 100, spriteSheetBuilderShowNames: false, spriteSheetBuilderShowCage: false, spriteSheetBuilderPaletteInfo: null, spriteSheetBuilderApplyPalette: true, spriteSheetBuilderExporting: false, spriteSheetBuilderDragRowId: '', activeSpriteSheetBuilderRowId: '', activeSpriteSheetBuilderFrameIndex: 0, spriteSheetBuilderPreviewZoom: 1, spriteSheetBuilderPreviewPanX: 0, spriteSheetBuilderPreviewPanY: 0, spriteSheetBuilderHoveredCell: null, spriteSheetBuilderHoveredAddCell: null, spriteSheetBuilderReplaceTarget: null, spriteSheetBuilderReferenceKeyDown: false, spriteSheetBuilderInputHistoryPushed: false, spriteSheetBuilderStroke: null,
       truePixelResolution: 128, truePixelReferenceCanvas: null, truePixelReferenceName: '', truePixelReferenceSize: null, truePixelPreviewVisible: false, truePixelPreviewKey: '', truePixelPreviewResult: null,
@@ -4263,7 +4277,7 @@
       state.fontRevision = Math.max(0, Math.round(parseFloat(s.fontRevision) || 0));
       clearFontGlyphCache();
       state.showCageOverlay = s.showCageOverlay !== undefined ? s.showCageOverlay !== false : s.showGuideOverlay !== false;
-      state.dimOutsideCage = s.dimOutsideCage === true;
+      state.dimOutsideCage = s.dimOutsideCage !== false;
       state.showRulerOverlay = s.showRulerOverlay !== undefined ? s.showRulerOverlay !== false : s.showGuideOverlay !== false;
       state.showPivotOverlay = s.showPivotOverlay !== false;
       state.pivotDark = !!s.pivotDark;
@@ -4342,6 +4356,7 @@
     function cancelActiveDrag() {
       finishAnimationTransform();
       if (!state.dragging) return;
+      if (state.dragMode === 'cage-resize') { finishCageResize(null, false); return; }
       if (state.dragMode?.startsWith('animation-')) { finishAnimationCanvasDrag({ type: 'pointercancel', pointerId: state.dragPointerId }); return; }
       state.dragging = false;
       state.dragMode = 'offset';
@@ -4682,10 +4697,9 @@
       x = Math.round(x); y = Math.round(y); length = Math.max(0, Math.round(length)); thickness = Math.max(1, Math.round(thickness)); dash = Math.max(1, Math.round(dash));
       centeredDashRuns(length, dash).forEach(run => t.fillRect(x, y + run.start, thickness, run.length));
     }
-    function drawTopCageGuide(octx, shellRect, mainRect) {
+    function drawTopCageGuide(octx, shellRect, mainRect, frame = previewFrameSize()) {
       if (spriteSheetBuilderPanelActive()) return;
       if (state.showCageOverlay === false || (!hasFrames() && !state.referenceCompositorVisible)) return;
-      const frame=previewFrameSize();
       drawCageGuide(pixelGuideContext(octx,shellRect,mainRect,frame),0,0,frame);
     }
     function drawTopRulers(octx, shellRect, mainRect) {
@@ -5279,6 +5293,72 @@
         }
       });
     }
+    function captureCanvasImageWithReferences() {
+      const main = els.mainCanvas, bounds = main.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return null;
+      const layers = [...els.displayReferenceLayerHost.querySelectorAll('canvas.display-reference-layer')].flatMap(canvas => {
+        const style = getComputedStyle(canvas), opacity = Number(style.opacity);
+        if (style.display === 'none' || style.visibility !== 'visible' || opacity <= 0) return [];
+        return [{ canvas, opacity, order: Number(style.zIndex) || 0 }];
+      });
+      if (!layers.length) return null;
+      // The reference host precedes the main canvas, so equal z-index layers draw behind it.
+      layers.push({ canvas: main, opacity: 1, order: Number(getComputedStyle(main).zIndex) || 0 });
+      layers.sort((a, b) => a.order - b.order);
+      const image = makeMask(main.width, main.height), target = image.getContext('2d');
+      const scaleX = main.width / bounds.width, scaleY = main.height / bounds.height;
+      target.imageSmoothingEnabled = false;
+      for (const { canvas, opacity } of layers) {
+        const rect = canvas.getBoundingClientRect();
+        const left = Math.round((rect.left - bounds.left) * scaleX);
+        const top = Math.round((rect.top - bounds.top) * scaleY);
+        const right = Math.round((rect.right - bounds.left) * scaleX);
+        const bottom = Math.round((rect.bottom - bounds.top) * scaleY);
+        if (right <= left || bottom <= top) continue;
+        target.globalAlpha = opacity;
+        target.drawImage(canvas, left, top, right - left, bottom - top);
+      }
+      return image;
+    }
+    let canvasImageSnapshot = null;
+    function openCanvasImageContextMenu(event) {
+      const snapshot = captureCanvasImageWithReferences();
+      if (!snapshot) return;
+      event.preventDefault();
+      canvasImageSnapshot = snapshot;
+      const menu = els.canvasImageContextMenu, parent = fullscreenElement() || document.body;
+      if (menu.parentElement !== parent) parent.appendChild(menu);
+      els.copyCanvasImageMenuButton.disabled = !navigator.clipboard?.write || typeof ClipboardItem !== 'function';
+      menu.classList.add('show');
+      menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8))}px`;
+      menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8))}px`;
+      const firstAction = els.copyCanvasImageMenuButton.disabled ? els.saveCanvasImageMenuButton : els.copyCanvasImageMenuButton;
+      firstAction.focus({ preventScroll: true });
+    }
+    function closeCanvasImageContextMenu() {
+      canvasImageSnapshot = null;
+      els.canvasImageContextMenu.classList.remove('show');
+    }
+    async function useCanvasImageSnapshot(copy) {
+      const image = canvasImageSnapshot;
+      closeCanvasImageContextMenu();
+      if (!image) return;
+      els.canvasShell.focus({ preventScroll: true });
+      try {
+        const png = new Promise((resolve, reject) => {
+          image.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not encode PNG.')), 'image/png');
+        });
+        if (copy) {
+          // Initiate the clipboard write during the click's user activation.
+          await Promise.all([navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]), png]);
+        } else {
+          downloadBlob(await png, `${exportFileBase()}_preview.png`);
+        }
+        showError('');
+      } catch {
+        showError(copy ? 'Could not copy the image. Use Save image as… from the canvas menu instead.' : 'Could not save the canvas image.');
+      }
+    }
     function renderCompositorFadeOverlay() {
       const overlay = els.compositorFadeOverlay;
       const host = els.displayReferenceLayerHost;
@@ -5352,6 +5432,8 @@
       overlay.style.display = 'block';
       const rect = overlay.getBoundingClientRect();
       const mainRect = els.mainCanvas.getBoundingClientRect();
+      const resize = state.cageResizeDrag;
+      const cageRect = resize?.previewRect || mainRect;
       const width = Math.max(1, rect.width || 1);
       const height = Math.max(1, rect.height || 1);
       const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -5368,7 +5450,7 @@
         octx.fillStyle = 'rgba(0, 0, 0, .5)';
         octx.beginPath();
         octx.rect(0, 0, width, height);
-        octx.rect(mainRect.left - rect.left, mainRect.top - rect.top, mainRect.width, mainRect.height);
+        octx.rect(cageRect.left - rect.left, cageRect.top - rect.top, cageRect.width, cageRect.height);
         octx.fill('evenodd');
       }
       if (drawScanlines) {
@@ -5383,7 +5465,7 @@
         for (; y < height; y += period) octx.fillRect(0, y, width, lineHeight);
         octx.globalAlpha = 1;
       }
-      drawTopCageGuide(octx, { left: rect.left, top: rect.top, width, height }, mainRect);
+      drawTopCageGuide(octx, { left: rect.left, top: rect.top, width, height }, cageRect, resize?.size);
       drawTopRulers(octx, { left: rect.left, top: rect.top, width, height }, mainRect);
       drawSpriteSheetBuilderCageOverlay(octx, { left: rect.left, top: rect.top, width, height }, mainRect);
       overlay.style.display = 'block';
@@ -6658,6 +6740,9 @@
       els.cageResolutionPresetInput.disabled = els.dimOutsideCageButton.disabled = !hasFrames();
       els.dimOutsideCageButton.classList.toggle('active', state.dimOutsideCage);
       els.dimOutsideCageButton.setAttribute('aria-pressed', String(state.dimOutsideCage));
+      els.lockCageButton.classList.toggle('active', state.cageLocked);
+      els.lockCageButton.setAttribute('aria-pressed', String(state.cageLocked));
+      if (state.cageLocked || !state.showCageOverlay) els.canvasShell.removeAttribute('data-cage-resize');
       setVal(els.cageWidthInput, Math.round(state.cageWidth)); setVal(els.cageHeightInput, Math.round(state.cageHeight)); setVal(els.scaleFrameXInput, scaleInputValue('x', currentScale)); setVal(els.scaleFrameYInput, scaleInputValue('y', currentScale)); setVal(els.scaleXInput, scaleInputValue('x', globalScale)); setVal(els.scaleYInput, scaleInputValue('y', globalScale));
       setVal(els.offsetXAllInput, Math.round(state.offsetXAll || 0)); setVal(els.offsetYAllInput, Math.round(state.offsetYAll || 0)); setVal(els.pivotOnlyXInput, pivotXValue()); setVal(els.pivotOnlyYInput, Math.round(state.pivotY)); setVal(els.offsetXInput, Math.round(o.x)); setVal(els.offsetYInput, Math.round(o.y));
       const referenceUnit = referenceTransformUnit(), referenceUnitLabel = referenceUnit === 'px' ? 'Px' : '%';
@@ -12980,6 +13065,7 @@
         format: 'spritesheet-editor-project', version: 1, imageName: state.imageName, importedId: state.importedId, sheetImage, sheetImages,
         settings: {
           dimOutsideCage: state.dimOutsideCage,
+          cageLocked: state.cageLocked,
           animationLayers: serializeAnimationLayers(state.animationLayers), activeAnimationLayerId: state.activeAnimationLayerId, selectedAnimationLayerIds: [...selectedAnimationLayerIds()], animationBrushSize: state.animationBrushSize, animationWandSettings: animationWandSettings(), rows: state.rows, cols: state.cols, currentFrame: state.currentFrame, startFrame: state.startFrame, endFrame: state.endFrame, importFrameSkip: state.importFrameSkip, importFrameSkipMax: state.importFrameSkipMax, fps: state.fps, pingPongAnimation: state.pingPongAnimation, loopPlayback: state.loopPlayback !== false, oneRowPack: state.oneRowPack,
           frameWidth: state.frameWidth, frameHeight: state.frameHeight, cageWidth: state.cageWidth, cageHeight: state.cageHeight, cageCustom: state.cageCustom,
           scaleX: state.scaleX, scaleY: state.scaleY, scaleLocked: state.scaleLocked, scaleAll: state.scaleAll, scaleControls: 'split', scaleUnit: state.scaleUnit, frameScales: state.frameScales.map(scale => ({ ...scale })), frameFlips: state.frameFlips.map(Boolean), frameFlipYs: state.frameFlipYs.map(Boolean), offsetXAll: state.offsetXAll, offsetYAll: state.offsetYAll, pivotX: state.pivotX, pivotY: state.pivotY, rulersV: [...state.rulersV], rulersH: [...state.rulersH], rulersBeyondCage: !!state.rulersBeyondCage, rulerColor: cloneColor(state.rulerColor), showCageOverlay: state.showCageOverlay !== false, showRulerOverlay: state.showRulerOverlay !== false, showPivotOverlay: state.showPivotOverlay, pivotDark: state.pivotDark,
@@ -13019,11 +13105,13 @@
       resetProject();
     }
     function resetProject() {
+      if (state.cageResizeDrag) finishCageResize(null, false);
       resetAnimationState();
       pause(true); showError('');
       closeFrameContextMenu(); closeReferenceCompositorContextMenu(); closePencilColorContextMenu(); closeColorPicker(); closePaletteLayerModal(); closeReferenceFadeModal(); closeReferenceClipModal(); closeReferenceAudioModal(); closeReferenceTextModal();
       stopReferenceCompositorAudio(true);
-      state.dimOutsideCage = false;
+      state.dimOutsideCage = true;
+      state.cageLocked = true;
       Object.assign(state,{ sheetImage:null, sheetImages:[], imageName:'spritesheet', frames:[], importedId:0, rows:1, cols:4, totalFrames:0, currentFrame:0, startFrame:0, endFrame:0, importFrameSkip:0, importFrameSkipMax:60, fps:12, pingPongAnimation:false, loopPlayback:true, playing:false, animationId:null, lastTick:0, playbackDirection:1, referenceAnimationPlaying:false, referenceAnimationTime:0, referenceAnimationLastTick:0, frameWidth:0, frameHeight:0, cageWidth:1, cageHeight:1, cageCustom:false, scaleX:1, scaleY:1, scaleLocked:true, scaleAll:true, scaleUnit:'percent', frameScales:[], frameFlips:[], frameFlipYs:[], offsetXAll:0, offsetYAll:0, pivotX:null, pivotY:0, rulersV:[], rulersH:[], rulersBeyondCage:false, rulerColor:cloneColor(DEFAULT_RULER_COLOR), showCageOverlay:true, showRulerOverlay:true, showPivotOverlay:true, pivotDark:false, background:'checker', scanlinesVisible:false, scanlineOpacity:DEFAULT_SCANLINE_OPACITY, referenceCastShadow:false, referenceShadowColor:cloneColor(DEFAULT_REFERENCE_SHADOW_COLOR), referenceShadowHeight:DEFAULT_REFERENCE_SHADOW_HEIGHT, referenceShadowOffsetY:DEFAULT_REFERENCE_SHADOW_OFFSET_Y, spriteOutline:false, spriteOutlineWidth:DEFAULT_REFERENCE_CLIP_OUTLINE_WIDTH, spriteOutlineColor:cloneColor(DEFAULT_REFERENCE_CLIP_OUTLINE_COLOR), oneRowPack:false, showSkippedFrames:true, backgroundCustomColor:{ r: 32, g: 40, b: 52, a: 255 }, displayReferenceUnit:'percent', displayReferenceLayers:[], activeDisplayReferenceId:'', displayReferenceLayerCounter:0, displayReferenceCanvas:null, displayReferenceName:'', displayReferenceVisible:false, displayReferenceOffsetX:0, displayReferenceOffsetY:0, displayReferenceScale:100, fontCanvas:null, fontName:'', fontConfigSpritesheetName:'', fontRows:1, fontCols:DEFAULT_FONT_COLUMNS, fontColsAuto:true, fontOrder:DEFAULT_FONT_ORDER, fontLetterGap:0, fontSpace:0, fontRowGap:0, fontAlign:'center', fontForceUppercase:false, fontLetterOffsets:{}, activeFontLetter:'', fontColor:cloneColor(DEFAULT_FONT_COLOR), fontText:'', fontRevision:0, frameOffsets:[], frameMasks:[], maskDirty:[], indexedFrames:[], maskMode:false, hideMask:false, pencilMode:false, pencilCtrlPickMode:false, paintBucketMode:false, eyedropperMode:false, paletteDropperMode:false, paletteMergeTargetIndices:[], brushAction:'mask', brushSize:18, pencilToolMode:'pencil', pencilEraserPixelMode:false, pencilHardness:100, pencilColor:cloneColor(DEFAULT_PENCIL_COLOR), pencilColors:[cloneColor(DEFAULT_PENCIL_COLOR)], activePencilColorIndex:0, pencilColorContextIndex:null, activePencilLayerId:'', magicTolerance:32, magicAntialias:true, magicContiguous:true, haloTolerance:12, showHalo:false, indexColors:256, indexKeepTransparency:true, indexHighlightColors:true, indexHighlightColor:cloneColor(DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible:false, indexResetPendingAll:false, indexChannelMode:'none', importedPaletteInfo:null, importedPaletteRevision:0, frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, uploadedPaletteKey:'', uploadedPaletteInfo:null, indexColorSelectMode:false, selectedPaletteIndices:[], paletteLayers:[], activePaletteLayerId:'', paletteLayerCounter:0, paletteSelectionDragging:false, paletteSelectionDragStartIndex:null, paletteSelectionDragAction:'select', paletteAdjust:{ h:0, s:0, l:0, b:0, c:0 }, paletteAdjustBasePalette:null, paletteAdjustHistoryPushed:false, spriteEditMode:false, spriteEditAdjust:{ h:0, s:0, l:0, b:0, c:0, sharp:0 }, spriteEditBaseFrames:null, spriteEditHistoryPushed:false, spriteEditApplyToken:0, spriteEditApplyScheduled:false, spriteEditApplying:false, spriteEditClosePendingReset:false, referencePaletteInfo:null, referencePaletteVisible:false, referencePaletteSelectedIndices:[], referencePaletteTargetIndex:null, referencePaletteSelectionDragging:false, referencePaletteSelectionDragStartIndex:null, referencePaletteSelectionDragAction:'select', truePixelResolution:128, truePixelReferenceCanvas:null, truePixelReferenceName:'', truePixelReferenceSize:null, truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, brushCursorVisible:false, brushX:0, brushY:0, zoom:1, panX:0, panY:0, dragging:false, dragMode:'offset', dragPointerId:null, dragLastX:0, dragLastY:0, dragStartX:0, dragStartY:0, dragStartPanX:0, dragStartPanY:0, dragStartOffsetX:0, dragStartOffsetY:0, maskLastX:0, maskLastY:0, brushLineAnchor:null, draggedFrameIndex:null, draggedFrameIndices:[], dropIndex:null, contextFrameIndex:null, selectedFrameIndices:[], selectionAnchorFrame:null, timelineDragging:false, numberInputScrubbing:false, offsetXAllHistoryPushed:false, offsetYAllHistoryPushed:false, undoStack:[], redoStack:[], restoring:false });
       state.fontCastShadow = false;
       state.fontShadowColor = cloneColor(DEFAULT_FONT_SHADOW_COLOR);
@@ -13083,6 +13171,7 @@
     }
     async function loadProjectFile(file) {
       try {
+        if (file && state.cageResizeDrag) finishCageResize(null, false);
         if(!file)return; showError(''); pause(true); stopReferenceCompositorAudio(true); closeFrameContextMenu(); closePencilColorContextMenu(); closeColorPicker(); closePaletteLayerModal(); closeReferenceFadeModal(); closeReferenceClipModal(); closeReferenceAudioModal(); closeReferenceTextModal();
         const project=JSON.parse(await file.text()); if(project.format!=='spritesheet-editor-project'||!Array.isArray(project.frames)) throw new Error('That is not a valid Spritesheet Editor project file.');
         const s=project.settings||{}, frames=[], masks=[];
@@ -13153,7 +13242,8 @@
         const savedAnimationLayers = await restoreAnimationLayers(s.animationLayers);
         Object.assign(state,{ sheetImage:sheetImages[0]?.image || null, sheetImages, imageName:project.imageName||file.name||'spritesheet', frames, importedId:project.importedId||0, rows:clamp(parseInt(s.rows,10)||1,1,100), cols:clamp(parseInt(s.cols,10)||1,1,100), currentFrame:Number.isFinite(savedCurrent)?savedCurrent:0, startFrame:Number.isFinite(savedStart)?savedStart:0, endFrame:Number.isFinite(savedEnd)?savedEnd:Math.max(0,frames.length-1), importFrameSkip:clamp(parseInt(s.importFrameSkip,10)||0,0,Math.max(1,parseInt(s.importFrameSkipMax,10)||60)), importFrameSkipMax:Math.max(1,parseInt(s.importFrameSkipMax,10)||60), fps:clamp(parseInt(s.fps,10)||12,1,60), pingPongAnimation:!!s.pingPongAnimation, loopPlayback:s.loopPlayback!==false, oneRowPack:s.oneRowPack!==undefined?!!s.oneRowPack:!!s.recommendedRepack, playbackDirection:1, referenceAnimationPlaying:false, referenceAnimationTime:0, referenceAnimationLastTick:0, frameWidth:s.frameWidth||0, frameHeight:s.frameHeight||0, cageWidth:clamp(Math.round(s.cageWidth||frames[0]?.canvas.width||1),1,8192), cageHeight:clamp(Math.round(s.cageHeight||frames[0]?.canvas.height||1),1,8192), cageCustom:!!s.cageCustom, scaleX:clamp(parseFloat(s.scaleX)||1,.01,100), scaleY:clamp(parseFloat(s.scaleY)||1,.01,100), scaleLocked:s.scaleLocked!==false, scaleUnit:s.scaleUnit==='px'?'px':'percent', displayReferenceUnit:s.displayReferenceUnit==='px'?'px':'percent', offsetXAll:Math.round(s.offsetXAll||0), offsetYAll:Math.round(s.offsetYAll||0), pivotX:Number.isFinite(parseFloat(s.pivotX))?Math.round(parseFloat(s.pivotX)):null, pivotY:Math.round(s.pivotY||0), rulersV:Array.isArray(s.rulersV)?s.rulersV:[], rulersH:Array.isArray(s.rulersH)?s.rulersH:[], rulersBeyondCage:!!s.rulersBeyondCage, rulerColor:cloneColor(s.rulerColor || DEFAULT_RULER_COLOR), showCageOverlay:s.showCageOverlay!==undefined?s.showCageOverlay!==false:s.showGuideOverlay!==false, showRulerOverlay:s.showRulerOverlay!==undefined?s.showRulerOverlay!==false:s.showGuideOverlay!==false, showPivotOverlay:s.showPivotOverlay!==false, pivotDark:!!s.pivotDark, background:['checker','dark','light','transparent','custom'].includes(s.background)?s.background:'checker', backgroundCustomColor:cloneColor(s.backgroundCustomColor || { r: 32, g: 40, b: 52, a: 255 }), frameOffsets:project.frames.map(f=>({x:Math.round(f.offset?.x||0),y:Math.round(f.offset?.y||0)})), frameMasks:masks.map(m=>m||makeMask()), maskDirty:project.frames.map(f=>!!f.mask), indexedFrames, maskMode:!!s.maskMode, hideMask:!!s.hideMask, pencilMode:false, pencilCtrlPickMode:false, eyedropperMode:false, brushAction:['mask','restore','wand'].includes(s.brushAction)?s.brushAction:'mask', brushSize:clamp(parseInt(s.brushSize,10)||18,1,120), pencilToolMode:normalizePencilToolMode(s.pencilToolMode), pencilEraserPixelMode:!!s.pencilEraserPixelMode, pencilHardness:clamp(Math.round(Number.isFinite(parseFloat(s.pencilHardness))?parseFloat(s.pencilHardness):100),0,100), pencilColor:cloneColor(s.pencilColor || { r: 182, g: 192, b: 207, a: 255 }), activePencilLayerId:s.activePencilLayerId || '', magicTolerance:clamp(Number.isFinite(savedMagicTolerance)?savedMagicTolerance:32,0,255), magicAntialias:s.magicAntialias!==false, magicContiguous:s.magicContiguous!==false, haloTolerance:clamp(parseInt(s.haloTolerance,10)||12,0,30), showHalo:false, indexColors:clamp(parseInt(s.indexColors,10)||256,3,256), indexKeepTransparency:s.indexKeepTransparency!==false, indexHighlightColors:s.indexHighlightColors!==false, indexHighlightColor:cloneColor(s.indexHighlightColor || DEFAULT_INDEX_HIGHLIGHT_COLOR), indexPreviewVisible:false, indexResetPendingAll:false, indexChannelMode:['r','g','b','a'].includes(s.indexChannelMode)?s.indexChannelMode:'none', frameBitmapRevision:0, indexPreviewKey:'', indexPreviewResult:null, uploadedPaletteKey:'', uploadedPaletteInfo:null, truePixelResolution:normalizeTruePixelResolution(s.truePixelResolution || 128), truePixelPreviewVisible:false, truePixelPreviewKey:'', truePixelPreviewResult:null, zoom:clamp(parseFloat(s.zoom)||1,CANVAS_ZOOM_MIN,CANVAS_ZOOM_MAX), panX:parseFloat(s.panX)||0, panY:parseFloat(s.panY)||0, undoStack:[], redoStack:[], restoring:false });
         state.animationLayers = savedAnimationLayers;
-        state.dimOutsideCage = s.dimOutsideCage === true;
+        state.dimOutsideCage = s.dimOutsideCage !== false;
+        state.cageLocked = s.cageLocked !== false;
         state.activeAnimationLayerId = s.activeAnimationLayerId || "";
         state.selectedAnimationLayerIds=[...(s.selectedAnimationLayerIds || [state.activeAnimationLayerId].filter(Boolean))];
         state.animationSelectionAnchorId=state.activeAnimationLayerId;
@@ -13358,6 +13448,11 @@
       const oldWidth = state.cageWidth, oldHeight = state.cageHeight;
       const oldMaskLayouts = captureFrameMaskLayouts();
       pushHistory();
+      if (origin && (origin.x || origin.y) && validAnimationSelection()) {
+        animationSelection = translateAnimationSelection(animationSelection, -origin.x, -origin.y);
+      }
+      state.brushLineAnchor = null;
+      animationPaintAnchor = null;
       state.cageCustom = true;
       state.cageWidth = clamp(Math.round(w), 1, 8192);
       state.cageHeight = clamp(Math.round(h), 1, 8192);
@@ -16378,6 +16473,97 @@
       state.rulersH.forEach((v,i)=>{const start=state.rulersBeyondCage?Math.round(v):centeredGuideStart(v,w,0,state.cageHeight);hits.push({kind:'h',index:i,d:distance(p.y,start)*(r.height/state.cageHeight),offset:p.y-start});});
       hits.sort((a,b)=>a.d-b.d);
       return hits[0] && hits[0].d <= 8 ? hits[0] : null;
+    }
+    function cageBorderHit(e) {
+      if (state.cageLocked || !state.showCageOverlay || !hasFrames()
+        || state.referenceCompositorVisible || spriteSheetBuilderPanelActive()
+        || colorPicker.pickMode || state.eyedropperMode || state.paletteDropperMode || activeAnimationTransform()
+        || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.target?.closest?.('.canvas-info-row, button, input, select')) return null;
+      const rect = els.mainCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      const tolerance = 8;
+      if (x < -tolerance || y < -tolerance || x > rect.width + tolerance || y > rect.height + tolerance) return null;
+      const edges = [
+        { axis: 'x', leading: true, distance: Math.abs(x) },
+        { axis: 'x', leading: false, distance: Math.abs(rect.width - x) },
+        { axis: 'y', leading: true, distance: Math.abs(y) },
+        { axis: 'y', leading: false, distance: Math.abs(rect.height - y) }
+      ];
+      const border = edges.reduce((nearest, edge) => edge.distance < nearest.distance ? edge : nearest);
+      const unit = border.axis === 'x' ? rect.width / state.cageWidth : rect.height / state.cageHeight;
+      return unit > 0 && border.distance <= Math.max(tolerance, guideThickness() * unit) ? border : null;
+    }
+    function startCageResize(e, border) {
+      pause(false, { updateInfo: false });
+      const rect = els.mainCanvas.getBoundingClientRect();
+      state.cageResizeDrag = {
+        ...border, rect, clientX: e.clientX, clientY: e.clientY,
+        width: state.cageWidth, height: state.cageHeight,
+        zoomX: rect.width / state.cageWidth, zoomY: rect.height / state.cageHeight
+      };
+      state.dragging = true;
+      state.dragMode = 'cage-resize';
+      state.dragPointerId = e.pointerId;
+      hideBrushCursor(false);
+      els.canvasShell.dataset.cageResize = border.axis;
+      els.canvasShell.classList.add('dragging');
+      els.canvasShell.setPointerCapture(e.pointerId);
+    }
+    function cageResizeGeometry(drag, e) {
+      const horizontal = drag.axis === 'x';
+      const length = horizontal ? drag.width : drag.height;
+      const delta = horizontal ? (e.clientX - drag.clientX) / drag.zoomX : (e.clientY - drag.clientY) / drag.zoomY;
+      const next = clamp(length + Math.round(drag.leading ? -delta : delta), 1, 8192);
+      return {
+        size: { width: horizontal ? next : drag.width, height: horizontal ? drag.height : next },
+        origin: { x: horizontal && drag.leading ? length - next : 0, y: !horizontal && drag.leading ? length - next : 0 }
+      };
+    }
+    function resizeCagePreview(drag, e) {
+      const { size, origin } = cageResizeGeometry(drag, e);
+      if (size.width === drag.size?.width && size.height === drag.size?.height) return;
+      drag.size = size;
+      drag.previewRect = {
+        left: drag.rect.left + origin.x * drag.zoomX, top: drag.rect.top + origin.y * drag.zoomY,
+        width: size.width * drag.zoomX, height: size.height * drag.zoomY
+      };
+      setVal(els.cageWidthInput, size.width);
+      setVal(els.cageHeightInput, size.height);
+      els.cageSizeIndicator.textContent = `Cage ${size.width} x ${size.height} px`;
+      if (drag.previewFrame == null) {
+        drag.previewFrame = requestAnimationFrame(() => {
+          drag.previewFrame = null;
+          renderScanlineOverlay();
+        });
+      }
+    }
+    function finishCageResize(e, commit) {
+      const drag = state.cageResizeDrag, pointerId = state.dragPointerId;
+      if (!drag || (e && e.pointerId !== pointerId)) return;
+      if (drag.previewFrame != null) cancelAnimationFrame(drag.previewFrame);
+      state.cageResizeDrag = null;
+      state.dragging = false;
+      state.dragMode = 'offset';
+      state.dragPointerId = null;
+      els.canvasShell.removeAttribute('data-cage-resize');
+      els.canvasShell.classList.remove('dragging');
+      if (els.canvasShell.hasPointerCapture(pointerId)) els.canvasShell.releasePointerCapture(pointerId);
+      if (commit && !state.cageLocked && state.showCageOverlay && !state.referenceCompositorVisible && !spriteSheetBuilderPanelActive()) {
+        const { size, origin } = cageResizeGeometry(drag, e);
+        if (size.width !== drag.width || size.height !== drag.height) {
+          setCage(size.width, size.height, origin);
+          const rect = els.mainCanvas.getBoundingClientRect();
+          // Preserve the stationary edge even when the displayed dimensions round at fractional zoom.
+          state.panX += drag.rect.left + (drag.leading && drag.axis === 'x' ? drag.rect.width - rect.width : 0) - rect.left;
+          state.panY += drag.rect.top + (drag.leading && drag.axis === 'y' ? drag.rect.height - rect.height : 0) - rect.top;
+          updateCanvasZoom();
+          return;
+        }
+      }
+      setVal(els.cageWidthInput, state.cageWidth);
+      setVal(els.cageHeightInput, state.cageHeight);
+      els.cageSizeIndicator.textContent = `Cage ${state.cageWidth} x ${state.cageHeight} px`;
+      renderScanlineOverlay();
     }
     function pivotHit(e) {
       if (state.referenceCompositorVisible || !state.showPivotOverlay) return false;
@@ -19562,6 +19748,11 @@
       renderScanlineOverlay();
       updateInfo({ deferHiddenPalette: true });
     });
+    els.lockCageButton.addEventListener('click', () => {
+      state.cageLocked = !state.cageLocked;
+      if (state.cageLocked && state.cageResizeDrag) finishCageResize(null, false);
+      updateInfo({ deferHiddenPalette: true });
+    });
     els.centerPivotButton.addEventListener('click', centerPivotInCage);
     els.flipSpriteHorizontalButton.addEventListener('click', toggleSpriteFlipHorizontal);
     els.flipSpriteVerticalButton.addEventListener('click', toggleSpriteFlipVertical);
@@ -19778,19 +19969,23 @@
       const paletteOrderMenu=$('paletteOrderMenu');
       if(paletteOrderMenu.classList.contains('show') && !paletteOrderMenu.contains(e.target) && !els.indexButton.contains(e.target))closePaletteOrderMenu();
       if (els.frameContextMenu.classList.contains('show') && !els.frameContextMenu.contains(e.target)) closeFrameContextMenu();
+      if (els.canvasImageContextMenu.classList.contains('show') && !els.canvasImageContextMenu.contains(e.target)) closeCanvasImageContextMenu();
       const compositorMenuOpen = els.referenceCompositorContextMenu.classList.contains('show') || els.referenceCompositorTrackContextMenu?.classList.contains('show');
       const insideCompositorMenu = els.referenceCompositorContextMenu.contains(e.target) || !!els.referenceCompositorTrackContextMenu?.contains(e.target);
       if (compositorMenuOpen && !insideCompositorMenu) closeReferenceCompositorContextMenu();
       if (els.pencilColorContextMenu.classList.contains('show') && !els.pencilColorContextMenu.contains(e.target)) closePencilColorContextMenu();
     });
     const eventInsideReferenceCompositor = e => !!(els.referenceCompositor && !els.referenceCompositor.hidden && els.referenceCompositor.contains(e.target));
+    els.mainCanvas.addEventListener('contextmenu', openCanvasImageContextMenu);
+    els.copyCanvasImageMenuButton.addEventListener('click', () => void useCanvasImageSnapshot(true));
+    els.saveCanvasImageMenuButton.addEventListener('click', () => void useCanvasImageSnapshot(false));
     if (els.zoomIndicator) {
       els.zoomIndicator.addEventListener('pointerdown', e => e.stopPropagation());
       els.zoomIndicator.addEventListener('click', e => e.stopPropagation());
       els.zoomIndicator.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); startZoomIndicatorEdit(); });
       els.zoomIndicator.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
     }
-    els.canvasShell.addEventListener('wheel', e => { if(eventInsideReferenceCompositor(e)||!canvasContentAvailable())return; e.preventDefault(); if((hasFrames()||spriteSheetBuilderToolSurfaceAvailable())&&e.shiftKey&&((state.maskMode&&state.brushAction!=='wand')||state.pencilMode||animationPixelBrushActive())){const step=Math.max(1,Math.round(Math.abs(e.deltaY)/100));adjustBrushSize(e.deltaY<0?step:-step);return} const before=els.mainCanvas.getBoundingClientRect(), ax=(e.clientX-before.left)/before.width, ay=(e.clientY-before.top)/before.height; state.zoom=clamp(state.zoom*(e.deltaY<0?1.12:1/1.12),canvasZoomMin(),CANVAS_ZOOM_MAX); updateCanvasZoom(); const after=els.mainCanvas.getBoundingClientRect(); state.panX+=e.clientX-(after.left+ax*after.width); state.panY+=e.clientY-(after.top+ay*after.height); updateCanvasZoom(); }, {passive:false});
+    els.canvasShell.addEventListener('wheel', e => { if(eventInsideReferenceCompositor(e)||!canvasContentAvailable())return; e.preventDefault(); if(state.cageResizeDrag)return; if((hasFrames()||spriteSheetBuilderToolSurfaceAvailable())&&e.shiftKey&&((state.maskMode&&state.brushAction!=='wand')||state.pencilMode||animationPixelBrushActive())){const step=Math.max(1,Math.round(Math.abs(e.deltaY)/100));adjustBrushSize(e.deltaY<0?step:-step);return} const before=els.mainCanvas.getBoundingClientRect(), ax=(e.clientX-before.left)/before.width, ay=(e.clientY-before.top)/before.height; state.zoom=clamp(state.zoom*(e.deltaY<0?1.12:1/1.12),canvasZoomMin(),CANVAS_ZOOM_MAX); updateCanvasZoom(); const after=els.mainCanvas.getBoundingClientRect(); state.panX+=e.clientX-(after.left+ax*after.width); state.panY+=e.clientY-(after.top+ay*after.height); updateCanvasZoom(); }, {passive:false});
     els.spriteSheetBuilderPreviewStage?.addEventListener('wheel', zoomSpriteSheetBuilderPreviewFromWheel, { passive: false });
     els.spriteSheetBuilderPreviewStage?.addEventListener('pointerdown', beginSpriteSheetBuilderPreviewPan);
     els.spriteSheetBuilderPreviewStage?.addEventListener('pointermove', moveSpriteSheetBuilderPreviewPan);
@@ -19800,13 +19995,14 @@
     document.addEventListener('fullscreenchange',()=>requestAnimationFrame(updateCanvasZoom));
     document.addEventListener('webkitfullscreenchange',()=>requestAnimationFrame(updateCanvasZoom));
     els.canvasShell.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
-    els.canvasShell.addEventListener('dblclick',e=>{const hit=rulerHit(e); if(!hit)return; pushHistory(); removeRuler(hit); drawFrame(state.currentFrame); updateInfo()});
+    els.canvasShell.addEventListener('dblclick',e=>{if(cageBorderHit(e))return; const hit=rulerHit(e); if(!hit)return; pushHistory(); removeRuler(hit); drawFrame(state.currentFrame); updateInfo()});
     els.canvasShell.addEventListener('pointerdown', e => {
       if (e.target.closest?.('.sprite-sheet-builder-cell-actions')) return;
       if(eventInsideReferenceCompositor(e))return;
-      if(!canvasContentAvailable()||(e.button!==0&&e.button!==1))return;
+      if(state.cageResizeDrag || !canvasContentAvailable()||(e.button!==0&&e.button!==1))return;
       e.preventDefault();
       if(e.button===1){
+        if (startAnimationScaleMove(e)) return;
         state.dragging=true; state.dragMode='pan'; state.dragPointerId=e.pointerId;
         state.dragStartX=e.clientX; state.dragStartY=e.clientY; state.dragStartPanX=state.panX; state.dragStartPanY=state.panY;
         hideBrushCursor(false);
@@ -19874,6 +20070,11 @@
         finishColorPickerCanvasPick(color || { r: 0, g: 0, b: 0, a: 0 });
         return;
       }
+      const cageBorder = cageBorderHit(e);
+      if (cageBorder) {
+        startCageResize(e, cageBorder);
+        return;
+      }
       ensureArrays();
       const dragTargets = offsetFrameTargets();
       if (!(state.maskMode && state.brushAction === 'wand') && startAnimationCanvasDrag(e)) {
@@ -19935,10 +20136,21 @@
       els.canvasShell.setPointerCapture(e.pointerId);
     });
     els.canvasShell.addEventListener('pointermove', e => {
+      if (state.cageResizeDrag) {
+        if (e.pointerId === state.dragPointerId) resizeCagePreview(state.cageResizeDrag, e);
+        return;
+      }
       if (eventInsideReferenceCompositor(e)) return;
       if (moveAnimationTransformPointer(e)) return;
       if (!canvasContentAvailable()) return;
       if (!state.dragging) {
+        const border = cageBorderHit(e);
+        if (border) {
+          els.canvasShell.dataset.cageResize = border.axis;
+          hideBrushCursor(false);
+          return;
+        }
+        els.canvasShell.removeAttribute('data-cage-resize');
         if (spriteSheetBuilderPanelActive()) {
           if (spriteSheetBuilderToolModeActive(e)) {
             hideSpriteSheetBuilderCellActions();
@@ -20001,6 +20213,7 @@
     });
     function endDrag(e){
       if(!state.dragging)return;
+      if (state.dragMode === 'cage-resize') { finishCageResize(e, e.type === 'pointerup'); return; }
       if (state.dragMode.startsWith?.('animation-')) { finishAnimationCanvasDrag(e); return; }
       const mode=state.dragMode, redrawCurrent=mode==='offset'||mode==='mask'||mode==='sprite-sheet-mask'||mode==='sprite-sheet-pencil';
       const offsetDragCount = Array.isArray(state.dragStartOffsets) ? state.dragStartOffsets.length : 0;
@@ -20028,7 +20241,10 @@
     els.canvasShell.addEventListener('pointerup', e => releaseAnimationTransformPointer(e));
     els.canvasShell.addEventListener('pointercancel', e => releaseAnimationTransformPointer(e));
     els.canvasShell.addEventListener('pointerleave', () => setAnimationTransformAlt(false, true));
-    els.canvasShell.addEventListener('pointerup',endDrag); els.canvasShell.addEventListener('pointercancel',endDrag); els.canvasShell.addEventListener('pointerleave',e=>{hideSpriteSheetBuilderCellActions();if(state.dragging)endDrag(e); else if(!syncBrushCursorFromEvent(e) && state.brushCursorVisible)hideBrushCursor(false);});
+    els.canvasShell.addEventListener('pointerup',endDrag); els.canvasShell.addEventListener('pointercancel',endDrag); els.canvasShell.addEventListener('pointerleave',e=>{if(state.cageResizeDrag)return; els.canvasShell.removeAttribute('data-cage-resize'); hideSpriteSheetBuilderCellActions();if(state.dragging)endDrag(e); else if(!syncBrushCursorFromEvent(e) && state.brushCursorVisible)hideBrushCursor(false);});
+    els.canvasShell.addEventListener('lostpointercapture', e => {
+      if (state.cageResizeDrag) finishCageResize(e, false);
+    });
     document.addEventListener('pointermove', e => {
       if (referenceCompositorTrackDrag && e.pointerId === referenceCompositorTrackDrag.pointerId) {
         const drag = referenceCompositorTrackDrag;
@@ -20175,6 +20391,7 @@
     document.addEventListener('pointerup', e => endReferenceCompositorTrackDrag(e, true));
     document.addEventListener('pointercancel', e => endReferenceCompositorTrackDrag(e, false));
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && state.cageResizeDrag) { e.preventDefault(); finishCageResize(null, false); return; }
       if (e.key === 'Shift') setAnimationPaintShiftHeld(true);
       const k = e.key.toLowerCase();
       if($('paletteOrderMenu').classList.contains('show')) {
@@ -20206,6 +20423,14 @@
       if (els.aboutModal?.classList.contains('show')) return;
       if (e.key === 'Escape' && els.frameContextMenu.classList.contains('show')) { e.preventDefault(); closeFrameContextMenu(); return; }
       if (els.frameContextMenu.classList.contains('show')) return;
+      if (els.canvasImageContextMenu.classList.contains('show')) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCanvasImageContextMenu();
+          els.canvasShell.focus({ preventScroll: true });
+        }
+        return;
+      }
       if (e.key === 'Escape' && els.referenceCompositorContextMenu.classList.contains('show')) { e.preventDefault(); closeReferenceCompositorContextMenu(); return; }
       if (els.referenceCompositorContextMenu.classList.contains('show')) return;
       if (e.key === 'Escape' && els.pencilColorContextMenu.classList.contains('show')) { e.preventDefault(); closePencilColorContextMenu(); return; }
@@ -20599,7 +20824,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-8"></script>
+  <script src="animation.js?v=1.7.0-11"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

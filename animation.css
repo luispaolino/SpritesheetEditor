@@ -1,8 +1,11 @@
 .side-panels .reference-layer-controls.animation-layer-controls {
   grid-column: 2; grid-row: 2;
-  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px;
 }
-.animation-offset-field { display: grid; grid-template-columns: 12px minmax(0, 1fr); align-items: center; gap: 4px; min-width: 0; color: var(--muted); font-size: 11px; }
+.side-panels .animation-layer-item:not(.animation-group-item) .animation-layer-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 32px;
+}
+.animation-offset-field { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 3px; min-width: 0; color: var(--muted); font-size: 11px; }
 .animation-offset-field .reference-offset-input { min-width: 0; }
 .animation-layer-item { touch-action: pan-y; margin-left: calc(var(--animation-layer-depth, 0) * 14px); }
 .side-panels .reference-layer-item.animation-group-item { border-color: rgba(102,213,151,.8); }
@@ -98,6 +101,7 @@
   cursor: url('icons/cursor-rotate.svg?v=2') 12 12, crosshair;
 }
 .canvas-shell.animation-scale-cursor:not(.panning) { cursor: nwse-resize; }
+.canvas-shell.animation-scale-move-cursor:not(.panning) { cursor: grabbing; }
 .canvas-shell.animation-rotation-pivot-cursor:not(.panning) { cursor: crosshair; }
 .animation-rotation-pivot {
   position: absolute; z-index: 321; width: 24px; height: 24px;
