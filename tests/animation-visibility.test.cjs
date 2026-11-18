@@ -81,14 +81,16 @@ test('pasting above a grouped child keeps the new subtree inside the destination
   const ids=Array.from(app.state.animationLayers,layer=>layer.id);assert.equal(ids.indexOf(copy.id),ids.indexOf('b')-1);
 });
 
-test('copy and paste keyboard shortcuts allow clipboard events and suppress held keys',()=>{
+test('cut, copy, and paste keyboard shortcuts allow clipboard events and suppress held keys',()=>{
   const app=clipboardEditor();app.animationPanelActive=()=>true;let prevented=0;
   const press=(key,options={})=>app.handleAnimationKeyDown({key,preventDefault(){prevented++;},...options});
   assert.equal(press('c',{ctrlKey:true}),true);
+  assert.equal(press('x',{ctrlKey:true}),true);
   assert.equal(press('v',{metaKey:true}),true);
   assert.equal(prevented,0);
   assert.equal(press('v',{ctrlKey:true,repeat:true}),true);
-  assert.equal(prevented,1);
+  assert.equal(press('x',{metaKey:true,repeat:true}),true);
+  assert.equal(prevented,2);
   assert.equal(press('v',{ctrlKey:true,altKey:true}),false);
 });
 
@@ -103,9 +105,40 @@ test('clipboard events paste layers and leave input clipboard events available f
   assert.equal(app.state.animationLayers.length,4);
   const input={ closest(){ return this; } };
   dispatch('copy',input);
+  dispatch('cut',input);
   dispatch('paste',input);
   assert.equal(app.state.animationLayers.length,4);
   assert.equal(prevented,2);
+});
+
+test('cutting a group transfers its current cels and leaves the other frames intact',()=>{
+  const app=clipboardEditor();
+  app.animationPanelActive=()=>true;
+  app.state.indexedFrames=[];
+  app.state.selectedAnimationLayerIds=['a','b'];
+  app.createAnimationGroup();
+  const layers=app.animationLayerList(), a=layers.find(layer=>layer.id==='a'), b=layers.find(layer=>layer.id==='b');
+  const local=app.animationCel(a,0), other=app.animationCel(a,1);
+  b.sharedCel=app.animationCel(b,0);
+  local.canvas.pixel='red';
+  b.sharedCel.canvas.pixel='blue';
+  let history=0, clipboardEntry;
+  app.pushHistory=()=>history++;
+  app.documentListeners.cut({
+    clipboardData:{setData(type,value){clipboardEntry=[type,value];}},
+    target:{}, preventDefault(){}
+  });
+  assert.deepEqual(clipboardEntry,['application/x-spritesheet-editor','layers']);
+  assert.equal(history,1);
+  assert.equal(app.animationCel(a,0),null);
+  assert.equal(app.animationCel(a,1),other);
+  assert.equal(app.animationLayerVisible(b,0),false);
+  assert.equal(app.animationLayerVisible(b,1),true);
+  assert.equal(app.pasteAnimationLayers(),true);
+  const pasted=app.activeAnimationLayer();
+  const children=app.animationLayerList().filter(layer=>layer.parentId===pasted.id);
+  assert.deepEqual(Array.from(children,layer=>app.animationCel(layer,0).canvas.pixel),['red','blue']);
+  assert.equal(children.every(layer=>app.animationCel(layer,1)===null),true);
 });
 
 test('paste without copied artwork has no history or document changes',()=>{

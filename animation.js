@@ -25,7 +25,7 @@ const animationEls = {
   wandContiguous: $('animationWandContiguous'), wandTolerance: $('animationWandTolerance'),
   selectionActions: $('animationSelectionActions'), newLayer: $('animationNewLayerButton'), newGroup: $('animationGroupLayersButton'), merge: $('animationMergeButton'),
   exportLayer: $('animationExportLayerButton'),
-  copy: $('animationCopyButton'), paste: $('animationPasteButton')
+  cut: $('animationCutButton'), copy: $('animationCopyButton'), paste: $('animationPasteButton')
 };
 let animationSelection = null;
 let animationStroke = null;
@@ -352,7 +352,7 @@ function toggleAnimationAllFrames(id) {
   else target.sharedCel = captureAnimationCel(target);
   animationChanged();
 }
-function copyAnimationLayers() {
+function copyAnimationLayers({ cut = false } = {}) {
   if (!hasFrames()) return false;
   const layers=animationLayerList(), selected=new Set(selectedAnimationLayerIds());
   const roots=layers.filter(layer=>selected.has(layer.id) && !animationAncestors(layer,layers).some(parent=>selected.has(parent.id)));
@@ -366,23 +366,53 @@ function copyAnimationLayers() {
       visible:rootIds.has(layer.id)?animationLayerVisible(layer):animationLayerOwnVisible(layer),opacity:layer.opacity,spriteMask:layer.spriteMask,cel};
   });
   animationClipboard={records, width: state.cageWidth, height: state.cageHeight};
-  updateAnimationUi();
+  if (cut) {
+    pause(false, { updateInfo: false });
+    pushHistory();
+    const frame = state.frames[state.currentFrame];
+    for (const layer of layers) {
+      if (layer.group || !ids.has(layer.id) || !animationCel(layer)) continue;
+      if (layer.sharedCel) {
+        // Shared artwork has one cel. Hide its instance in this frame.
+        frame.animationVisibility ||= {};
+        frame.animationVisibility[layer.id] = false;
+      } else if (animationLayerUsesBaseFrame(layer)) {
+        animationBakeBase(state.currentFrame, makeMask());
+      } else {
+        delete frame.animationCels[layer.id];
+        if (frame.animationVisibility) delete frame.animationVisibility[layer.id];
+      }
+    }
+    state.indexedFrames[state.currentFrame] = null;
+    state.activeAnimationLayerId = activeAnimationLayer()?.id || '';
+    state.selectedAnimationLayerIds = selectedAnimationLayerIds();
+    state.animationSelectionAnchorId = state.activeAnimationLayerId;
+    animationSelection = null;
+    animationChanged();
+  } else updateAnimationUi();
   return true;
 }
-function copyAnimationSelection(layer) {
+function copyAnimationSelection(layer, { cut = false } = {}) {
   const mask = animationSelectionMask();
   const cel = mask && animationLayerVisible(layer) && animationCel(layer)
     ? captureAnimationSelectionCel(layer, mask) : null;
   if (!cel) {
-    showError('Select some visible pixels on the active layer to copy.');
+    showError(`Select some visible pixels on the active layer to ${cut ? 'cut' : 'copy'}.`);
     return false;
   }
+  if (cut && !eraseAnimationSelection()) return false;
   animationClipboard = { width: state.cageWidth, height: state.cageHeight, records: [{
     id: layer.id, name: `${layer.name} selection`, parentId: '', visible: true, opacity: layer.opacity, cel
   }] };
   showError('');
   updateAnimationUi();
   return true;
+}
+function cutAnimationArtwork() {
+  if (!animationPanelActive() || state.dragging || animationTransform) return false;
+  const layer = activeAnimationLayer(), options = { cut: true };
+  return validAnimationSelection() && layer && !layer.group
+    ? copyAnimationSelection(layer, options) : copyAnimationLayers(options);
 }
 function pasteAnimationLayers(clipboard = animationClipboard) {
   if (!clipboard?.records.length) return false;
@@ -921,7 +951,7 @@ function moveAnimationLayer(id, targetId, after, intoGroup = false) {
 }
 function updateAnimationUi(force = false) {
   const layers = animationLayerList(), active = activeAnimationLayer(), visibleLayers=animationVisibleLayers(), selectedIds=new Set(selectedAnimationLayerIds());
-  animationEls.copy.disabled=!hasFrames() || !selectedIds.size;
+  animationEls.copy.disabled = animationEls.cut.disabled = !hasFrames() || !selectedIds.size;
   animationEls.paste.disabled=!animationClipboard?.records.length;
   animationEls.newGroup.disabled=!hasFrames() || !selectedIds.size;
   animationEls.merge.disabled=!hasFrames() || (selectedIds.size<2 && !layers.some(layer=>selectedIds.has(layer.id) && layer.group));
@@ -1606,7 +1636,7 @@ function moveAnimationTransformPointer(event) {
   else if (event.pointerId === transform.pointerId) {
     if (transform.translationDrag) {
       const start = transform.translationDrag;
-      const { dx, dy } = pointerDelta(event, start.x, start.y);
+      const { dx, dy } = spriteDragDelta(event, start.x, start.y, start);
       const x = start.pivot.x + Math.round(dx), y = start.pivot.y + Math.round(dy);
       if (x === transform.pivot.x && y === transform.pivot.y) return true;
       transform.pivot = { x, y };
@@ -2016,7 +2046,9 @@ function queueAnimationPaintPreview(stroke,e) {
 function moveAnimationCanvasDrag(e) {
   const stroke=animationStroke;if(!stroke)return;
   if (stroke.pixelMove) {
-    if (updateAnimationPixelMove(stroke, pointerDelta(e, stroke.startX, stroke.startY))) {
+    stroke.lastMoveX = e.clientX;
+    stroke.lastMoveY = e.clientY;
+    if (updateAnimationPixelMove(stroke, spriteDragDelta(e, stroke.startX, stroke.startY, stroke))) {
       const move = stroke.pixelMove;
       drawFrame(state.currentFrame, { fast: true, skipThumb: true, animationPixelMove: move.dx || move.dy ? move : null });
     }
@@ -2030,7 +2062,7 @@ function moveAnimationCanvasDrag(e) {
     if(stroke.tool==='rectangle')animationSelection.points[1]=p;
     else {const last=animationSelection.points[animationSelection.points.length-1];if(Math.hypot(p.x-last.x,p.y-last.y)>=.5)animationSelection.points.push(p);}
   } else if(stroke.tool==='move') {
-    const layers=animationLayerList(),d=pointerDelta(e,stroke.startX,stroke.startY);
+    const layers=animationLayerList(),d=spriteDragDelta(e,stroke.startX,stroke.startY,stroke);
     stroke.targets.forEach(record=>{const layer=layers.find(item=>item.id===record.id);if(layer)writeAnimationOffset(layer,stroke.frame,record.x+d.dx,record.y+d.dy);});
     animationSelection=null;
   } else if(stroke.tool==='pencil'||stroke.tool==='eraser') {
@@ -2061,7 +2093,9 @@ function finishAnimationCanvasDrag(e) {
   if (stroke?.pixelMove) {
     if (e.type === 'pointercancel') animationSelection = stroke.previousSelection;
     else {
-      updateAnimationPixelMove(stroke, pointerDelta(e, stroke.startX, stroke.startY));
+      if (e.clientX !== stroke.lastMoveX || e.clientY !== stroke.lastMoveY) {
+        updateAnimationPixelMove(stroke, spriteDragDelta(e, stroke.startX, stroke.startY, stroke));
+      }
       commitAnimationPixelMove(stroke);
     }
     drawFrame(state.currentFrame);
@@ -2111,7 +2145,7 @@ function handleAnimationTransformKeyDown(event, typing) {
 function handleAnimationKeyDown(e) {
   if(!animationPanelActive()||e.altKey)return false;
   const key=e.key.toLowerCase();
-  if ((e.ctrlKey||e.metaKey) && !e.shiftKey && ['c','v'].includes(key)) {
+  if ((e.ctrlKey||e.metaKey) && !e.shiftKey && ['x','c','v'].includes(key)) {
     if (e.repeat) e.preventDefault();
     // The browser's clipboard events carry the copied or pasted data.
     return true;
@@ -2178,8 +2212,14 @@ document.addEventListener('pointerdown', event => {
     finishAnimationTransform();
   }
 }, true);
-animationEls.copy.addEventListener('click',copyAnimationLayers);
+animationEls.cut.addEventListener('click', cutAnimationArtwork);
+animationEls.copy.addEventListener('click', () => copyAnimationLayers());
 animationEls.paste.addEventListener('click', () => pasteAnimationLayers());
+document.addEventListener('cut', event => {
+  if (!event.clipboardData || !animationClipboardEventAllowed(event) || !hasFrames()) return;
+  event.preventDefault();
+  if (cutAnimationArtwork()) event.clipboardData.setData('application/x-spritesheet-editor', 'layers');
+});
 document.addEventListener('copy', event => {
   if (!event.clipboardData || !animationClipboardEventAllowed(event) || !hasFrames()) return;
   event.preventDefault();

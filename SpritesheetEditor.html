@@ -1275,8 +1275,18 @@
     .app.canvas-expanded .timeline-slider-wrap { flex: 1 1 160px; }
     .app.canvas-expanded .timeline-slider-wrap input[type="range"] { min-width: 0; }
     .app.canvas-expanded .filmstrip { padding: 6px 12px; }
+    .app.main-menu-hidden {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "center" "timeline";
+    }
+    .app.main-menu-hidden:is(.compositor-mode, .timeline-hidden) { grid-template-areas: "center"; }
+    .app.main-menu-hidden .left-panel { display: none; }
     @media (max-width: 680px) {
       .app.canvas-expanded .floating-tool-tabs { padding: 46px 0 0; }
+    }
+    @media (max-width: 500px) {
+      .floating-tool-tabs { padding: 46px 0 0; }
+      .floating-visibility-buttons { max-width: 100%; flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -1293,7 +1303,7 @@
   </div>
 
   <main class="app">
-    <section class="card left-panel">
+    <section class="card left-panel" id="mainMenu">
       <div class="brand">
         <img class="brand-logo" src="logo.png" alt="Spritesheet Editor" />
         <span class="tool-version">v1.7.0</span>
@@ -1479,7 +1489,13 @@
           <button id="bakeTransformButton" class="secondary small-button standalone-button" type="button" disabled>Bake Transform</button>
         </div>
         <div class="group">
-          <p class="group-title"><span>Display</span><span class="group-title-actions"><button id="timelineVisibilityButton" class="lock-button active" type="button" title="Hide Timeline" aria-label="Hide Timeline" aria-controls="timelineCard" aria-pressed="true"></button><button id="cageVisibilityButton" class="lock-button active" type="button" disabled title="Hide Cage" aria-label="Hide Cage"></button><button id="rulerVisibilityButton" class="lock-button active" type="button" disabled title="Hide Rulers" aria-label="Hide Rulers"></button><button id="pivotVisibilityButton" class="lock-button active" type="button" disabled title="Hide Pivot & Offset Guides" aria-label="Hide Pivot & Offset Guides"></button></span></p>
+          <p class="group-title"><span>Display</span><span class="group-title-actions">
+            <button id="mainMenuVisibilityButton" class="lock-button active" type="button" title="Hide Main Menu" aria-label="Hide Main Menu" aria-controls="mainMenu" aria-pressed="true"></button>
+            <button id="timelineVisibilityButton" class="lock-button active" type="button" title="Hide Timeline" aria-label="Hide Timeline" aria-controls="timelineCard" aria-pressed="true"></button>
+            <button id="cageVisibilityButton" class="lock-button active" type="button" disabled title="Hide Cage" aria-label="Hide Cage"></button>
+            <button id="rulerVisibilityButton" class="lock-button active" type="button" disabled title="Hide Rulers" aria-label="Hide Rulers"></button>
+            <button id="pivotVisibilityButton" class="lock-button active" type="button" disabled title="Hide Pivot & Offset Guides" aria-label="Hide Pivot & Offset Guides"></button>
+          </span></p>
           <div class="field">
             <label for="backgroundInput">Preview background</label>
             <select id="backgroundInput">
@@ -1839,7 +1855,11 @@
             </details>
           </div>
           <div class="group animation-group" id="animationGroup">
-            <p class="group-title"><span>Edit Image</span><span class="group-title-actions"><button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy layers" title="Copy selected layers or groups from this frame"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button><button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste into this frame (Ctrl/Cmd+V)" title="Paste copied pixels, layers, or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button></span></p>
+            <p class="group-title"><span>Edit Image</span><span class="group-title-actions">
+              <button id="animationCutButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Cut (Ctrl/Cmd+X)" title="Cut selected pixels or layer artwork (Ctrl/Cmd+X)"><svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.1 8.1 12 12m2 2 7 7M8.1 15.9 21 3"/></svg></button>
+              <button id="animationCopyButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Copy layers" title="Copy selected layers or groups from this frame"><img class="tool-icon-image" src="icons/copy.svg" alt="" /></button>
+              <button id="animationPasteButton" class="lock-button animation-clipboard-button" type="button" disabled aria-label="Paste into this frame (Ctrl/Cmd+V)" title="Paste copied pixels, layers, or groups into this frame (Ctrl/Cmd+V)"><img class="tool-icon-image" src="icons/clipboard-paste.svg" alt="" /></button>
+            </span></p>
             <label class="upload compact" id="animationDropZone">
               <input id="animationFileInput" type="file" accept="image/*,.gif,.webp" multiple />
               <div><strong>Load Sprite</strong><span>Click here or drag image / GIF / WebP file(s)</span></div>
@@ -2181,12 +2201,12 @@
         <div><kbd>Ctrl/Cmd + Click</kbd><span>Select a layer’s visible pixels from the Edit Image layer list. On the canvas, pick a color with Pencil or Paint Bucket, or pick the topmost visible layer with other tools.</span></div>
         <div><kbd>Ctrl/Cmd + Alt + Click</kbd><span>Toggle a layer in the Edit Image layer selection. Shift-click selects a range of layers.</span></div>
         <div><kbd>C</kbd><span>Swap primary and secondary paint colors in Edit Image</span></div>
-        <div><kbd>Ctrl/Cmd + C / V</kbd><span>Copy selected pixels, layers, or groups. Paste copied artwork or a clipboard image in Edit Image.</span></div>
+        <div><kbd>Ctrl/Cmd + X / C / V</kbd><span>Cut or copy selected pixels, layers, or groups. Paste artwork or a clipboard image in Edit Image.</span></div>
         <div><kbd>Ctrl/Cmd + A</kbd><span>Select the full canvas in Edit Image</span></div>
         <div><kbd>R / S</kbd><span>Rotate / Scale the selection or active layer in Edit Image. Drag to preview, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
         <div><kbd>Middle Mouse Drag</kbd><span>Move the sprite during a Scale preview</span></div>
         <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
-        <div><kbd>Shift + Drag</kbd><span>Add to a lasso or rectangle selection</span></div>
+        <div><kbd>Shift + Drag</kbd><span>Move a sprite or selected pixels along one axis. With Lasso or Rectangle, add to the selection.</span></div>
         <div><kbd>Arrows / Shift + Arrows</kbd><span>Arrows move the outline 1 pixel with a selection tool. Shift + Arrows move the selected pixels 10 pixels in Edit Image.</span></div>
         <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active Edit Image layer</span></div>
         <div><kbd>F2</kbd><span>Rename the selected layer or group</span></div>
@@ -2544,7 +2564,7 @@
     const $ = (id) => document.getElementById(id);
     const els = {
       referenceFadeMirrorInput: $('referenceFadeMirrorInput'),
-      canvasHistoryButtons: $('canvasHistoryButtons'), canvasExpandButton: $('canvasExpandButton'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'), timelineVisibilityButton: $('timelineVisibilityButton'),
+      canvasHistoryButtons: $('canvasHistoryButtons'), canvasExpandButton: $('canvasExpandButton'), canvasUndoButton: $('canvasUndoButton'), canvasRedoButton: $('canvasRedoButton'), makeFrameFirstMenuButton: $('makeFrameFirstMenuButton'), mainMenuVisibilityButton: $('mainMenuVisibilityButton'), timelineVisibilityButton: $('timelineVisibilityButton'),
       canvasImageContextMenu: $('canvasImageContextMenu'), saveCanvasImageMenuButton: $('saveCanvasImageMenuButton'), copyCanvasImageMenuButton: $('copyCanvasImageMenuButton'),
       fileInput: $('fileInput'), frameFileInput: $('frameFileInput'), projectFileInput: $('projectFileInput'), paletteFileInput: $('paletteFileInput'), referencePaletteFileInput: $('referencePaletteFileInput'), dropZone: $('dropZone'), importFrameSkipInput: $('importFrameSkipInput'), importFrameSkipValue: $('importFrameSkipValue'), importVideoInfo: $('importVideoInfo'),
       rowsInput: $('rowsInput'), colsInput: $('colsInput'), startFrameInput: $('startFrameInput'), endFrameInput: $('endFrameInput'), speedInput: $('speedInput'), speedValue: $('speedValue'), pingPongInput: $('pingPongInput'), oneRowPackInput: $('oneRowPackInput'),
@@ -4069,6 +4089,7 @@
         button.dataset.iconBody = iconBody;
       }
     }
+    const ICON_MAIN_MENU = '<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M11 5v14M6 9h2m-2 3h2m-2 3h2"></path>';
     const ICON_TIMELINE = '<rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M3 10h18M3 14h18M9 10v4m6-4v4"></path>';
     const ICON_CAGE = '<path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M14 3h1"></path><path d="M21 9v1"></path><path d="M21 14v1"></path><path d="M14 21h1"></path><path d="M9 21h1"></path><path d="M3 14v1"></path><path d="M3 9v1"></path>';
     const ICON_RULER = '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z"></path><path d="m14.5 12.5 2-2"></path><path d="m11.5 9.5 2-2"></path><path d="m8.5 6.5 2-2"></path><path d="m17.5 15.5 2-2"></path>';
@@ -4093,8 +4114,10 @@
     function setDisplayVisibilityButtons() {
       const builderActive = spriteSheetBuilderPanelActive();
       const timelineButton = els.timelineVisibilityButton;
+      const app = timelineButton.closest('.app');
       timelineButton.hidden = !!state.referenceCompositorVisible;
-      setOverlayIconButton(timelineButton, !timelineButton.closest('.app').classList.contains('timeline-hidden'), 'Timeline', ICON_TIMELINE);
+      setOverlayIconButton(els.mainMenuVisibilityButton, !app.classList.contains('main-menu-hidden'), 'Main Menu', ICON_MAIN_MENU);
+      setOverlayIconButton(timelineButton, !app.classList.contains('timeline-hidden'), 'Timeline', ICON_TIMELINE);
       setOverlayIconButton(els.cageVisibilityButton, builderActive ? !!state.spriteSheetBuilderShowCage : state.showCageOverlay !== false, builderActive ? 'Sprite Sheet Grid' : 'Cage', ICON_CAGE);
       setOverlayIconButton(els.rulerVisibilityButton, state.showRulerOverlay !== false, 'Rulers', ICON_RULER);
       setOverlayIconButton(els.pivotVisibilityButton, state.showPivotOverlay !== false, 'Pivot & Offset Guides', ICON_PIVOT);
@@ -16390,6 +16413,18 @@
     }
     function pointerPoint(e) { const p = pointerGuidePoint(e); return { x: clamp(Math.floor(p.x),0,state.cageWidth-1), y: clamp(Math.floor(p.y),0,state.cageHeight-1) }; }
     function pointerDelta(e,px,py) { const r=els.mainCanvas.getBoundingClientRect(), frame=activeGuideFrameSize(); return { dx:r.width?(e.clientX-px)*(frame.width/r.width):0, dy:r.height?(e.clientY-py)*(frame.height/r.height):0 }; }
+    function spriteDragDelta(e, startX, startY, drag) {
+      const delta = pointerDelta(e, startX, startY);
+      if (!e.shiftKey) {
+        drag.spriteMoveAxis = null;
+        return delta;
+      }
+      const x = Math.abs(delta.dx), y = Math.abs(delta.dy);
+      if (!drag.spriteMoveAxis && Math.max(x, y) >= .5) drag.spriteMoveAxis = x >= y ? 'x' : 'y';
+      if (drag.spriteMoveAxis !== 'x') delta.dx = 0;
+      if (drag.spriteMoveAxis !== 'y') delta.dy = 0;
+      return delta;
+    }
     function pointerCagePoint(e) {
       const p = pointerGuidePoint(e), x = Math.floor(p.x), y = Math.floor(p.y);
       return x >= 0 && y >= 0 && x < state.cageWidth && y < state.cageHeight ? { x, y } : null;
@@ -18960,6 +18995,12 @@
       if (!expanded) syncStageHeightToOpenLeftPanel();
       requestAnimationFrame(updateCanvasZoom);
     });
+    els.mainMenuVisibilityButton.addEventListener('click', () => {
+      const hidden = els.mainMenuVisibilityButton.closest('.app').classList.toggle('main-menu-hidden');
+      if (!hidden) syncStageHeightToOpenLeftPanel();
+      setDisplayVisibilityButtons();
+      requestAnimationFrame(updateCanvasZoom);
+    });
     els.timelineVisibilityButton.addEventListener('click', () => {
       const hidden = els.timelineVisibilityButton.closest('.app').classList.toggle('timeline-hidden');
       if (hidden) closeFrameContextMenu();
@@ -20134,7 +20175,10 @@
       state.dragging=true; state.dragPointerId=e.pointerId; pushHistory();
       if(hit)state.dragMode=hit;
       else if(state.maskMode){state.dragMode='mask';const p=pointerPoint(e);state.maskLastX=p.x;state.maskLastY=p.y;state.brushX=p.x;state.brushY=p.y;state.brushCursorVisible=true;paintMaskLine(state.currentFrame,p.x,p.y,p.x,p.y);setBrushLineAnchor(p);drawFrame(state.currentFrame,{fast:true,skipThumb:true,skipIndexPreview:true})}
-      else state.dragMode='offset';
+      else {
+        state.dragMode = 'offset';
+        state.spriteMoveAxis = null;
+      }
       els.canvasShell.classList.add('dragging');
       els.canvasShell.setPointerCapture(e.pointerId);
     });
@@ -20205,7 +20249,7 @@
         drawFrame(state.currentFrame, { fast: true, skipThumb: true, skipIndexPreview: true });
         return;
       }
-      const d = pointerDelta(e, state.dragStartX, state.dragStartY);
+      const d = spriteDragDelta(e, state.dragStartX, state.dragStartY, state);
       if (Array.isArray(state.dragStartOffsets) && state.dragStartOffsets.length) {
         state.dragStartOffsets.forEach(record => setOffset(record.frame, record.x + d.dx, record.y + d.dy));
       } else {
@@ -20762,7 +20806,7 @@
           if (referenceTabButton?.parentNode) referenceTabButton.parentNode.insertBefore(compositorTabButton, referenceTabButton.nextSibling);
           else els.floatingToolTabs.appendChild(compositorTabButton);
         }
-        const visibilityButtons = [els.timelineVisibilityButton, els.cageVisibilityButton, els.rulerVisibilityButton, els.pivotVisibilityButton].filter(Boolean);
+        const visibilityButtons = [els.mainMenuVisibilityButton, els.timelineVisibilityButton, els.cageVisibilityButton, els.rulerVisibilityButton, els.pivotVisibilityButton].filter(Boolean);
         if (visibilityButtons.length) {
           const sourceActions = visibilityButtons[0].closest('.group-title-actions');
           const visibilityGroup = document.createElement('div');
@@ -20833,7 +20877,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-12"></script>
+  <script src="animation.js?v=1.7.0-14"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);
