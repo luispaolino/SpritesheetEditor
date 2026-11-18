@@ -1324,7 +1324,7 @@
       <label class="upload" id="dropZone">
         <input id="fileInput" type="file" accept="image/*,video/mp4,.mp4,.psd,image/vnd.adobe.photoshop,application/x-photoshop" multiple />
         <div>
-          <strong>Upload spritesheet</strong>
+          <strong>Load SpriteSheet</strong>
           <span>Click here or drag</span>
           <span>(Images, GIF, PSD, MP4)</span>
         </div>
@@ -5445,7 +5445,7 @@
       const hasTopRulers = !builderActive && state.showRulerOverlay !== false && !!((state.rulersV || []).length || (state.rulersH || []).length);
       const hasSpriteSheetBuilderCages = builderActive && spriteSheetBuilderPreviewAvailable() && (!!state.spriteSheetBuilderShowCage || !!state.activeSpriteSheetBuilderRowId);
       const drawTopGuides = !builderActive && ((hasFrames() && (state.showCageOverlay !== false || hasTopRulers)) || (state.referenceCompositorVisible && state.showCageOverlay !== false));
-      const dimOutsideCage = state.dimOutsideCage && hasFrames() && !builderActive && !state.referenceCompositorVisible;
+      const dimOutsideCage = state.dimOutsideCage && !builderActive && (hasFrames() || state.referenceCompositorVisible);
       if (!drawScanlines && !drawTopGuides && !hasSpriteSheetBuilderCages && !dimOutsideCage) {
         const octx = overlay.getContext('2d', { alpha: true });
         if (octx) octx.clearRect(0, 0, overlay.width || 1, overlay.height || 1);
@@ -5477,6 +5477,12 @@
         octx.rect(cageRect.left - rect.left, cageRect.top - rect.top, cageRect.width, cageRect.height);
         octx.fill('evenodd');
       }
+      octx.save();
+      if (state.referenceCompositorVisible && state.referenceCompositorMaskOutsideCage) {
+        octx.beginPath();
+        octx.rect(mainRect.left - rect.left, mainRect.top - rect.top, mainRect.width, mainRect.height);
+        octx.clip();
+      }
       if (drawScanlines) {
         const frame = previewFrameSize();
         const zoomY = mainRect.height > 0 && frame.height > 0 ? mainRect.height / frame.height : Math.max(.01, state.zoom);
@@ -5492,8 +5498,9 @@
       drawTopCageGuide(octx, { left: rect.left, top: rect.top, width, height }, cageRect, resize?.size);
       drawTopRulers(octx, { left: rect.left, top: rect.top, width, height }, mainRect);
       drawSpriteSheetBuilderCageOverlay(octx, { left: rect.left, top: rect.top, width, height }, mainRect);
+      octx.restore();
       overlay.style.display = 'block';
-      applyReferenceCompositorMaskToOverlay(overlay);
+      overlay.style.clipPath = '';
     }
     function drawHaloPreview(t, i, x = 0, y = 0) {
       const halo = computeHaloSelection(i); if (!halo) return; const alpha = state.maskDirty[i] ? halo.addAlpha : halo.resultAlpha; if (!alpha.some(a=>a>0)) return;
@@ -6761,7 +6768,8 @@
       setVal(els.speedInput, state.fps); setVal(els.backgroundInput, state.background); setVal(els.scanlineOpacityInput, state.scanlineOpacity); setVal(els.referenceShadowHeightInput, state.referenceShadowHeight); setVal(els.referenceShadowOffsetYInput, state.referenceShadowOffsetY); setVal(els.maskBrushSizeInput, state.brushSize); setVal(els.maskBrushHardnessInput, state.pencilHardness); setVal(els.magicToleranceInput, state.magicTolerance); setVal(els.haloToleranceInput, state.haloTolerance); setVal(els.indexColorsInput, state.indexColors); setVal(els.truePixelResolutionInput, state.truePixelResolution);
       const currentScale = frameScale(state.currentFrame), globalScale = allFrameScale();
       els.cageResolutionPresetInput.value = resolutionPresetValue(state.cageWidth, state.cageHeight);
-      els.cageResolutionPresetInput.disabled = els.dimOutsideCageButton.disabled = !hasFrames();
+      els.cageResolutionPresetInput.disabled = !hasFrames();
+      els.dimOutsideCageButton.disabled = !hasFrames() && !state.referenceCompositorVisible;
       els.dimOutsideCageButton.classList.toggle('active', state.dimOutsideCage);
       els.dimOutsideCageButton.setAttribute('aria-pressed', String(state.dimOutsideCage));
       els.lockCageButton.classList.toggle('active', state.cageLocked);
@@ -19818,6 +19826,7 @@
       if (hasFrames() || (state.referenceCompositorClips || []).length || (state.referenceCompositorTracks || []).length) pushHistory();
       state.referenceCompositorMaskOutsideCage = !!els.referenceCompositorMaskOutsideCageInput.checked;
       renderDisplayReferenceLayers();
+      renderScanlineOverlay();
       updateInfo();
     });
     els.referenceCompositorVideoQualityInput?.addEventListener('input', () => {
@@ -20441,6 +20450,16 @@
       if (e.key === 'Escape' && state.cageResizeDrag) { e.preventDefault(); finishCageResize(null, false); return; }
       if (e.key === 'Shift') setAnimationPaintShiftHeld(true);
       const k = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k === 'a') {
+        const field = document.activeElement;
+        const editingText = field?.isContentEditable || field?.tagName === 'TEXTAREA'
+          || (field?.tagName === 'INPUT' && ['text', 'number', 'search', 'email', 'password', 'tel', 'url'].includes(field.type || 'text'));
+        if (editingText) return;
+        if (animationPanelActive() && !document.querySelector('.modal-backdrop.show')
+          && !colorPicker.pickMode && !activeAnimationTransform()) handleAnimationKeyDown(e);
+        else e.preventDefault();
+        return;
+      }
       if($('paletteOrderMenu').classList.contains('show')) {
         if(e.key==='Escape') {e.preventDefault();closePaletteOrderMenu(true);}
         return;
