@@ -483,6 +483,8 @@
     .side-panels .inspector-section + .inspector-section { margin-top: 0; }
     .side-panels .inspector-section summary { min-height: 20px; }
     .inspector-section summary .summary-count { margin-left: auto; }
+    .index-color-group .inspector-section:not([open]) { gap: 0; padding: 0; }
+    .index-color-group .inspector-section:not([open]) summary { min-height: 30px; }
     .edit-image-color-actions { display: grid; gap: 8px; }
     .clip-outline-controls { display: grid; gap: 10px; }
     .clip-outline-main-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: end; }
@@ -1100,7 +1102,15 @@
     .timeline-action { flex: 0 0 auto; min-height: 36px; padding: 8px 12px; white-space: nowrap; }
     .transport-row { grid-template-columns: repeat(5, 42px); }
     .timeline-mode-button.active { color: #071018; background: var(--warning); border-color: transparent; }
-    .filmstrip { padding: 18px 20px 20px; overflow-x: auto; background: rgba(255,255,255,.025); scrollbar-width: thin; }
+    .filmstrip {
+      margin: 0 14px 12px; padding: 18px 6px 8px; overflow-x: auto; background: rgba(255,255,255,.025);
+      scrollbar-width: thin; scrollbar-color: rgba(246,248,255,.34) rgba(255,255,255,.055);
+    }
+    .filmstrip::-webkit-scrollbar { width: 8px; height: 8px; }
+    .filmstrip::-webkit-scrollbar-track { background: rgba(255,255,255,.045); border-radius: 999px; }
+    .filmstrip::-webkit-scrollbar-thumb { background: rgba(246,248,255,.34); border-radius: 999px; border: 2px solid rgba(18,22,33,.96); }
+    .filmstrip::-webkit-scrollbar-thumb:hover { background: rgba(112,205,248,.52); }
+    .filmstrip::-webkit-scrollbar-corner { background: transparent; }
     .frames { display: flex; gap: 10px; align-items: center; justify-content: center; width: max-content; min-width: 100%; min-height: 84px; }
     .thumb, .add-frame-button {
       flex: 0 0 auto; width: 74px; height: 74px; border: 1px solid var(--border); border-radius: 14px;
@@ -1274,7 +1284,7 @@
     .app.canvas-expanded .timeline-toolbar { flex-flow: row wrap; align-items: center; gap: 8px; padding: 8px 12px; }
     .app.canvas-expanded .timeline-slider-wrap { flex: 1 1 160px; }
     .app.canvas-expanded .timeline-slider-wrap input[type="range"] { min-width: 0; }
-    .app.canvas-expanded .filmstrip { padding: 6px 12px; }
+    .app.canvas-expanded .filmstrip { margin: 0 12px 10px; padding: 6px 6px 8px; }
     .app.main-menu-hidden {
       grid-template-columns: minmax(0, 1fr);
       grid-template-areas: "center" "timeline";
@@ -1735,7 +1745,7 @@
 
       <aside class="index-panel">
         <div class="controls">
-          <div class="group">
+          <div class="group index-color-group">
             <p class="group-title">Index Color</p>
             <details class="inspector-section" open>
               <summary>Colors</summary>
