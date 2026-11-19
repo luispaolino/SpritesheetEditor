@@ -149,6 +149,7 @@ function selectedAnimationLayerIds() {
   return selected.length ? selected : (activeAnimationLayer() ? [activeAnimationLayer().id] : []);
 }
 function animationLayerOwnVisible(layer, i = state.currentFrame) {
+  if (state.frames[i]?.animationRemovedLayers?.[layer.id]) return false;
   const visible = state.frames[i]?.animationVisibility?.[layer.id];
   return typeof visible === 'boolean' ? visible : layer.visible !== false;
 }
@@ -241,7 +242,7 @@ function animationLayerUsesBaseFrame(layer) {
 }
 function animationCel(layer, i = state.currentFrame) {
   const frame = state.frames[i];
-  if (!layer || layer.group || !frame) return null;
+  if (!layer || layer.group || !frame || frame.animationRemovedLayers?.[layer.id]) return null;
   if (layer.sharedCel) return layer.sharedCel;
   if (layer.base) {
     const offset = state.frameOffsets[i] || { x: 0, y: 0 };
@@ -925,18 +926,37 @@ function toggleAnimationFlip(id, axis) {
   state.activeAnimationLayerId = id; animationSelection = null; animationChanged();
 }
 function removeAnimationLayer(id) {
-  if (!animationLayerList().some(layer => layer.id === id)) return;
+  const frame = state.frames[state.currentFrame];
+  if (!frame || !animationFrameLayers().some(layer => layer.id === id)) return;
+  pause(false, { updateInfo: false });
   pushHistory();
   const layers = ensureAnimationLayers(), at = layers.findIndex(layer => layer.id === id), removed=animationSubtreeIds(id,layers);
-  state.animationLayers=layers.filter(layer=>!removed.has(layer.id));
-  state.frames.forEach(frame => {
-    removed.forEach(removedId=>{
-      if (frame.animationCels) delete frame.animationCels[removedId];
-      if (frame.animationVisibility) delete frame.animationVisibility[removedId];
+  // Base and shared cels still need their source data in the other frames.
+  frame.animationRemovedLayers = { ...cloneAnimationVisibility(frame.animationRemovedLayers) };
+  removed.forEach(removedId => {
+    frame.animationRemovedLayers[removedId] = true;
+    if (frame.animationCels) delete frame.animationCels[removedId];
+    if (frame.animationVisibility) delete frame.animationVisibility[removedId];
+  });
+  // Discard global metadata only after no frame contains the layer's artwork.
+  const retained = new Set();
+  layers.forEach(layer => {
+    if (layer.group || !state.frames.some((_, i) => animationCel(layer, i))) return;
+    retained.add(layer.id);
+    animationAncestors(layer, layers).forEach(parent => retained.add(parent.id));
+  });
+  state.animationLayers = layers.filter(layer => !removed.has(layer.id) || retained.has(layer.id));
+  const pruned = [...removed].filter(removedId => !retained.has(removedId));
+  state.frames.forEach(item => {
+    pruned.forEach(removedId => {
+      if (item.animationRemovedLayers) delete item.animationRemovedLayers[removedId];
+      if (item.animationVisibility) delete item.animationVisibility[removedId];
     });
   });
-  state.activeAnimationLayerId = state.animationLayers[Math.min(at,state.animationLayers.length-1)]?.id || '';
+  const remaining = animationFrameLayers();
+  state.activeAnimationLayerId = remaining.find(layer => layers.indexOf(layer) >= at)?.id || remaining.at(-1)?.id || '';
   state.selectedAnimationLayerIds=state.activeAnimationLayerId?[state.activeAnimationLayerId]:[];
+  state.animationSelectionAnchorId = state.activeAnimationLayerId;
   animationSelection = null; animationChanged();
 }
 function renameAnimationLayer(id, name) {
@@ -1038,8 +1058,8 @@ function updateAnimationUi(force = false) {
       }
       const eye = document.createElement('button'); eye.type = 'button'; eye.className = 'lock-button reference-visibility-button'; eye.dataset.animationAction = 'visible';
       eye.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'lock-button reference-remove-button'; remove.dataset.animationAction = 'remove'; remove.setAttribute('aria-label',`Remove ${layer.name}`); remove.title = 'Remove Layer';
-      if(layer.group)remove.title='Remove group and its layers';
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'lock-button reference-remove-button'; remove.dataset.animationAction = 'remove'; remove.setAttribute('aria-label',`Remove ${layer.name} from current frame`); remove.title = 'Remove layer from current frame';
+      if(layer.group)remove.title='Remove group and its layers from current frame';
       remove.innerHTML = '<svg class="lock-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>';
       actions.append(eye,remove);
       const controls = document.createElement('div'); controls.className = 'reference-layer-controls animation-layer-controls';
@@ -1218,7 +1238,8 @@ function resliceAnimationGrid(rows, cols) {
   const rebuilt = applyImportFrameSkip(sheetFrames).map((frame, i) => ({
     ...frame,
     animationCels: { ...previousSheetFrames[i]?.animationCels },
-    animationVisibility: cloneAnimationVisibility(previousSheetFrames[i]?.animationVisibility)
+    animationVisibility: cloneAnimationVisibility(previousSheetFrames[i]?.animationVisibility),
+    animationRemovedLayers: cloneAnimationVisibility(previousSheetFrames[i]?.animationRemovedLayers)
   }));
   const animatedFrames = Math.min(oldFrames.length, Math.max(0, ...state.animationLayers.map(layer => layer.sourceFrameCount || 0)));
   const minFrames = Math.max(1, animatedFrames, ...slices.map(frames => frames.length));
@@ -1720,6 +1741,7 @@ function splitAnimationSelection() {
     for (const item of state.frames) {
       const visible = item.animationVisibility?.[layer.id];
       if (typeof visible === 'boolean') item.animationVisibility[id] = visible;
+      if (item.animationRemovedLayers?.[layer.id]) item.animationRemovedLayers[id] = true;
     }
   }
   state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id]; animationSelection=null; state.animationTool='move'; showError(''); animationChanged();

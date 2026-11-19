@@ -748,11 +748,66 @@ test('group metadata survives project/history cloning without sharing mutable ob
   assert.equal(restored[0].group,true);assert.equal(restored[1].parentId,restored[0].id);
 });
 
-test('removing a group removes its contents and leaves other layers intact', () => {
+test('removing a group removes its current-frame contents and preserves other frames', () => {
   const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
-  const group=app.activeAnimationLayer();app.removeAnimationLayer(group.id);
+  const group=app.activeAnimationLayer(), other=app.state.frames[1].animationCels;
+  app.removeAnimationLayer(group.id);
+  assert.deepEqual(Array.from(app.animationFrameLayers(),layer=>layer.id),['c']);
+  assert.equal(app.state.frames[0].animationCels.a,undefined);
+  assert.equal(app.state.frames[0].animationCels.b,undefined);
+  assert.ok(app.state.frames[0].animationCels.c);
+  assert.equal(app.animationLayerVisible(group,0),false);
+  assert.equal(app.animationLayerVisible(group,1),true);
+  assert.equal(app.animationCel(app.state.animationLayers.find(layer=>layer.id==='a'),1),other.a);
+  assert.equal(app.animationCel(app.state.animationLayers.find(layer=>layer.id==='b'),1),other.b);
+  assert.deepEqual(Array.from(app.animationFrameLayers(1),layer=>layer.id),[group.id,'a','b','c']);
+  app.state.currentFrame=1;app.removeAnimationLayer(group.id);
   assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),['c']);
-  for(const frame of app.state.frames) {assert.equal(frame.animationCels.a,undefined);assert.equal(frame.animationCels.b,undefined);assert.ok(frame.animationCels.c);}
+});
+
+test('deleting the original GIF layer preserves its source artwork in other frames', () => {
+  const app=editor();app.updateAnimationUi=()=>{};
+  const layer=app.activeAnimationLayer(), originals=app.state.frames.map(frame=>frame.canvas);
+  let history=0;app.pushHistory=()=>history++;
+  app.removeAnimationLayer(layer.id);
+  assert.equal(history,1);
+  assert.equal(app.animationCel(layer,0),null);
+  assert.equal(app.animationLayerVisible(layer,0),false);
+  assert.equal(app.animationCel(layer,1).canvas,originals[1]);
+  assert.equal(app.state.frames[0].canvas,originals[0]);
+  assert.equal(app.animationFrameLayers().length,0);
+  assert.equal(app.activeAnimationLayer(),null);
+  const drawn=[];app.drawBaseSprite=(_target,i)=>drawn.push(i);
+  const target={save(){},beginPath(){},rect(){},clip(){},restore(){},drawImage(){}};
+  app.drawAnimationSprite(target,0,0,0,{});
+  app.drawAnimationSprite(target,1,0,0,{});
+  assert.deepEqual(drawn,[1]);
+  app.state.currentFrame=1;app.removeAnimationLayer(layer.id);
+  assert.equal(app.state.animationLayers.length,0);
+});
+
+test('deleting shared artwork excludes only the current frame without mutating the shared cel', () => {
+  const app=clipboardEditor(), layer=app.activeAnimationLayer();
+  layer.sharedCel=app.state.frames[0].animationCels.a;
+  layer.sharedCel.canvas.pixel='red';
+  const shared=layer.sharedCel, other=app.state.frames[1].animationCels.a;
+  app.removeAnimationLayer(layer.id);
+  assert.equal(app.animationCel(layer,0),null);
+  assert.equal(app.animationCel(layer,1),shared);
+  assert.equal(app.animationLayerVisible(layer,1),true);
+  assert.equal(shared.canvas.pixel,'red');
+  assert.equal(app.state.frames[1].animationCels.a,other);
+  assert.equal(app.activeAnimationLayer().id,'b');
+  assert.deepEqual(Array.from(app.animationFrameLayers(1),layer=>layer.id),['a','b','c']);
+});
+
+test('removing frame-local artwork prunes unused metadata and repeated removal is a no-op', () => {
+  const app=clipboardEditor();delete app.state.frames[1].animationCels.a;
+  let history=0;app.pushHistory=()=>history++;
+  app.removeAnimationLayer('a');app.removeAnimationLayer('a');
+  assert.equal(history,1);
+  assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),['b','c']);
+  assert.equal(app.state.frames[0].animationRemovedLayers.a,undefined);
 });
 
 test('New Layer above a grouped child stays inside the same group', () => {
