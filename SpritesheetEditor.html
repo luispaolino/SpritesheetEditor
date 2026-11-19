@@ -7781,6 +7781,7 @@
       return normalizeIndexList(state.selectedPaletteIndices || [], paletteLength).length ? layer : null;
     }
     function spriteEditUsesPaletteLayer(axis = null) {
+      if (animationPanelActive()) return false;
       if (!activeEditablePaletteLayer()) return false;
       return axis ? PALETTE_LAYER_EDIT_AXES.has(axis) : true;
     }
@@ -7797,8 +7798,10 @@
       });
     }
     function syncSpriteEditUi() {
+      syncSpriteEditTarget();
       const enabled = hasFrames() && state.spriteEditMode;
-      const editImageEnabled = hasFrames() && !spriteSheetBuilderPanelActive();
+      const editImageEnabled = hasFrames() && !spriteSheetBuilderPanelActive()
+        && (!animationPanelActive() || !!activeAnimationLayer());
       const editImageControls = new Set(editImageSpriteEditControls());
       const paletteLayerMode = spriteEditUsesPaletteLayer();
       els.spriteEditColorButton.classList.toggle('active', !!state.spriteEditMode);
@@ -13159,6 +13162,7 @@
     }
     function resetProject() {
       if (state.cageResizeDrag) finishCageResize(null, false);
+      resetSpriteEditSession();
       resetAnimationState();
       pause(true); showError('');
       closeFrameContextMenu(); closeReferenceCompositorContextMenu(); closePencilColorContextMenu(); closeColorPicker(); closePaletteLayerModal(); closeReferenceFadeModal(); closeReferenceClipModal(); closeReferenceAudioModal(); closeReferenceTextModal();
@@ -16796,15 +16800,47 @@
       state.spriteEditApplyScheduled = false;
       state.spriteEditApplying = false;
       state.spriteEditClosePendingReset = false;
+      state.spriteEditLayerId = null;
+      state.spriteEditFrames = null;
+      state.spriteEditRevision = null;
+    }
+    function syncSpriteEditTarget() {
+      const layerId = animationPanelActive() ? activeAnimationLayer()?.id || null : null;
+      if (!state.spriteEditBaseFrames || (state.spriteEditLayerId === layerId && state.spriteEditFrames === state.frames
+        && state.spriteEditRevision === state.frameBitmapRevision)) return;
+      // Finish the previous layer's queued adjustment before starting another target.
+      if (state.spriteEditFrames === state.frames && state.spriteEditRevision === state.frameBitmapRevision && !state.restoring) {
+        void applySpriteEditRequest(state.spriteEditApplyToken, { yieldToBrowser: false, refresh: false });
+      }
+      resetSpriteEditSession();
+      state.spriteEditAdjust = neutralSpriteEditAdjust();
     }
     function captureSpriteEditBaseFrames() {
-      state.spriteEditBaseFrames = state.frames.map(frame => ({
-        canvas: canvasClone(frame.canvas),
-        sourceCanvas: canvasClone(frame.sourceCanvas || frame.canvas)
-      }));
+      const layer = animationPanelActive() ? activeAnimationLayer() : null;
+      const layers = animationLayerList(), ids = layer && animationSubtreeIds(layer.id, layers);
+      const targets = layer ? layers.filter(item => ids.has(item.id) && !item.group) : [null];
+      const records = [], seen = new Set();
+      state.frames.forEach((frame, index) => {
+        for (const target of targets) {
+          const base = !target || animationLayerUsesBaseFrame(target);
+          const cel = base ? null : animationCel(target, index);
+          if (!base && (!cel || seen.has(cel))) continue;
+          if (cel) seen.add(cel);
+          const canvas = base ? frame.canvas : cel.canvas;
+          records.push({
+            frame, cel, canvas: canvasClone(canvas),
+            sourceCanvas: base ? canvasClone(frame.sourceCanvas || canvas) : null
+          });
+        }
+      });
+      state.spriteEditBaseFrames = records;
+      state.spriteEditLayerId = layer?.id || null;
+      state.spriteEditFrames = state.frames;
+      state.spriteEditRevision = state.frameBitmapRevision;
     }
     function ensureSpriteEditBaseFrames() {
-      if (!state.spriteEditBaseFrames || state.spriteEditBaseFrames.length !== state.frames.length) captureSpriteEditBaseFrames();
+      syncSpriteEditTarget();
+      if (!state.spriteEditBaseFrames) captureSpriteEditBaseFrames();
     }
     function sharpenImageData(imageData, amount) {
       const strength = clamp(parseFloat(amount) || 0, 0, 1);
@@ -16871,35 +16907,50 @@
       state.indexedFrames = state.frames.map(() => null);
       return true;
     }
-    async function applySpriteEditRequest(token) {
+    async function applySpriteEditRequest(token, { yieldToBrowser = true, refresh = true } = {}) {
       const baseFrames = state.spriteEditBaseFrames;
       if (!hasFrames() || !baseFrames?.length) return true;
       const adjust = normalizeSpriteEditAdjust(state.spriteEditAdjust);
-      for (let i = 0; i < state.frames.length; i++) {
+      const edits = [];
+      for (let i = 0; i < baseFrames.length; i++) {
         if (token !== state.spriteEditApplyToken) return false;
         const base = baseFrames[i];
         if (!base) continue;
-        state.frames[i].canvas = spriteEditCanvasFromBase(base.canvas, adjust);
-        state.frames[i].sourceCanvas = spriteEditCanvasFromBase(base.sourceCanvas || base.canvas, adjust);
-        state.indexedFrames[i] = null;
-        if (i % 3 === 2) await new Promise(resolve => requestAnimationFrame(resolve));
+        edits.push({
+          base, canvas: spriteEditCanvasFromBase(base.canvas, adjust),
+          sourceCanvas: base.sourceCanvas ? spriteEditCanvasFromBase(base.sourceCanvas, adjust) : null
+        });
+        if (yieldToBrowser && i % 3 === 2) await new Promise(resolve => requestAnimationFrame(resolve));
       }
       if (token !== state.spriteEditApplyToken) return false;
+      for (const edit of edits) {
+        if (edit.base.cel) edit.base.cel.canvas = edit.canvas;
+        else {
+          edit.base.frame.canvas = edit.canvas;
+          edit.base.frame.sourceCanvas = edit.sourceCanvas;
+        }
+      }
       markFrameBitmapsDirty();
+      state.spriteEditRevision = state.frameBitmapRevision;
+      if (!refresh) return true;
       buildFilmstrip();
       drawFrame(state.currentFrame);
       updateInfo();
       return true;
     }
     async function runSpriteEditApplyLoop() {
+      const baseFrames = state.spriteEditBaseFrames;
       state.spriteEditApplyScheduled = false;
       state.spriteEditApplying = true;
       const token = state.spriteEditApplyToken;
       const completed = await applySpriteEditRequest(token);
+      if (baseFrames !== state.spriteEditBaseFrames) return;
       state.spriteEditApplying = false;
       if (!completed || token !== state.spriteEditApplyToken) {
         state.spriteEditApplyScheduled = true;
-        requestAnimationFrame(runSpriteEditApplyLoop);
+        requestAnimationFrame(() => {
+          if (baseFrames === state.spriteEditBaseFrames) runSpriteEditApplyLoop();
+        });
         return;
       }
       if (state.spriteEditClosePendingReset && !state.spriteEditMode) {
@@ -16911,7 +16962,10 @@
       state.spriteEditApplyToken += 1;
       if (state.spriteEditApplyScheduled || state.spriteEditApplying) return;
       state.spriteEditApplyScheduled = true;
-      requestAnimationFrame(runSpriteEditApplyLoop);
+      const baseFrames = state.spriteEditBaseFrames;
+      requestAnimationFrame(() => {
+        if (baseFrames === state.spriteEditBaseFrames) runSpriteEditApplyLoop();
+      });
     }
     function activateSpriteEditToolState() {
       state.maskMode = false;
@@ -16925,6 +16979,7 @@
     }
     function setSpriteEditAdjust(axis, value) {
       if (!hasFrames()) return;
+      syncSpriteEditTarget();
       if (spriteEditUsesPaletteLayer(axis)) {
         if (!state.spriteEditMode) {
           state.spriteEditAdjust = neutralSpriteEditAdjust();
