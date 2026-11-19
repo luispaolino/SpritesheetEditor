@@ -73,7 +73,7 @@
 .animation-wand-settings .check-field,
 .animation-wand-tolerance { min-height: 32px; padding: 0 5px; gap: 4px; font-size: 11px; white-space: nowrap; }
 .animation-wand-tolerance { display: flex; align-items: center; justify-content: flex-end; color: var(--muted); }
-.animation-wand-tolerance input { width: 42px; min-width: 0; min-height: 32px; padding: 0 3px; text-align: center; }
+.side-panels #animationWandTolerance { width: 44px; min-width: 44px; flex: 0 0 44px; min-height: 32px; padding: 0 4px; text-align: center; }
 .animation-selection-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .animation-selection-actions .small-button { flex: 1; }
 .side-panels #animationColorStrip { flex: 0 0 auto; max-width: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; }

@@ -697,6 +697,17 @@ function clearAnimationSelection() {
   drawFrame(state.currentFrame);
   updateAnimationUi();
 }
+function invertAnimationSelection() {
+  const frame = state.frames[state.currentFrame];
+  if (!frame || state.dragging) return;
+  const width = state.cageWidth, height = state.cageHeight;
+  const current = animationSelectionRaster()?.alpha;
+  const alpha = Uint8Array.from({ length: width * height }, (_, index) => 255 - (current?.[index] || 0));
+  const next = alpha.some(Boolean) ? { kind: 'mask', alpha, width, height, frameId: frame.id } : null;
+  commitAnimationSelection(next);
+  drawFrame(state.currentFrame);
+  updateAnimationUi();
+}
 function selectAnimationLayerPixels(layer) {
   if (!layer || layer.group) return;
   const frame = state.currentFrame;
@@ -1097,6 +1108,7 @@ function swapAnimationPencilColors() {
   const index = animationSecondaryPencilIndex(), primary = state.pencilColor;
   setPencilColorAt(state.activePencilColorIndex, state.pencilColors[index] || DEFAULT_SECONDARY_PENCIL_COLOR, { refresh: false });
   state.pencilColors[index] = cloneColor(primary);
+  savePencilColorPreferences();
   updateAnimationColorUi(false, false);
   renderBrushCursorOverlay();
 }
@@ -2127,11 +2139,12 @@ function handleAnimationTransformKeyDown(event, typing) {
     return true;
   }
   if (!activeAnimationTransform()) return false;
-  if (command && key === 'd') {
+  if (command && (key === 'd' || key === 'i')) {
     event.preventDefault();
     if (!event.repeat) {
       finishAnimationTransform();
-      clearAnimationSelection();
+      if (key === 'i') invertAnimationSelection();
+      else clearAnimationSelection();
     }
   } else if (event.key === 'Enter' || event.key === 'Escape') {
     event.preventDefault();
@@ -2153,6 +2166,11 @@ function handleAnimationKeyDown(e) {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') {
     e.preventDefault();
     if (!e.repeat) clearAnimationSelection();
+    return true;
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'i') {
+    e.preventDefault();
+    if (!e.repeat) invertAnimationSelection();
     return true;
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'a') {
