@@ -1,5 +1,13 @@
 # Release Notes
 
+## v1.8.0 - 2026-11-20
+
+- Added an inline layer blend-mode dropdown beside the layer name, keeping the controls at two rows. Choose Normal, Multiply, Screen, Overlay, and the other standard blend modes.
+- Groups default to Pass Through. Other modes composite the group as one image, with its opacity applied once.
+- Blend modes survive project saving/loading, Undo/Redo, copying, pasting, splitting, and group flattening.
+- Painting Undo now copies only the edited layer or base frame instead of every frame and reference image, reducing memory use and pauses during repeated strokes.
+- Reused hard-edged eraser stamps, skipped unnecessary canvas baking for aligned layers, and avoided full layout updates on brush release. Pencil and Eraser retain their existing pixel footprints, transparency, selection clipping, and Sprite Mask behavior.
+
 ## v1.7.0 - 2026-11-11
 
 - Copy selected pixels in Edit Image with Ctrl/Cmd+C and paste them into a new layer on the current frame with Ctrl/Cmd+V.

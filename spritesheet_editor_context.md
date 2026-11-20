@@ -193,6 +193,7 @@ Current release notes are split into:
 - `v1.6.0 - 2026-10-29`
 - `v1.6.5 - 2026-11-09`
 - `v1.7.0 - 2026-11-11`
+- `v1.8.0 - 2026-11-20`
 
 Major features:
 
@@ -201,6 +202,10 @@ Major features:
 - Animation layers are documented under `v1.6.0`; their logic and styling live in `animation.js` and `animation.css`.
 
 Version 1.6.5 combines layer and image editing in the Edit Image panel.
+
+Version 1.8.0 adds inline blend modes in layer headings and lighter pixel-painting history. `animationBlendMode` validates the 16 supported modes; groups default to `pass-through`, while other group modes render children into an isolated canvas before applying group opacity and blending once. Preserve `blendMode` in metadata cloning, project serialization, the clipboard, splitting, and single-group flattening.
+
+Pencil/Eraser strokes use `animation-paint-history` entries captured by `captureAnimationPaintHistory`, not full project snapshots. `undo`/`redo` capture an inverse entry of the matching kind. Local entries clone one cel; shared entries restore the layer's shared cel; base entries retain source pixels, masks, legacy pencil layers, sheet bounds, and transforms. Other actions still use full snapshots, so preserve interoperability between both entry kinds. Aligned cels skip unnecessary baking, and the round eraser reuses one cached hard-edged stamp. Painting previews and stroke completion avoid full canvas-layout updates. Regression coverage lives in `tests/animation-visibility.test.cjs`.
 
 Animation visibility is stored in each frame's `animationVisibility` map, with the layer's old visibility used as the default for compatibility. Keep this map when cloning, saving, restoring, or reordering frames. Selection masks are binary pixel rasters; the translucent fill and animated black-and-white border render on a separate noninteractive overlay canvas so they never appear in exports. The section bar uses the full stage width, and a ResizeObserver updates the floating panel's top offset when the section buttons wrap.
 

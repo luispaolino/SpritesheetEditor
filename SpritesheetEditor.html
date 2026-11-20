@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.7.0-7" />
+  <link rel="stylesheet" href="animation.css?v=1.8.0-1" />
   <style>
     :root {
       --bg: #10131b;
@@ -1307,7 +1307,7 @@
       <div class="app-splash__eyebrow">Made by <a href="https://renderpopstudio.com/" target="_blank" rel="noopener noreferrer">RenderPop Studio</a></div>
       <div class="app-splash__title">Spritesheet Editor</div>
       <div class="app-splash__subtitle">Preparing the sprite editor</div>
-      <div class="app-splash__version">Version 1.7.0</div>
+      <div class="app-splash__version">Version 1.8.0</div>
       <div class="app-splash__road" aria-hidden="true"></div>
     </div>
   </div>
@@ -1316,7 +1316,7 @@
     <section class="card left-panel" id="mainMenu">
       <div class="brand">
         <img class="brand-logo" src="logo.webp" width="1631" height="550" alt="Spritesheet Editor" />
-        <span class="tool-version">v1.7.0</span>
+        <span class="tool-version">v1.8.0</span>
       </div>
       <p class="subtitle">Upload a spritesheet, set its grid, adjust each frame offset, draw removal masks, and export a repacked PNG.</p>
 
@@ -2259,7 +2259,7 @@
           </div>
           <div>
             <strong>Current Release</strong>
-            <span>Version 1.7.0</span>
+            <span>Version 1.8.0</span>
           </div>
         </div>
         <p>Built for animation cleanup, reference matching, palette workflows, bitmap font work, and compositor-driven sprite exports.</p>
@@ -4433,8 +4433,25 @@
       if (els.canvasRedoButton) els.canvasRedoButton.disabled = !state.redoStack.length;
     }
     function pushHistory() { if (state.restoring || historySuppressDepth) return; state.undoStack.push(snapshot()); if (state.undoStack.length > 40) state.undoStack.shift(); state.redoStack = []; syncHistoryButtons(); }
-    function undo() { cancelActiveDrag(); finishKeyboardNudge(false); if (!state.undoStack.length) return; state.redoStack.push(snapshot()); restore(state.undoStack.pop()); }
-    function redo() { cancelActiveDrag(); finishKeyboardNudge(false); if (!state.redoStack.length) return; state.undoStack.push(snapshot()); restore(state.redoStack.pop()); }
+    function pushAnimationPaintHistory(layerId, frame) {
+      if (state.restoring || historySuppressDepth) return;
+      const entry = captureAnimationPaintHistory(layerId, frame);
+      if (!entry) return;
+      state.undoStack.push(entry); if (state.undoStack.length > 40) state.undoStack.shift();
+      state.redoStack = []; syncHistoryButtons();
+    }
+    function undo() {
+      cancelActiveDrag(); finishKeyboardNudge(false); if (!state.undoStack.length) return;
+      const entry = state.undoStack.pop(), paint = entry.kind === 'animation-paint-history';
+      state.redoStack.push(paint ? captureAnimationPaintHistory(entry.layerId, entry.frameId) : snapshot());
+      if (paint) restoreAnimationPaintHistory(entry); else restore(entry);
+    }
+    function redo() {
+      cancelActiveDrag(); finishKeyboardNudge(false); if (!state.redoStack.length) return;
+      const entry = state.redoStack.pop(), paint = entry.kind === 'animation-paint-history';
+      state.undoStack.push(paint ? captureAnimationPaintHistory(entry.layerId, entry.frameId) : snapshot());
+      if (paint) restoreAnimationPaintHistory(entry); else restore(entry);
+    }
 
     function makeFrameCanvas(image, sx = 0, sy = 0, sw = image.naturalWidth || image.width, sh = image.naturalHeight || image.height) {
       const c = document.createElement('canvas'); c.width = Math.max(1, Math.floor(sw)); c.height = Math.max(1, Math.floor(sh));
@@ -20985,7 +21002,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.7.0-17"></script>
+  <script src="animation.js?v=1.8.0-1"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     restorePencilColorPreferences(); initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);

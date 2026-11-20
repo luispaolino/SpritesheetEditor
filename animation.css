@@ -31,7 +31,12 @@
 .animation-layer-flips { grid-column: 3; }
 .side-panels .animation-layer-actions .lock-button { width: 26px; min-width: 26px; height: 32px; min-height: 32px; justify-self: center; }
 .side-panels .animation-layer-item .reference-flip-button { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
-.animation-layer-heading { grid-column: 2; grid-row: 1; display: flex; gap: 6px; margin-left: 16px; min-width: 0; }
+.animation-layer-heading { grid-column: 2; grid-row: 1; display: flex; gap: 6px; min-width: 0; }
+.side-panels .animation-layer-blend-mode {
+  flex: 0 1 104px; width: 104px; min-width: 70px; max-width: 44%;
+  height: 32px; min-height: 32px; padding: 0 5px; border-radius: 11px;
+  font-size: 11px; font-weight: 800; text-overflow: ellipsis; text-align: left; appearance: auto;
+}
 .side-panels .animation-layer-item .animation-layer-name,
 .side-panels .animation-layer-item .animation-layer-rename-input {
   flex: 1 1 0; min-width: 0;

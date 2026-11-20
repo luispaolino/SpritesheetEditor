@@ -103,6 +103,8 @@ Hold the selection button to switch between Lasso, Rectangle, and Magic Wand (W)
 
 Set **O** beside **X** and **Y** to change a layer or group's opacity from 0% to 100% across its frames.
 
+Choose a blend mode beside the layer name: Normal, Multiply, Screen, Overlay, and other standard modes. Groups default to Pass Through; choosing another mode composites their children as one image. Painting Undo stores only the edited artwork, keeping repeated strokes lighter without copying the entire animation.
+
 Static images loaded in Edit Image use the Spritesheet Grid's Rows and Columns. Cells appear in the timeline from left to right, top to bottom. Changing the grid slices the original sheet again. Undo restores the previous grid and its edits. Animated GIF and WebP files use their decoded frames.
 
 New Layer creates an empty layer above the selected layer, with independent artwork in each frame. Ctrl/Cmd-click layer names to select several, or Shift-click a range, then click Group. Groups have green borders; double-click a group to expand or collapse its children. Children remain individually selectable and editable. Move, offsets, flips, and per-frame visibility work on the whole group, while drawing and selection tools operate only on individual layers. Drag a layer onto the middle of a group to put it inside, or above/below the group to move it outside. Press F2 to rename a layer or group. Groups and their contents are preserved by project saving and undo/redo.
@@ -159,6 +161,11 @@ https://github.com/luispaolino/SpritesheetEditor/
 ## Release Notes
 
 For the full release history, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+### v1.8.0 - 2026-11-20
+
+- Added compact layer blend modes and group compositing, preserved through project saving, copying, splitting, and Undo/Redo.
+- Reduced pixel-painting memory use and lag with history for the edited artwork only, reusable eraser stamps, and fewer canvas/layout updates.
 
 ### v1.7.0 - 2026-11-11
 

@@ -30,6 +30,150 @@ function clipboardEditor() {
   const app=layeredEditor();app.updateAnimationUi=()=>{};return app;
 }
 
+function paintHistoryEditor() {
+  const app=clipboardEditor();
+  Object.assign(app.state,{selectedFrameIndices:[0],selectedAnimationLayerIds:['a'],animationBrushSize:8,animationTool:'pencil',
+    frameScales:[{x:1,y:1},{x:1,y:1}],frameMasks:[{width:64,height:64},{width:64,height:64}],maskDirty:[false,false],indexedFrames:[null,null],
+    pencilColor:{r:12,g:34,b:56,a:255},pencilColors:[{r:12,g:34,b:56,a:255},{r:0,g:0,b:0,a:255}],activePencilColorIndex:0,undoStack:[],redoStack:[]});
+  app.cloneColor=color=>({...color});app.clonePencilColors=colors=>colors.map(color=>({...color}));
+  app.cloneIndexedFrameInfo=info=>info?{...info}:null;app.clonePencilLayers=layers=>layers.map(layer=>({...layer,canvas:app.canvasClone(layer.canvas)}));
+  app.cloneSheetRect=rect=>rect?{...rect}:null;app.syncAfterDataChange=()=>{};
+  app.historySuppressDepth=0;app.finishKeyboardNudge=()=>{};app.els={};
+  for(const name of ['syncHistoryButtons','pushAnimationPaintHistory','undo','redo'])vm.runInContext(sourceFunction(name),app);
+  app.cancelActiveDrag=()=>{};
+  return app;
+}
+
+test('paint history copies one cel and leaves other layers and frames untouched through Undo/Redo',()=>{
+  const app=paintHistoryEditor(),otherFrame=app.state.frames[1].animationCels.a,otherLayer=app.state.frames[0].animationCels.b;
+  app.animationCel(app.activeAnimationLayer()).canvas.pixel='before';
+  let clones=0;const clone=app.canvasClone;app.canvasClone=canvas=>{clones++;return clone(canvas);};
+  app.pushAnimationPaintHistory('a',0);
+  assert.equal(clones,1);assert.equal(app.state.undoStack[0].kind,'animation-paint-history');
+  app.animationCel(app.activeAnimationLayer()).canvas.pixel='after';app.state.currentFrame=1;app.selectAnimationLayer('b');
+  app.undo();
+  assert.equal(app.state.currentFrame,0);assert.equal(app.activeAnimationLayer().id,'a');
+  assert.equal(app.animationCel(app.activeAnimationLayer()).canvas.pixel,'before');
+  assert.equal(app.state.frames[1].animationCels.a,otherFrame);assert.equal(app.state.frames[0].animationCels.b,otherLayer);
+  app.redo();
+  assert.equal(app.state.currentFrame,1);assert.equal(app.activeAnimationLayer().id,'b');
+  assert.equal(app.state.frames[0].animationCels.a.canvas.pixel,'after');
+  assert.equal(app.state.frames[1].animationCels.a,otherFrame);assert.equal(app.state.frames[0].animationCels.b,otherLayer);
+});
+
+test('paint history restores shared artwork without replacing local cels or other frame artwork',()=>{
+  const app=paintHistoryEditor(),layer=app.activeAnimationLayer();layer.sharedCel=app.cloneAnimationCel(app.animationCel(layer));
+  layer.sharedCel.canvas.pixel='shared-before';const local=app.state.frames[0].animationCels.a;
+  app.pushAnimationPaintHistory(layer.id,0);layer.sharedCel.canvas.pixel='shared-after';
+  app.undo();assert.equal(app.animationCel(layer,0).canvas.pixel,'shared-before');assert.equal(app.animationCel(layer,1).canvas.pixel,'shared-before');
+  assert.equal(app.state.frames[0].animationCels.a,local);
+  app.redo();assert.equal(app.animationCel(layer,1).canvas.pixel,'shared-after');assert.equal(app.state.frames[0].animationCels.a,local);
+});
+
+test('base paint history preserves source pixels, transforms, masks, legacy pencil layers, and sheet bounds',()=>{
+  const app=paintHistoryEditor();app.state.animationLayers=null;app.state.activeAnimationLayerId='animation-base';
+  const frame=app.state.frames[0],other=app.state.frames[1].canvas;
+  Object.assign(frame,{canvas:{width:32,height:24,pixel:'base'},sourceCanvas:{width:32,height:24,pixel:'source'},sheetSlice:{x:1,y:2,w:32,h:24},sheetCrop:{x:2,y:3,w:30,h:20},pencilLayers:[{canvas:{width:32,height:24,pixel:'paint'},id:'legacy'}]});
+  app.state.frameOffsets[0]={x:10,y:-4};app.state.frameScales[0]={x:2,y:3};app.state.frameFlips[0]=true;
+  app.state.frameMasks[0].pixel='mask';app.state.maskDirty[0]=true;
+  const saved=app.captureAnimationPaintHistory('animation-base',0);
+  frame.canvas.pixel='changed';frame.sourceCanvas.pixel='changed';frame.pencilLayers=[];frame.sheetSlice=null;frame.sheetCrop=null;
+  app.state.frameOffsets[0]={x:0,y:0};app.state.frameScales[0]={x:1,y:1};app.state.frameFlips[0]=false;app.state.frameMasks[0].pixel='changed';app.state.maskDirty[0]=false;
+  app.restoreAnimationPaintHistory(saved);
+  assert.equal(frame.canvas.pixel,'base');assert.equal(frame.sourceCanvas.pixel,'source');assert.equal(frame.pencilLayers[0].canvas.pixel,'paint');
+  assert.deepEqual({...frame.sheetSlice},{x:1,y:2,w:32,h:24});assert.deepEqual({...frame.sheetCrop},{x:2,y:3,w:30,h:20});
+  assert.deepEqual({...app.state.frameOffsets[0]},{x:10,y:-4});assert.deepEqual({...app.state.frameScales[0]},{x:2,y:3});assert.equal(app.state.frameFlips[0],true);
+  assert.equal(app.state.frameMasks[0].pixel,'mask');assert.equal(app.state.maskDirty[0],true);assert.equal(app.state.frames[1].canvas,other);
+  frame.canvas.pixel='edit-again';assert.equal(saved.base.canvas.pixel,'base');
+});
+
+test('paint history honors the history limit and suppression and invalidates Redo after a new stroke',()=>{
+  const app=paintHistoryEditor();
+  for(let i=0;i<45;i++)app.pushAnimationPaintHistory('a',0);
+  assert.equal(app.state.undoStack.length,40);
+  app.undo();assert.equal(app.state.redoStack.length,1);
+  app.historySuppressDepth=1;app.pushAnimationPaintHistory('a',0);assert.equal(app.state.redoStack.length,1);
+  app.historySuppressDepth=0;app.pushAnimationPaintHistory('a',0);assert.equal(app.state.redoStack.length,0);
+});
+
+test('already aligned cels retain their canvas instead of allocating another full canvas at every stroke',()=>{
+  const app=paintHistoryEditor(),cel=app.animationCel(app.activeAnimationLayer());
+  cel.canvas.width=app.state.cageWidth;cel.canvas.height=app.state.cageHeight;
+  const canvas=cel.canvas;app.makeMask=()=>{throw Error('Unexpected canvas allocation');};
+  app.animationBakeCel(app.activeAnimationLayer(),0);assert.equal(cel.canvas,canvas);
+});
+
+test('blend modes default safely and survive independent history and project copies', async()=>{
+  const app=editor();
+  const layers=[{id:'a',name:'Overlay',blendMode:'multiply'},{id:'g',group:true},{id:'b',blendMode:'destination-out'},{id:'c',group:true,blendMode:'screen'}];
+  const copy=app.cloneAnimationLayers(layers);
+  assert.deepEqual(Array.from(copy,layer=>layer.blendMode),['multiply','pass-through','normal','screen']);
+  layers[0].blendMode='normal';assert.equal(copy[0].blendMode,'multiply');
+  const saved=app.serializeAnimationLayers(copy),restored=await app.restoreAnimationLayers(JSON.parse(JSON.stringify(saved)));
+  assert.deepEqual(Array.from(restored,layer=>layer.blendMode),['multiply','pass-through','normal','screen']);
+  assert.equal(app.animationBlendMode({blendMode:'pass-through'}),'normal');
+});
+
+test('changing a layer blend mode creates one history entry and leaves other layers untouched',()=>{
+  const app=clipboardEditor();let history=0;app.pushHistory=()=>history++;
+  assert.equal(app.setAnimationBlendMode('a','multiply'),true);
+  assert.equal(app.state.animationLayers[0].blendMode,'multiply');
+  assert.equal(app.animationBlendMode(app.state.animationLayers[1]),'normal');
+  assert.equal(app.setAnimationBlendMode('a','multiply'),false);
+  assert.equal(app.setAnimationBlendMode('a','destination-out'),false);
+  assert.equal(app.setAnimationBlendMode('a','pass-through'),false);
+  assert.equal(app.setAnimationBlendMode('missing','screen'),false);
+  assert.equal(history,1);
+});
+
+test('copy and paste retain layer and group blend modes without baking them into source pixels',()=>{
+  const app=clipboardEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();group.blendMode='screen';
+  app.state.animationLayers.find(layer=>layer.id==='a').blendMode='multiply';
+  app.copyAnimationLayers();app.pasteAnimationLayers();
+  const pasted=app.activeAnimationLayer(),child=app.state.animationLayers.find(layer=>layer.parentId===pasted.id);
+  assert.equal(pasted.blendMode,'screen');assert.equal(child.blendMode,'multiply');
+  assert.notEqual(app.animationCel(child).canvas,app.state.frames[0].animationCels.a.canvas);
+});
+
+function blendRenderEditor() {
+  const app=layeredEditor();
+  const context=()=>({
+    globalAlpha:1,globalCompositeOperation:'source-over',calls:[],stack:[],
+    save(){this.stack.push([this.globalAlpha,this.globalCompositeOperation]);},
+    restore(){[this.globalAlpha,this.globalCompositeOperation]=this.stack.pop();},
+    drawImage(canvas){this.calls.push({canvas,mode:this.globalCompositeOperation,alpha:this.globalAlpha});}
+  });
+  app.makeMask=(width=64,height=64)=>{const canvas={width,height},t=context();canvas.getContext=()=>t;return canvas;};
+  app.drawAnimationCel=(t,cel)=>{if(cel)t.drawImage(cel.canvas);};
+  app.context=context;
+  return app;
+}
+
+test('rendering applies each blend mode and opacity once and restores the caller context',()=>{
+  const app=blendRenderEditor(),layers=app.state.animationLayers,target=app.context();
+  layers[0].blendMode='multiply';layers[0].opacity=50;layers[1].blendMode='screen';
+  app.drawAnimationLayers(target,layers,0,0,0);
+  assert.deepEqual(target.calls.map(call=>[call.mode,call.alpha]),[['source-over',1],['screen',1],['multiply',.5]]);
+  assert.equal(target.globalCompositeOperation,'source-over');assert.equal(target.globalAlpha,1);assert.equal(target.stack.length,0);
+});
+
+test('blended groups flatten overlapping children once while legacy groups remain pass-through',()=>{
+  const app=blendRenderEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer(),layers=app.state.animationLayers;
+  layers.find(layer=>layer.id==='a').blendMode='screen';
+  const direct=app.context();app.drawAnimationLayers(direct,layers,0,0,0);
+  assert.deepEqual(direct.calls.map(call=>call.mode),['source-over','source-over','screen']);
+  group.blendMode='multiply';group.opacity=50;
+  const flattened=app.context();app.drawAnimationLayers(flattened,layers,0,0,0);
+  assert.deepEqual(flattened.calls.map(call=>[call.mode,call.alpha]),[['source-over',1],['multiply',.5]]);
+  const children=flattened.calls[1].canvas.getContext('2d');
+  assert.deepEqual(children.calls.map(call=>[call.mode,call.alpha]),[['source-over',1],['screen',1]]);
+  group.blendMode='normal';group.opacity=100;
+  const isolated=app.context();app.drawAnimationLayers(isolated,layers,0,0,0);
+  assert.equal(isolated.calls.length,2);assert.equal(isolated.calls[1].canvas.getContext('2d').calls.length,2);
+});
+
 test('copy captures an immutable current-frame cel and repeated pastes are independent',()=>{
   const app=clipboardEditor(), original=app.state.frames[0].animationCels.a;
   original.flipX=true;original.canvas.pixel='red';
@@ -628,6 +772,13 @@ test('Merge accepts a single group and removes its subtree without touching othe
   assert.equal(merged.name,group.name);assert.equal(merged.group,false);assert.equal(merged.parentId,'');
   assert.deepEqual(app.animationCel(merged).canvas.drawn,['b-0','a-0']);assert.equal(app.state.animationLayers.length,2);
   assert.equal(app.state.frames[0].animationCels.c,other);
+});
+
+test('Merge retains the outer blend mode when flattening a single group',()=>{
+  const app=blendRenderEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  app.activeAnimationLayer().blendMode='multiply';
+  app.mergeAnimationLayers();
+  assert.equal(app.activeAnimationLayer().blendMode,'multiply');
 });
 
 test('Merge retains frame-local membership and bakes descendant visibility per frame',()=>{
