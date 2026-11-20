@@ -22,7 +22,16 @@
       --radius: 26px;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(246,248,255,.34) rgba(255,255,255,.055);
+    }
+    *::-webkit-scrollbar { width: 8px; height: 8px; }
+    *::-webkit-scrollbar-track { background: rgba(255,255,255,.045); border-radius: 999px; }
+    *::-webkit-scrollbar-thumb { background: rgba(246,248,255,.34); border-radius: 999px; border: 2px solid rgba(18,22,33,.96); }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(112,205,248,.52); }
+    *::-webkit-scrollbar-corner { background: transparent; }
 
     .app-splash {
       position: fixed;
