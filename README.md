@@ -95,7 +95,7 @@ Use **Edit Image**, next to **Transform**, to load sprites as layers on the canv
 
 Selections use a translucent fill and animated black-and-white borders. Selection masks use hard pixel edges without anti-aliasing. Section buttons use the full width above the floating panel and wrap when needed on smaller windows.
 
-With Lasso or Rectangle selected, hold Shift while selecting to add an area, or Alt to subtract an area. Drag inside an existing selection to move its outline, or use the arrow keys for one-pixel movement and Shift+Arrows for ten pixels. These actions move the selection without changing the artwork. Undo and Redo restore previous selections, including added/subtracted areas, outline movement, and clearing. The selection stays in place when switching layers or tools within the same frame. Delete or Backspace erases the selected pixels on the active layer and keeps the outline; Undo restores the artwork. Split layers appear in the layer list only on frames that contain their artwork.
+With Lasso or Rectangle selected, hold Shift while selecting to add an area, or Alt to subtract an area. Drag inside an existing selection to move its outline, or use the arrow keys for one-pixel movement and Shift+Arrows for ten pixels. These actions move the selection without changing the artwork. Undo and Redo restore previous selections, including added/subtracted areas, outline movement, and clearing. The selection stays in the same cage coordinates when switching frames, layers, or tools. Delete or Backspace erases the selected pixels on the active layer in the current frame and keeps the outline; Undo restores the artwork. Split layers appear in the layer list only on frames that contain their artwork.
 
 Hold Shift and use the mouse wheel over the canvas to adjust Pencil or Eraser size. Rectangle selection uses a crosshair, and Lasso uses a contrasting cursor with a precise selection point.
 
@@ -111,7 +111,11 @@ New Layer creates an empty layer above the selected layer, with independent artw
 
 Merge combines selected layers and groups into one editable layer across their frames. Select several layer names with Ctrl/Cmd-click or Shift-click, then click Merge beside New Layer and Group. Selecting one group and clicking Merge flattens that group. The result preserves each frame's selected artwork in layer order, including offsets, flips, and visibility. Undo restores the original layers and groups.
 
-Copy selected layers or groups with Ctrl/Cmd+C or the Copy icon in the Animation title. Choose the destination frame and use Ctrl/Cmd+V or the adjacent Paste icon. Paste creates independent copies above the selected layer, preserving the copied frame's artwork, hierarchy, offsets, flips, and visibility. The pasted layers belong to the destination frame. Text fields retain their usual copy and paste behavior.
+Shift+H shows or hides the selected layers in the current frame. Ctrl/Cmd+E merges selected layers or flattens a selected group; with one ordinary layer selected, it merges with the next layer below in the same group. The Merge button uses the same behavior. Ctrl/Cmd+Shift+E merges all layers across the animation. These shortcuts leave text and numeric fields available for editing.
+
+Copy selected layers or groups with Ctrl/Cmd+C or the Copy icon in the Animation title. Choose the destination frame and use Ctrl/Cmd+V or the adjacent Paste icon. When creating new layers, Paste inserts independent copies above the selected layer, preserving the copied frame's artwork, hierarchy, offsets, flips, and visibility. The pasted layers belong to the destination frame. Text fields retain their usual copy and paste behavior.
+
+Pasting a single image or copied sprite reuses the selected layer when its current-frame artwork is empty, retaining the destination layer's name and settings. If that layer contains pixels, Paste creates a new layer. Group and multiple-layer pastes preserve their structure as new layers.
 
 Numeric fields accept basic math such as `150+20`, `64*2`, and `(150-20)/2`. Press Enter or leave the field to calculate. Results follow the field's range and step size. Invalid expressions keep the last valid value; Escape cancels a pending expression. Drag scrubbing and arrow-key stepping remain available.
 

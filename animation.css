@@ -96,6 +96,8 @@
 .canvas-shell.animation-move-cursor.dragging { cursor: move; }
 .canvas-shell.animation-lasso-cursor,
 .canvas-shell.animation-lasso-cursor.dragging { cursor: url('icons/cursor-lasso.svg') 7 23, crosshair; }
+.canvas-shell.animation-lasso-cursor.animation-lasso-add:not(.panning) { cursor: url('icons/cursor-lasso-add.svg') 7 23, crosshair; }
+.canvas-shell.animation-lasso-cursor.animation-lasso-subtract:not(.panning) { cursor: url('icons/cursor-lasso-subtract.svg') 7 23, crosshair; }
 .canvas-shell.animation-rectangle-cursor,
 .canvas-shell.animation-rectangle-cursor.dragging { cursor: crosshair; }
 .canvas-shell.animation-wand-cursor,

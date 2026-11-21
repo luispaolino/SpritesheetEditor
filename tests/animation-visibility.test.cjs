@@ -15,6 +15,7 @@ function editor() {
     pause() {}, pushHistory() {}, markFrameBitmapsDirty() {}, buildFilmstrip() {}, drawFrame() {}, updateInfo() {},
     makeMask(width=64,height=64) { return { width,height,getContext() { return {}; } }; }, drawBaseSprite() {},
     canvasClone(canvas) { return {...canvas}; },
+    canvasAlphaBounds(canvas) { return canvas.empty ? null : { minX:0,minY:0,maxX:canvas.width-1,maxY:canvas.height-1 }; },
     temporaryPencilColorPickerActive() { return false; },
     clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }, renderBrushCursorOverlay() {}
   };
@@ -193,6 +194,53 @@ test('paste into another frame creates artwork only in the destination and prese
   app.pasteAnimationLayers();const copy=app.activeAnimationLayer();
   assert.equal(app.animationCel(copy,1).offsetY,17);assert.equal(app.animationCel(copy,0),null);
   assert.equal(app.state.frames[1].animationCels.a,before);
+});
+
+test('pasting one sprite reuses an empty current cel and preserves the layer settings and other frames',()=>{
+  const app=clipboardEditor(),layer=app.activeAnimationLayer(),other=app.animationCel(layer,1);
+  layer.name='Empty destination';layer.opacity=60;layer.blendMode='screen';layer.spriteMask=true;
+  app.animationCel(layer).canvas.empty=true;
+  const source={canvas:{width:8,height:6,pixel:'pasted'},offsetX:7,offsetY:-3,flipX:true};let history=0;app.pushHistory=()=>history++;
+  app.pasteAnimationLayers({width:64,height:64,records:[{id:'copied',name:'Source',visible:true,opacity:100,blendMode:'normal',cel:source}]});
+  assert.equal(app.state.animationLayers.length,3);assert.equal(app.activeAnimationLayer().id,layer.id);
+  assert.equal(layer.name,'Empty destination');assert.equal(layer.opacity,60);assert.equal(layer.blendMode,'screen');assert.equal(layer.spriteMask,true);
+  const pasted=app.animationCel(layer);assert.equal(pasted.canvas.pixel,'pasted');assert.equal(pasted.offsetX,7);assert.equal(pasted.offsetY,-3);assert.equal(pasted.flipX,true);
+  assert.notEqual(pasted.canvas,source.canvas);assert.equal(app.animationCel(layer,1),other);assert.equal(history,1);
+  source.canvas.pixel='changed';assert.equal(pasted.canvas.pixel,'pasted');
+});
+
+test('a second paste adds a new layer once the destination contains pixels',()=>{
+  const app=clipboardEditor(),layer=app.activeAnimationLayer();app.animationCel(layer).canvas.empty=true;
+  const clip={width:64,height:64,records:[{id:'source',name:'Source',visible:true,cel:{canvas:{width:8,height:8,pixel:'art'},offsetX:0,offsetY:0}}]};
+  app.pasteAnimationLayers(clip);assert.equal(app.state.animationLayers.length,3);
+  app.pasteAnimationLayers(clip);assert.equal(app.state.animationLayers.length,4);assert.notEqual(app.activeAnimationLayer().id,layer.id);
+  assert.equal(app.animationCel(layer).canvas.pixel,'art');
+});
+
+test('hidden, transparent-opacity, or masked artwork is occupied when choosing a paste destination',()=>{
+  for(const change of [layer=>layer.visible=false,layer=>layer.opacity=0,layer=>layer.sharedCel={canvas:{width:8,height:8,pixel:'existing'},offsetX:0,offsetY:0}]){
+    const app=clipboardEditor(),layer=app.activeAnimationLayer();change(layer);
+    app.animationCel(layer).mask={width:16,height:16,covered:true};
+    const before=app.animationCel(layer);
+    app.pasteAnimationLayers({records:[{id:'source',name:'Source',visible:true,cel:{canvas:{width:8,height:8,pixel:'new'}}}]});
+    assert.equal(app.state.animationLayers.length,4);assert.equal(app.animationCel(layer),before);
+  }
+});
+
+test('empty shared layers keep their identity and render pasted pixels in every frame',()=>{
+  const app=clipboardEditor(),layer=app.activeAnimationLayer();layer.sharedCel={canvas:{width:8,height:8,empty:true},offsetX:0,offsetY:0};
+  const otherLocal=app.state.frames[1].animationCels.a;
+  app.pasteAnimationLayers({records:[{id:'source',name:'Source',visible:true,cel:{canvas:{width:8,height:8,pixel:'shared'}}}]});
+  assert.equal(app.state.animationLayers.length,3);assert.equal(app.activeAnimationLayer().id,layer.id);
+  assert.equal(app.animationCel(layer,0).canvas.pixel,'shared');assert.equal(app.animationCel(layer,1),app.animationCel(layer,0));
+  assert.equal(app.state.frames[1].animationCels.a,otherLocal);
+});
+
+test('empty base detection protects legacy drawing layers even when their visibility is off',()=>{
+  const app=editor(),base=app.activeAnimationLayer();app.state.frames[0].canvas.empty=true;
+  app.state.frames[0].pencilLayers=[{visible:false,canvas:{width:64,height:64,pixel:'legacy'}}];
+  assert.equal(app.animationLayerIsEmpty(base),false);
+  app.state.frames[0].pencilLayers[0].canvas.empty=true;assert.equal(app.animationLayerIsEmpty(base),true);
 });
 
 test('group copy retains nested hierarchy, own visibility, flips, and collapse without copying twice',()=>{
@@ -440,7 +488,7 @@ test('Undo restores exact masks before Shift additions, Alt subtractions, moveme
 
 test('Ctrl/Cmd+A selects the full cage, keeps the active tool, and supports Undo', () => {
   const app = selectionHistoryEditor('pencil');
-  const modal = { classList: { contains() { return false; } } };
+  const modal = { classList: { contains() { return false; }, toggle() {} } };
   app.colorPicker = { pickMode: false };
   app.els = new Proxy({}, { get() { return modal; } });
   app.canvasContentAvailable = () => true;
@@ -522,7 +570,7 @@ test('Undo during an unfinished selection cancels the gesture before recording R
   app.redo();assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),first);
 });
 
-test('switching layers retains the frame selection and erases only the newly selected layer',()=>{
+test('switching layers and frames retains the cage selection and erases only the current cel',()=>{
   for(const tool of ['rectangle','lasso']) {
     const app=selectionEditor(tool),layers=layeredEditor();app.state.animationLayers=layers.state.animationLayers;app.state.frames=layers.state.frames;
     app.state.activeAnimationLayerId='a';app.state.indexedFrames=[];
@@ -533,8 +581,32 @@ test('switching layers retains the frame selection and erases only the newly sel
     app.selectAnimationLayer('b');assert.equal(app.state.animationTool,tool);
     assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);
     assert.equal(app.eraseAnimationSelection(),true);assert.deepEqual(erased,['b']);
-    app.state.currentFrame=1;assert.equal(app.validAnimationSelection(),false);
+    app.state.currentFrame=1;assert.equal(app.validAnimationSelection(),true);
+    assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);
+    app.state.frames[1].animationCels.b.canvas.getContext=()=>({save(){},restore(){},drawImage(){erased.push('b-1');}});
+    assert.equal(app.eraseAnimationSelection(),true);assert.deepEqual(erased,['b','b-1']);
   }
+});
+
+test('selection geometry and its cached clip survive arbitrary frame changes without adding history',()=>{
+  const app=selectionHistoryEditor('lasso');
+  selectionDrag(app,[[2,2],[10,2],[8,9],[2,7]]);
+  const raster=app.animationSelectionRaster(),mask=Array.from(raster.alpha),history=app.state.undoStack.length;
+  app.state.frames.push({id:'third-frame',canvas:{width:64,height:64}});
+  for(const frame of [1,2,0,2,1,0]){
+    app.state.currentFrame=frame;
+    assert.equal(app.validAnimationSelection(),true);assert.equal(app.animationSelectionRaster(),raster);
+    assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);
+    assert.ok(app.animationSelectionHistoryState().selection);
+  }
+  assert.equal(app.state.undoStack.length,history);
+});
+
+test('selection clearing and Undo on another frame retain independent mask history',()=>{
+  const app=selectionHistoryEditor();const alpha=Array.from(selectionDrag(app,[[2,2],[7,8]]));
+  app.state.currentFrame=1;app.clearAnimationSelection();assert.equal(app.validAnimationSelection(),null);
+  app.undo();assert.equal(app.state.currentFrame,1);assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),alpha);
+  app.redo();assert.equal(app.validAnimationSelection(),null);
 });
 
 test('switching Animation tools retains the same frame selection',()=>{
@@ -543,6 +615,14 @@ test('switching Animation tools retains the same frame selection',()=>{
   for(const tool of ['lasso','rectangle','move','pencil','eraser','dropper']) {
     app.setAnimationTool(tool);assert.deepEqual(Array.from(app.animationSelectionRaster().alpha),mask);
   }
+});
+
+test('lasso cursor modifiers follow Shift/Alt and reset, with subtraction taking precedence',()=>{
+  const app=editor(),flags={};app.els={canvasShell:{classList:{toggle(name,on){flags[name]=on;}}}};
+  app.updateAnimationSelectionCursor({shiftKey:true,altKey:false});assert.equal(flags['animation-lasso-add'],true);assert.equal(flags['animation-lasso-subtract'],false);
+  app.updateAnimationSelectionCursor({shiftKey:true,altKey:true});assert.equal(flags['animation-lasso-add'],false);assert.equal(flags['animation-lasso-subtract'],true);
+  app.updateAnimationSelectionCursor({shiftKey:false,altKey:true});assert.equal(flags['animation-lasso-subtract'],true);
+  app.updateAnimationSelectionCursor({shiftKey:false,altKey:false});assert.equal(flags['animation-lasso-add'],false);assert.equal(flags['animation-lasso-subtract'],false);
 });
 
 test('dragging inside a selection moves it while dragging outside replaces it',()=>{
@@ -755,6 +835,80 @@ function mergeEditor() {
   app.drawAnimationCel=(target,cel)=>{if(cel)target.drawImage(cel.canvas);};
   return app;
 }
+
+test('Shift+H toggles selected layer visibility only in the current frame with one Undo entry',()=>{
+  const app=layeredEditor();app.animationPanelActive=()=>true;app.state.selectedAnimationLayerIds=['a','b'];
+  let history=0,prevented=0;app.pushHistory=()=>history++;
+  const press=extra=>app.handleAnimationKeyDown({key:'H',shiftKey:true,preventDefault(){prevented++;},...extra});
+  assert.equal(press(),true);
+  assert.equal(app.animationLayerOwnVisible(app.state.animationLayers[0],0),false);
+  assert.equal(app.animationLayerOwnVisible(app.state.animationLayers[1],0),false);
+  assert.equal(app.animationLayerOwnVisible(app.state.animationLayers[0],1),true);
+  assert.equal(app.animationLayerOwnVisible(app.state.animationLayers[2],0),true);
+  press({repeat:true});assert.equal(history,1);
+  press();assert.equal(history,2);assert.equal(prevented,3);
+  assert.equal(app.animationLayerOwnVisible(app.state.animationLayers[0],0),true);
+});
+
+test('selected group visibility toggles its root without changing selected children own visibility',()=>{
+  const app=layeredEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  const group=app.activeAnimationLayer();app.state.selectedAnimationLayerIds=[group.id,'a'];app.toggleSelectedAnimationVisibility();
+  const child=app.state.animationLayers.find(layer=>layer.id==='a');
+  assert.equal(app.animationLayerVisible(child,0),false);assert.equal(app.animationLayerOwnVisible(child,0),true);
+  app.toggleSelectedAnimationVisibility();assert.equal(app.animationLayerVisible(child,0),true);
+});
+
+test('Ctrl+E merges a single layer down and retains independent frame artwork and other layers',()=>{
+  const app=mergeEditor();app.animationPanelActive=()=>true;let history=0;app.pushHistory=()=>history++;
+  app.handleAnimationKeyDown({key:'e',ctrlKey:true,preventDefault(){}});
+  const merged=app.activeAnimationLayer();
+  assert.deepEqual(app.animationCel(merged,0).canvas.drawn,['b-0','a-0']);
+  assert.deepEqual(app.animationCel(merged,1).canvas.drawn,['b-1','a-1']);
+  assert.deepEqual(Array.from(app.state.animationLayers,layer=>layer.id),[merged.id,'c']);assert.equal(history,1);
+});
+
+test('Ctrl+E merges multiple selected layers without implicitly adding the layer below',()=>{
+  const app=mergeEditor();app.animationPanelActive=()=>true;app.state.selectedAnimationLayerIds=['a','c'];
+  let selectedAtHistory;app.pushHistory=()=>selectedAtHistory=[...app.state.selectedAnimationLayerIds];
+  app.handleAnimationKeyDown({key:'e',metaKey:true,preventDefault(){}});
+  assert.deepEqual(selectedAtHistory,['a','c']);
+  assert.deepEqual(app.animationCel(app.activeAnimationLayer()).canvas.drawn,['c-0','a-0']);
+  assert.equal(app.state.animationLayers[1].id,'b');
+});
+
+test('merge down stops at the bottom sibling and never consumes a layer outside the group',()=>{
+  const app=mergeEditor();app.state.selectedAnimationLayerIds=['a','b'];app.createAnimationGroup();
+  app.selectAnimationLayer('b');let history=0;app.pushHistory=()=>history++;
+  assert.equal(app.mergeAnimationLayerSelection(),false);assert.equal(history,0);
+  app.selectAnimationLayer('a');assert.equal(app.mergeAnimationLayerSelection(),true);
+  assert.equal(app.activeAnimationLayer().parentId,app.state.animationLayers[0].id);
+  assert.equal(app.state.animationLayers.at(-1).id,'c');
+});
+
+test('Ctrl+Shift+E merges every layer including artwork that exists only in another frame',()=>{
+  const app=mergeEditor();app.animationPanelActive=()=>true;delete app.state.frames[0].animationCels.c;
+  let history=0;app.pushHistory=()=>history++;
+  assert.equal(app.handleAnimationKeyDown({key:'E',ctrlKey:true,shiftKey:true,preventDefault(){}}),true);
+  const merged=app.activeAnimationLayer();assert.equal(app.state.animationLayers.length,1);
+  assert.deepEqual(app.animationCel(merged,0).canvas.drawn,['b-0','a-0']);
+  assert.deepEqual(app.animationCel(merged,1).canvas.drawn,['c-1','b-1','a-1']);assert.equal(history,1);
+});
+
+test('layer shortcuts ignore typing, other panels, key repeats, and active drags',()=>{
+  const app=mergeEditor();app.animationPanelActive=()=>true;let history=0,prevented=0;app.pushHistory=()=>history++;
+  const press=extra=>app.handleAnimationKeyDown({key:'e',ctrlKey:true,preventDefault(){prevented++;},...extra});
+  assert.equal(press({target:{closest(){return this;}}}),false);
+  assert.equal(press({target:{isContentEditable:true}}),false);
+  app.animationPanelActive=()=>false;assert.equal(press(),false);app.animationPanelActive=()=>true;
+  assert.equal(press({repeat:true}),true);app.state.dragging=true;assert.equal(press(),true);
+  assert.equal(history,0);assert.equal(prevented,2);
+});
+
+test('Ctrl+E during an unfinished transform suppresses browser search without merging the preview',()=>{
+  const app=mergeEditor();app.activeAnimationTransform=()=>({mode:'rotate'});let prevented=0;
+  assert.equal(app.handleAnimationTransformKeyDown({key:'E',ctrlKey:true,shiftKey:true,preventDefault(){prevented++;}},false),true);
+  assert.equal(prevented,1);assert.equal(app.state.animationLayers.length,3);
+});
 
 test('Merge flattens selected layers in render order with independent artwork in each frame',()=>{
   const app=mergeEditor();app.state.selectedAnimationLayerIds=['a','b'];let history=0;app.pushHistory=()=>history++;

@@ -2,6 +2,10 @@
 
 ## v1.8.0 - 2026-11-20
 
+- Pixel selections now stay in the same cage coordinates when changing frames, so the same area can be edited on successive frames.
+- The Lasso cursor shows + while Shift is held and − while Alt is held, matching additive and subtractive selection modes.
+- Pasting one image or copied sprite reuses an empty selected layer while preserving its name and settings. Occupied destinations receive a new layer; group and multiple-layer pastes retain their structure.
+- Added Edit Image shortcuts: Shift+H toggles selected-layer visibility in the current frame; Ctrl/Cmd+E merges selected layers, flattens a selected group, or merges one layer down; Ctrl/Cmd+Shift+E merges all layers across the animation.
 - Added an inline layer blend-mode dropdown beside the layer name, keeping the controls at two rows. Choose Normal, Multiply, Screen, Overlay, and the other standard blend modes.
 - Groups default to Pass Through. Other modes composite the group as one image, with its opacity applied once.
 - Blend modes survive project saving/loading, Undo/Redo, copying, pasting, splitting, and group flattening.

@@ -193,6 +193,17 @@ function toggleAnimationVisibility(id) {
   frame.animationVisibility = { ...cloneAnimationVisibility(frame.animationVisibility), [id]: !visible };
   animationChanged();
 }
+function toggleSelectedAnimationVisibility() {
+  const frame = state.frames[state.currentFrame], layers = animationFrameLayers(), selected = new Set(selectedAnimationLayerIds());
+  const roots = layers.filter(layer => selected.has(layer.id) && !animationAncestors(layer).some(parent => selected.has(parent.id)));
+  if (!frame || !roots.length) return false;
+  const visible = !roots.some(layer => animationLayerOwnVisible(layer));
+  pause(false, { updateInfo: false }); pushHistory(); ensureAnimationLayers();
+  frame.animationVisibility = { ...cloneAnimationVisibility(frame.animationVisibility) };
+  roots.forEach(layer => { frame.animationVisibility[layer.id] = visible; });
+  animationChanged();
+  return true;
+}
 function animationCelTransform(cel) {
   return { offsetX: Math.round(cel.offsetX || 0), offsetY: Math.round(cel.offsetY || 0), flipX: !!cel.flipX, flipY: !!cel.flipY };
 }
@@ -499,12 +510,38 @@ function cutAnimationArtwork() {
   return validAnimationSelection() && layer && !layer.group
     ? copyAnimationSelection(layer, options) : copyAnimationLayers(options);
 }
+function animationLayerIsEmpty(layer, i = state.currentFrame) {
+  const cel = animationCel(layer, i);
+  if (!cel || canvasAlphaBounds(cel.canvas, 1)) return false;
+  // Hidden or masked pixels still count as content and must not be replaced.
+  return !animationLayerUsesBaseFrame(layer) || !(state.frames[i].pencilLayers || [])
+    .some(item => item.canvas && canvasAlphaBounds(item.canvas, 1));
+}
 function pasteAnimationLayers(clipboard = animationClipboard) {
   if (!clipboard?.records.length) return false;
   pause();pushHistory();
   const firstFrame = !hasFrames();
   if (firstFrame) initializeAnimationCanvas(makeMask(clipboard.width, clipboard.height), clipboard.records[0].name, false);
   const layers=ensureAnimationLayers(), active=activeAnimationLayer(), frame=state.frames[state.currentFrame];
+  if (clipboard.records.length === 1 && !clipboard.records[0].group && clipboard.records[0].cel?.canvas
+    && active && animationLayerIsEmpty(active)) {
+    const cel = cloneAnimationCel(clipboard.records[0].cel);
+    if (animationLayerUsesBaseFrame(active)) {
+      const canvas = makeMask();
+      drawAnimationCel(canvas.getContext('2d'), { ...cel, mask: null });
+      animationBakeBase(state.currentFrame, canvas);
+      if (cel.mask) {
+        const mask = makeMask();
+        drawAnimationCel(mask.getContext('2d'), { ...cel, canvas: cel.mask, mask: null });
+        state.frameMasks[state.currentFrame] = mask; state.maskDirty[state.currentFrame] = true;
+      }
+    } else if (active.sharedCel) active.sharedCel = cel;
+    else { frame.animationCels ||= {}; frame.animationCels[active.id] = cel; }
+    state.activeAnimationLayerId = active.id; state.selectedAnimationLayerIds = [active.id]; state.animationSelectionAnchorId = active.id;
+    animationSelection = null; state.animationTool = 'move';
+    animationChanged();
+    return true;
+  }
   const ids=new Map(clipboard.records.map(record=>[record.id,newAnimationId(record.group?'group':'layer')]));
   const names=new Set(layers.map(layer=>layer.name)), roots=[];
   frame.animationCels ||= {};frame.animationVisibility ||= {};
@@ -538,9 +575,10 @@ function animationClipboardEventAllowed(event) {
 async function pasteAnimationImage(file) {
   const frames = state.frames;
   const destination = frames[state.currentFrame];
+  const layerId = activeAnimationLayer()?.id || '';
   try {
     const canvas = makeFrameCanvas(await loadImage(file));
-    if (state.frames !== frames || state.frames[state.currentFrame] !== destination) return;
+    if (state.frames !== frames || state.frames[state.currentFrame] !== destination || (activeAnimationLayer()?.id || '') !== layerId) return;
     showError('');
     const name = uniqueAnimationName('Pasted Image');
     pasteAnimationLayers({ width: canvas.width, height: canvas.height, records: [{
@@ -568,8 +606,21 @@ function createAnimationGroup() {
   state.animationLayers=cloneAnimationLayers(remaining);state.activeAnimationLayerId=id;state.selectedAnimationLayerIds=[id];state.animationSelectionAnchorId=id;
   animationSelection=null;state.animationTool='move';animationChanged();
 }
-function mergeAnimationLayers() {
-  const layers=animationLayerList(), selected=new Set(selectedAnimationLayerIds());
+function animationMergeTargets(all = false) {
+  const layers = animationLayerList();
+  if (all) return layers.filter(layer => !layer.parentId).map(layer => layer.id);
+  const available = animationFrameLayers(), selected = new Set(selectedAnimationLayerIds());
+  const roots = available.filter(layer => selected.has(layer.id) && !animationAncestors(layer, layers).some(parent => selected.has(parent.id)));
+  if (roots.length !== 1 || roots[0].group) return roots.map(layer => layer.id);
+  const siblings = available.filter(layer => (layer.parentId || '') === (roots[0].parentId || ''));
+  const below = siblings[siblings.indexOf(roots[0]) + 1];
+  return below ? [roots[0].id, below.id] : [];
+}
+function mergeAnimationLayerSelection(all = false) {
+  return mergeAnimationLayers(animationMergeTargets(all));
+}
+function mergeAnimationLayers(layerIds = null) {
+  const layers=animationLayerList(), selected=new Set(Array.isArray(layerIds) ? layerIds : selectedAnimationLayerIds());
   const roots=layers.filter(layer=>selected.has(layer.id) && !animationAncestors(layer,layers).some(parent=>selected.has(parent.id)));
   if(!hasFrames() || !roots.length || (roots.length===1 && !roots[0].group))return false;
   const parentPaths=roots.map(layer=>[...animationAncestors(layer,layers).map(parent=>parent.id),'']);
@@ -748,8 +799,8 @@ function animationEffectiveOpacity(layer) {
   return [layer, ...animationAncestors(layer)].reduce((alpha, item) => alpha * normalizeAnimationOpacity(item.opacity) / 100, 1);
 }
 function validAnimationSelection() {
-  // The cage selection belongs to the frame and can be used on any of its layers.
-  return animationSelection && animationSelection.frameId === state.frames[state.currentFrame]?.id;
+  // The selection belongs to the cage and can be reused on any frame or layer.
+  return animationSelection && hasFrames();
 }
 function cloneAnimationSelection(selection = animationSelection) {
   if (!selection) return null;
@@ -768,7 +819,6 @@ function restoreAnimationSelectionHistory(saved) {
 }
 function commitAnimationSelection(next, previous = animationSelection) {
   const same = previous === next || (previous && next && previous.kind === next.kind
-    && previous.frameId === next.frameId
     && (previous.offsetX || 0) === (next.offsetX || 0) && (previous.offsetY || 0) === (next.offsetY || 0)
     && previous.width === next.width && previous.height === next.height
     && JSON.stringify(previous.points) === JSON.stringify(next.points)
@@ -881,7 +931,7 @@ function animationSelectionContainsPoint(e) {
   return !!(p && animationSelectionRaster()?.alpha[p.y*state.cageWidth+p.x]);
 }
 function animationSelectionRaster(selection = animationSelection) {
-  if (!selection || selection.frameId !== state.frames[state.currentFrame]?.id) return null;
+  if (!selection || !hasFrames()) return null;
   const width = state.cageWidth, height = state.cageHeight;
   const key = JSON.stringify([width,height,selection.kind,selection.points]);
   if (animationSelectionRasterCache?.selection === selection && animationSelectionRasterCache?.key === key) return animationSelectionRasterCache;
@@ -1071,9 +1121,9 @@ function updateAnimationUi(force = false) {
   animationEls.copy.disabled = animationEls.cut.disabled = !hasFrames() || !selectedIds.size;
   animationEls.paste.disabled=!animationClipboard?.records.length;
   animationEls.newGroup.disabled=!hasFrames() || !selectedIds.size;
-  animationEls.merge.disabled=!hasFrames() || (selectedIds.size<2 && !layers.some(layer=>selectedIds.has(layer.id) && layer.group));
+  animationEls.merge.disabled=!hasFrames() || !animationMergeTargets().length;
   animationEls.exportLayer.disabled = !hasFrames() || !animationLayerVisible(active);
-  animationEls.merge.title='Merge selected layers or flatten a selected group across its frames';
+  animationEls.merge.title='Merge selected layers, flatten a group, or merge a single layer down (Ctrl/Cmd+E)';
   animationEls.newGroup.title='Group selected layers (Ctrl/Cmd+Alt-click or Shift-click to select several)';
   if (!validAnimationSelection()) animationSelection = null;
   const selected = !!animationSelection;
@@ -1885,6 +1935,11 @@ function setAnimationPaintShiftHeld(held, redraw = true) {
   animationPaintShiftHeld = held;
   if (redraw && state.brushCursorVisible && animationPixelBrushActive()) renderBrushCursorOverlay();
 }
+function updateAnimationSelectionCursor(event) {
+  const subtract = !!event.altKey;
+  els.canvasShell.classList.toggle('animation-lasso-add', !!event.shiftKey && !subtract);
+  els.canvasShell.classList.toggle('animation-lasso-subtract', subtract);
+}
 function animationLayerAtPixel(x, y, i = state.currentFrame) {
   for (const layer of animationFrameLayers(i)) {
     if (layer.group || !animationLayerVisible(layer, i) || !animationEffectiveOpacity(layer)) continue;
@@ -2292,6 +2347,8 @@ function handleAnimationTransformKeyDown(event, typing) {
       if (key === 'i') invertAnimationSelection();
       else clearAnimationSelection();
     }
+  } else if ((event.ctrlKey || event.metaKey) && !event.altKey && key === 'e') {
+    event.preventDefault();
   } else if (event.key === 'Enter' || event.key === 'Escape') {
     event.preventDefault();
     finishAnimationTransform(event.key === 'Enter');
@@ -2303,7 +2360,13 @@ function handleAnimationTransformKeyDown(event, typing) {
 }
 function handleAnimationKeyDown(e) {
   if(!animationPanelActive()||e.altKey)return false;
+  if (e.target?.isContentEditable || e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return false;
   const key=e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'e') {
+    e.preventDefault();
+    if (!e.repeat && !state.dragging) mergeAnimationLayerSelection(!!e.shiftKey);
+    return true;
+  }
   if ((e.ctrlKey||e.metaKey) && !e.shiftKey && ['x','c','v'].includes(key)) {
     if (e.repeat) e.preventDefault();
     // The browser's clipboard events carry the copied or pasted data.
@@ -2334,6 +2397,11 @@ function handleAnimationKeyDown(e) {
     return true;
   }
   if(e.ctrlKey||e.metaKey)return false;
+  if (e.shiftKey && key === 'h') {
+    e.preventDefault();
+    if (!e.repeat && !state.dragging) toggleSelectedAnimationVisibility();
+    return true;
+  }
   if(['Delete','Backspace'].includes(e.key) && (validAnimationSelection() || ANIMATION_SELECTION_TOOLS[state.animationTool])) {
     e.preventDefault();if(!e.repeat)eraseAnimationSelection();return true;
   }
@@ -2367,7 +2435,7 @@ function handleAnimationKeyDown(e) {
 animationEls.input.addEventListener('change',e=>loadAnimationSprites(e.target.files));
 animationEls.newLayer.addEventListener('click',createEmptyAnimationLayer);
 animationEls.newGroup.addEventListener('click',createAnimationGroup);
-animationEls.merge.addEventListener('click',mergeAnimationLayers);
+animationEls.merge.addEventListener('click',()=>mergeAnimationLayerSelection());
 animationEls.exportLayer.addEventListener('click', exportAnimationLayerPng);
 $('animationRotationOk').addEventListener('click', closeAnimationTransformMessage);
 document.addEventListener('pointerdown', event => {

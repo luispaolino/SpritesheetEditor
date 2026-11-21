@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spritesheet Editor</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="stylesheet" href="animation.css?v=1.8.0-1" />
+  <link rel="stylesheet" href="animation.css?v=1.8.0-2" />
   <style>
     :root {
       --bg: #10131b;
@@ -735,7 +735,8 @@
     }
     .canvas-shell.dragging { cursor: grabbing; border-color: var(--accent); }
     .canvas-shell.mask-mode { cursor: crosshair; border-color: var(--warning); }
-    .canvas-shell.brush-cursor-mode { cursor: none; }
+    .canvas-shell.brush-cursor-mode { cursor: url('icons/cursor-dot.svg') 4 4, crosshair; }
+    .canvas-shell.brush-cursor-mode.brush-cursor-visible { cursor: none; }
     #canvasShell[data-cage-resize="x"] { cursor: ew-resize; }
     #canvasShell[data-cage-resize="y"] { cursor: ns-resize; }
     .stage-card.preview-bg-light .side-panels :is(#lockCageButton, #dimOutsideCageButton).active {
@@ -1204,9 +1205,21 @@
     .reference-text-color-field .swatch-button { width: 54px; height: 44px; min-width: 54px; min-height: 44px; padding: 0; display: grid; place-items: center; }
     .modal-header { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .modal-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; font-size: 14px; font-weight: 850; }
-    .shortcut-list { display: grid; gap: 8px; margin: 0; max-height: min(62vh, 620px); overflow: auto; padding-right: 4px; }
-    .shortcut-list div { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--muted); font-size: 13px; }
-    .shortcut-list kbd { min-width: 84px; text-align: center; color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); border-radius: 9px; padding: 5px 8px; font-family: inherit; font-weight: 850; }
+    #shortcutsModal .modal { width: min(1120px, 100%); max-height: calc(100vh - 32px); grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
+    .shortcut-platform-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .shortcut-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px 30px; margin: 0; min-height: 0; max-height: min(72vh, 780px); overflow: auto; padding-right: 8px; }
+    .shortcut-section { min-width: 0; }
+    .shortcut-section h3 { margin: 0 0 10px; color: var(--text); font-size: 14px; font-weight: 850; }
+    .shortcut-section dl { display: grid; gap: 9px; margin: 0; }
+    .shortcut-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: center; gap: 12px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .shortcut-row dt, .shortcut-row dd { margin: 0; min-width: 0; }
+    .shortcut-list kbd { display: block; text-align: center; color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--border); border-radius: 9px; padding: 5px 7px; font-family: inherit; font-size: 12px; font-weight: 850; white-space: normal; }
+    @media (max-width: 800px) {
+      .shortcut-list { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+    }
+    @media (max-width: 420px) {
+      .shortcut-row { grid-template-columns: minmax(84px, 35%) minmax(0, 1fr); gap: 9px; }
+    }
     .about-modal { width: min(520px, 100%); }
     .about-body { display: grid; gap: 12px; color: var(--muted); font-size: 13px; line-height: 1.48; }
     .about-body p { margin: 0; }
@@ -2203,44 +2216,99 @@
         <p class="modal-title" id="shortcutsTitle">Shortcuts</p>
         <button id="closeShortcutsButton" class="secondary icon-button" type="button" aria-label="Close shortcuts">×</button>
       </div>
+      <p class="shortcut-platform-note">Ctrl/Cmd means Ctrl on Windows/Linux or Cmd on macOS. Shortcuts depend on the active section; text and number fields keep their editing controls.</p>
       <div class="shortcut-list">
-        <div><kbd>B</kbd><span>Mask Brush, or Brush when editing a Sprite Sheet cell</span></div>
-        <div><kbd>P</kbd><span>Pencil tool</span></div>
-        <div><kbd>E</kbd><span>Eraser tool</span></div>
-        <div><kbd>G</kbd><span>Paint Bucket tool</span></div>
-        <div><kbd>W</kbd><span>Magic Wand tool</span></div>
-        <div><kbd>D</kbd><span>Dropper tool</span></div>
-        <div><kbd>H</kbd><span>Hide Mask on/off</span></div>
-        <div><kbd>Ctrl + H</kbd><span>Show or hide the cage and rulers together</span></div>
-        <div><kbd>F</kbd><span>Reset view, or fit the Compositor timeline when hovering it</span></div>
-        <div><kbd>Mouse Wheel</kbd><span>Zoom preview canvas</span></div>
-        <div><kbd>Shift + Wheel</kbd><span>Adjust active brush, pencil, or eraser size</span></div>
-        <div><kbd>Left / Right</kbd><span>Previous/next frame, or previous/next Compositor frame</span></div>
-        <div><kbd>M / L / Shift + R</kbd><span>Move / Lasso / Rectangle selection in Edit Image</span></div>
-        <div><kbd>Ctrl/Cmd + Click</kbd><span>Select a layer’s visible pixels from the Edit Image layer list. On the canvas, pick a color with Pencil or Paint Bucket, or pick the topmost visible layer with other tools.</span></div>
-        <div><kbd>Ctrl/Cmd + Alt + Click</kbd><span>Toggle a layer in the Edit Image layer selection. Shift-click selects a range of layers.</span></div>
-        <div><kbd>C</kbd><span>Swap primary and secondary paint colors in Edit Image</span></div>
-        <div><kbd>Ctrl/Cmd + X / C / V</kbd><span>Cut or copy selected pixels, layers, or groups. Paste artwork or a clipboard image in Edit Image.</span></div>
-        <div><kbd>Ctrl/Cmd + A</kbd><span>Select the full canvas in Edit Image</span></div>
-        <div><kbd>Ctrl/Cmd + I</kbd><span>Invert the pixel selection within the canvas in Edit Image</span></div>
-        <div><kbd>R / S</kbd><span>Rotate / Scale the selection or active layer in Edit Image. Drag to preview, Alt-click to set the pivot, and press Enter to apply or Escape to cancel.</span></div>
-        <div><kbd>Middle Mouse Drag</kbd><span>Move the sprite during a Scale preview</span></div>
-        <div><kbd>Alt + Drag</kbd><span>Subtract from a lasso or rectangle selection</span></div>
-        <div><kbd>Shift + Drag</kbd><span>Move a sprite or selected pixels along one axis. With Lasso or Rectangle, add to the selection.</span></div>
-        <div><kbd>Arrows / Shift + Arrows</kbd><span>Arrows move the outline 1 pixel with a selection tool. Shift + Arrows move the selected pixels 10 pixels in Edit Image.</span></div>
-        <div><kbd>Delete / Backspace</kbd><span>Erase selected pixels on the active Edit Image layer</span></div>
-        <div><kbd>F2</kbd><span>Rename the selected layer or group</span></div>
-        <div><kbd>Shift + Arrows</kbd><span>Move the current frame, selected Compositor clips, or active Edit Image layer when no pixels are selected</span></div>
-        <div><kbd>Space</kbd><span>Play/Pause</span></div>
-        <div><kbd>Delete</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
-        <div><kbd>Backspace</kbd><span>Delete selected frame(s), or selected Compositor clip</span></div>
-        <div><kbd>Ctrl/Cmd + D</kbd><span>Deselect pixels in Edit Image or duplicate selected Compositor clips</span></div>
-        <div><kbd>Ctrl/Cmd + Z</kbd><span>Undo</span></div>
-        <div><kbd>Ctrl/Cmd + Shift + Z</kbd><span>Redo</span></div>
-        <div><kbd>Ctrl/Cmd + Y</kbd><span>Redo</span></div>
-        <div><kbd>Escape</kbd><span>Close modal/menu or cancel the active picker</span></div>
-        <div><kbd>Shift + Click</kbd><span>Draw a straight line from the last Pencil or Eraser stroke, or select a range of frames, layers, or clips</span></div>
-        <div><kbd>Ctrl/Cmd + Click</kbd><span>Toggle frame or Compositor clip selection</span></div>
+        <section class="shortcut-section" aria-labelledby="shortcutToolsTitle">
+          <h3 id="shortcutToolsTitle">Tools</h3>
+          <dl>
+            <div class="shortcut-row"><dt><kbd>M</kbd></dt><dd>Move sprite in Edit Image.</dd></div>
+            <div class="shortcut-row"><dt><kbd>L</kbd></dt><dd>Lasso selection.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + R</kbd></dt><dd>Rectangle selection.</dd></div>
+            <div class="shortcut-row"><dt><kbd>W</kbd></dt><dd>Magic Wand.</dd></div>
+            <div class="shortcut-row"><dt><kbd>P / E</kbd></dt><dd>Pencil / Eraser.</dd></div>
+            <div class="shortcut-row"><dt><kbd>G / D</kbd></dt><dd>Paint Bucket / Dropper.</dd></div>
+            <div class="shortcut-row"><dt><kbd>B</kbd></dt><dd>Mask Brush, or Brush while editing a Sprite Sheet cell.</dd></div>
+            <div class="shortcut-row"><dt><kbd>H</kbd></dt><dd>Show or hide the mask in Mask mode.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Hold tool button</kbd></dt><dd>Choose Move/Rotate/Scale or Lasso/Rectangle/Magic Wand.</dd></div>
+          </dl>
+        </section>
+        <section class="shortcut-section" aria-labelledby="shortcutSelectionTitle">
+          <h3 id="shortcutSelectionTitle">Selection &amp; painting · Edit Image</h3>
+          <dl>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + A</kbd></dt><dd>Select the full canvas.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + D</kbd></dt><dd>Deselect pixels. Also cancels a pending transform.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + I</kbd></dt><dd>Invert the pixel selection.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Delete / Backspace</kbd></dt><dd>Erase selected pixels on the active layer; keep the selection outline.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Drag</kbd></dt><dd>Add to a Lasso or Rectangle selection. The Lasso cursor shows +.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Alt + Drag</kbd></dt><dd>Subtract from a Lasso or Rectangle selection. The Lasso cursor shows −.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Arrow keys</kbd></dt><dd>Move the outline 1 pixel with a selection tool.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Arrows</kbd></dt><dd>Move selected pixels 10 pixels; without a selection, nudge the active layer 1 pixel.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Click</kbd></dt><dd>Draw a line from the last Pencil/Eraser point. Hold Shift to preview it.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Wheel</kbd></dt><dd>Change the active brush, pencil, or eraser size.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Click</kbd></dt><dd>With Pencil or Paint Bucket, sample the pixel color.</dd></div>
+            <div class="shortcut-row"><dt><kbd>C</kbd></dt><dd>Swap primary and secondary paint colors.</dd></div>
+          </dl>
+        </section>
+        <section class="shortcut-section" aria-labelledby="shortcutLayersTitle">
+          <h3 id="shortcutLayersTitle">Layers &amp; clipboard · Edit Image</h3>
+          <dl>
+            <div class="shortcut-row"><dt><kbd>Shift + H</kbd></dt><dd>Show or hide selected layers in the current frame.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + E</kbd></dt><dd>Merge selected layers, flatten a group, or merge one layer down.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Shift + E</kbd></dt><dd>Merge all layers across the animation.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + X</kbd></dt><dd>Cut selected pixels, layers, or groups.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + C</kbd></dt><dd>Copy selected pixels, layers, or groups.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + V</kbd></dt><dd>Paste into an empty selected layer, or create a new layer if occupied. Works in an empty project too.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Click</kbd></dt><dd>Layer name: select its pixels. Canvas with Move/selection tools: pick the topmost layer.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Alt + Click</kbd></dt><dd>Add or remove a layer from the layer selection.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Click</kbd></dt><dd>Select a range of layers.</dd></div>
+            <div class="shortcut-row"><dt><kbd>F2</kbd></dt><dd>Rename the active layer or group.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Alt + Up / Down</kbd></dt><dd>Move the focused layer up/down within its group.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Double-click group</kbd></dt><dd>Expand or collapse its layers.</dd></div>
+          </dl>
+        </section>
+        <section class="shortcut-section" aria-labelledby="shortcutTransformTitle">
+          <h3 id="shortcutTransformTitle">Transforms &amp; canvas</h3>
+          <dl>
+            <div class="shortcut-row"><dt><kbd>R / S</kbd></dt><dd>Rotate / Scale selected pixels or the active Edit Image layer.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Alt + Click</kbd></dt><dd>Set the pivot during a Rotate or Scale preview.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Enter / Escape</kbd></dt><dd>Apply / cancel the pending transform.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Middle Mouse Drag</kbd></dt><dd>Pan the canvas. During Scale, move the sprite before confirming.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Drag</kbd></dt><dd>Constrain sprite or selected-pixel movement to one axis.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Mouse Wheel</kbd></dt><dd>Zoom around the pointer on the canvas.</dd></div>
+            <div class="shortcut-row"><dt><kbd>F</kbd></dt><dd>Reset the canvas view.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl + H</kbd></dt><dd>Show or hide the cage and rulers together.</dd></div>
+          </dl>
+        </section>
+        <section class="shortcut-section" aria-labelledby="shortcutTimelineTitle">
+          <h3 id="shortcutTimelineTitle">Timeline &amp; Compositor</h3>
+          <dl>
+            <div class="shortcut-row"><dt><kbd>Space</kbd></dt><dd>Play or pause.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Left / Right</kbd></dt><dd>Go to the previous/next animation or Compositor frame.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Click</kbd></dt><dd>Add or remove frames/clips from the selection.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Click</kbd></dt><dd>Select a range of frames or clips; click a Compositor track to select its clips.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Delete / Backspace</kbd></dt><dd>Delete selected timeline frames or Compositor clips.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Arrows</kbd></dt><dd>Nudge the current frame or selected Compositor clips.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + D</kbd></dt><dd>Duplicate selected Compositor clips.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl + Wheel</kbd></dt><dd>Zoom the Compositor timeline around the pointer.</dd></div>
+            <div class="shortcut-row"><dt><kbd>F</kbd></dt><dd>Fit the Compositor timeline when hovering it.</dd></div>
+          </dl>
+        </section>
+        <section class="shortcut-section" aria-labelledby="shortcutGeneralTitle">
+          <h3 id="shortcutGeneralTitle">General, numeric fields &amp; Sprite Sheet</h3>
+          <dl>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Z</kbd></dt><dd>Undo.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Ctrl/Cmd + Shift + Z<br>Ctrl/Cmd + Y</kbd></dt><dd>Redo.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Escape</kbd></dt><dd>Close a dialog/menu, cancel a picker, or clear the Edit Image selection.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Enter / Escape</kbd></dt><dd>In a numeric field, apply an expression / cancel pending edits.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Up / Down</kbd></dt><dd>In a numeric field, increase/decrease by one step.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Drag / Shift + Drag</kbd></dt><dd>Adjust a numeric field; hold Shift for finer control.</dd></div>
+            <div class="shortcut-row"><dt><kbd>0–9</kbd></dt><dd>In Sprite Sheet, type a frame index starting at 0. Type digits quickly for larger indices.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Up / Down</kbd></dt><dd>In Sprite Sheet, select the previous/next row.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Shift + Arrows</kbd></dt><dd>In Sprite Sheet, nudge the active frame.</dd></div>
+            <div class="shortcut-row"><dt><kbd>Hold R<br>+ or −</kbd></dt><dd>In Sprite Sheet, move the reference vertically.</dd></div>
+            <div class="shortcut-row"><dt><kbd>F</kbd></dt><dd>Reset the Sprite Sheet preview when hovering it.</dd></div>
+          </dl>
+        </section>
       </div>
     </div>
   </div>
@@ -5755,6 +5823,7 @@
       t.restore();
     }
     function clearBrushCursorOverlay() {
+      els.canvasShell.classList.remove('brush-cursor-visible');
       const overlay = els.brushCursorOverlay;
       if (!overlay) return;
       const oc = overlay.getContext('2d', { alpha: true });
@@ -5870,6 +5939,7 @@
       }
       const t = resizeBrushCursorOverlay(shellRect);
       if (!t) return;
+      els.canvasShell.classList.add('brush-cursor-visible');
       // Keep large footprints off floating controls even before the pointer reaches them.
       t.save();
       t.beginPath();t.rect(shellRect.left,shellRect.top,shellRect.width,shellRect.height);t.clip();
@@ -20165,6 +20235,7 @@
     els.canvasShell.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault()});
     els.canvasShell.addEventListener('dblclick',e=>{if(cageBorderHit(e))return; const hit=rulerHit(e); if(!hit)return; pushHistory(); removeRuler(hit); drawFrame(state.currentFrame); updateInfo()});
     els.canvasShell.addEventListener('pointerdown', e => {
+      updateAnimationSelectionCursor(e);
       if (e.target.closest?.('.sprite-sheet-builder-cell-actions')) return;
       if(eventInsideReferenceCompositor(e))return;
       if(state.cageResizeDrag || !canvasContentAvailable()||(e.button!==0&&e.button!==1))return;
@@ -20307,6 +20378,7 @@
       els.canvasShell.setPointerCapture(e.pointerId);
     });
     els.canvasShell.addEventListener('pointermove', e => {
+      updateAnimationSelectionCursor(e);
       if (state.cageResizeDrag) {
         if (e.pointerId === state.dragPointerId) resizeCagePreview(state.cageResizeDrag, e);
         return;
@@ -20562,6 +20634,7 @@
     document.addEventListener('pointerup', e => endReferenceCompositorTrackDrag(e, true));
     document.addEventListener('pointercancel', e => endReferenceCompositorTrackDrag(e, false));
     document.addEventListener('keydown', e => {
+      updateAnimationSelectionCursor(e);
       if (e.key === 'Escape' && state.cageResizeDrag) { e.preventDefault(); finishCageResize(null, false); return; }
       if (e.key === 'Shift') setAnimationPaintShiftHeld(true);
       const k = e.key.toLowerCase();
@@ -20632,6 +20705,9 @@
         return;
       }
       if (handleAnimationTransformKeyDown(e, typing)) return;
+      const editLayerShortcut = !e.altKey && (((e.ctrlKey || e.metaKey) && k === 'e')
+        || (!e.ctrlKey && !e.metaKey && e.shiftKey && k === 'h'));
+      if (!typing && editLayerShortcut && handleAnimationKeyDown(e)) return;
       if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space') {
         e.preventDefault();
         if (!e.repeat) playbackControlsActive() ? pause(true) : play();
@@ -20731,6 +20807,7 @@
       if (e.key === 'ArrowRight') { e.preventDefault(); step(1, { fast: true }); }
     });
     document.addEventListener('keyup', e => {
+      updateAnimationSelectionCursor(e);
       if (e.key === 'Alt') setAnimationTransformAlt(false);
       if (e.key === 'Shift') setAnimationPaintShiftHeld(false);
       if (e.key === 'Shift' || ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) finishReferenceCompositorKeyboardNudge();
@@ -20741,6 +20818,7 @@
       if ((e.key === 'Control' || e.key === 'Meta') && state.pencilCtrlPickMode) setPencilCtrlPickMode(e.ctrlKey || e.metaKey);
     });
     window.addEventListener('blur', () => {
+      updateAnimationSelectionCursor({ shiftKey: false, altKey: false });
       setAnimationTransformAlt(false, true);
       setAnimationPaintShiftHeld(false);
       finishReferenceCompositorKeyboardNudge();
@@ -21011,7 +21089,7 @@
     }
 
   </script>
-  <script src="animation.js?v=1.8.0-1"></script>
+  <script src="animation.js?v=1.8.0-5"></script>
   <script src="numeric-inputs.js"></script>
   <script>
     restorePencilColorPreferences(); initNumericInputs(); initScrub(); initCollapsibleGroups(); syncStageHeightToOpenLeftPanel(); window.addEventListener('resize', syncStageHeightToOpenLeftPanel); window.addEventListener('load', syncStageHeightToOpenLeftPanel); if (document.fonts?.ready) document.fonts.ready.then(syncStageHeightToOpenLeftPanel); buildFilmstrip(); updateInfo(); setButtons(false);
