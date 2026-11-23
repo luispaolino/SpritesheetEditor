@@ -99,6 +99,8 @@ With Lasso or Rectangle selected, hold Shift while selecting to add an area, or 
 
 Hold Shift and use the mouse wheel over the canvas to adjust Pencil or Eraser size. Rectangle selection uses a crosshair, and Lasso uses a contrasting cursor with a precise selection point.
 
+Brush hover updates once per display frame and draws only the cursor's screen bounds, keeping high-density displays responsive without redrawing the sprite. The Shift-line preview expands those bounds only as needed.
+
 Hold the selection button to switch between Lasso, Rectangle, and Magic Wand (W). The wand selects matching pixels on the active layer and shows Anti-aliasing, Contiguous, and Tolerance below the toolbar. Paint Bucket (G) fills connected pixels of the same color on the active layer. Ctrl/Cmd-click with Pencil or Paint Bucket to sample a color, or use Dropper (D). With other tools, Ctrl/Cmd-click the canvas to select the topmost visible layer.
 
 Set **O** beside **X** and **Y** to change a layer or group's opacity from 0% to 100% across its frames.

@@ -1,5 +1,11 @@
 # Release Notes
 
+## v1.8.0 updates - 2026-11-23
+
+- Fixed slow Pencil hover by removing duplicate pointer handling and drawing the cursor once per display frame, using the latest pointer position.
+- Reduced the cursor overlay to the brush or Shift-line bounds instead of the entire browser, including on high-density displays. Large Pencil/Eraser outlines now use row contours rather than per-pixel string lookups.
+- Kept the existing pixel footprints, menu clipping, contrast, outside-cage dot, and Shift-line preview. Hover does not redraw artwork or create history entries.
+
 ## v1.8.0 - 2026-11-20
 
 - Pixel selections now stay in the same cage coordinates when changing frames, so the same area can be edited on successive frames.

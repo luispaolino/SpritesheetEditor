@@ -765,7 +765,7 @@
     }
     .canvas-shell > canvas.brush-cursor-overlay,
     canvas.brush-cursor-overlay {
-      position: fixed; inset: 0; z-index: 10000; display: none; width: 100vw; height: 100vh;
+      position: fixed; inset: auto; z-index: 10000; display: none;
       max-width: none; max-height: none; pointer-events: none; background: transparent; image-rendering: auto; transform: none;
       mix-blend-mode: difference;
     }
@@ -5823,6 +5823,7 @@
       t.restore();
     }
     function clearBrushCursorOverlay() {
+      cancelBrushCursorPreview();
       els.canvasShell.classList.remove('brush-cursor-visible');
       const overlay = els.brushCursorOverlay;
       if (!overlay) return;
@@ -5831,13 +5832,42 @@
       oc.clearRect(0, 0, overlay.width || 1, overlay.height || 1);
       overlay.style.display = 'none';
     }
-    function resizeBrushCursorOverlay(shellRect) {
+    function brushCursorOverlayBounds(shellRect, mainRect, frame, mode, builderSurface) {
+      const zoomX = mainRect.width / frame.width, zoomY = mainRect.height / frame.height;
+      let left, top, right, bottom;
+      if (mode === 'pencil' && !builderSurface) {
+        const point = cagePixelPoint(state.brushX, state.brushY);
+        if (!point) return null;
+        const size = Math.max(1, Math.round(state.animationBrushSize || 1)), offset = Math.floor(.5 - size / 2);
+        left = point.x + offset; top = point.y + offset; right = left + size; bottom = top + size;
+        const anchor = animationPaintShiftHeld && !state.dragging && animationPaintLineAnchor(activeAnimationLayer(), state.animationTool);
+        if (anchor) {
+          const x = Math.floor(anchor.x) + offset, y = Math.floor(anchor.y) + offset;
+          left = Math.min(left, x); top = Math.min(top, y);
+          right = Math.max(right, x + size); bottom = Math.max(bottom, y + size);
+        }
+        left = mainRect.left + Math.max(0, left) * zoomX;
+        top = mainRect.top + Math.max(0, top) * zoomY;
+        right = mainRect.left + Math.min(frame.width, right) * zoomX;
+        bottom = mainRect.top + Math.min(frame.height, bottom) * zoomY;
+      } else {
+        const g = brushCursorGeometry(), x = mainRect.left + g.cx * zoomX, y = mainRect.top + g.cy * zoomY;
+        const rx = Math.max(8, g.rx * zoomX), ry = Math.max(8, g.ry * zoomY);
+        left = x - rx; top = y - ry; right = x + rx; bottom = y + ry;
+      }
+      // Keep only the brush/line's screen bounds, including its one-pixel outline.
+      left = Math.max(0, Math.floor(shellRect.left), Math.floor(left - 3));
+      top = Math.max(0, Math.floor(shellRect.top), Math.floor(top - 3));
+      right = Math.min(window.innerWidth, Math.ceil(shellRect.right), Math.ceil(right + 3));
+      bottom = Math.min(window.innerHeight, Math.ceil(shellRect.bottom), Math.ceil(bottom + 3));
+      return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null;
+    }
+    function resizeBrushCursorOverlay(bounds) {
       const overlay = els.brushCursorOverlay;
       if (!overlay) return null;
       if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
       const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const cssWidth = Math.max(1, window.innerWidth || Math.ceil(shellRect.width));
-      const cssHeight = Math.max(1, window.innerHeight || Math.ceil(shellRect.height));
+      const cssWidth = bounds.width, cssHeight = bounds.height;
       const width = Math.max(1, Math.ceil(cssWidth * dpr));
       const height = Math.max(1, Math.ceil(cssHeight * dpr));
       if (overlay.width !== width || overlay.height !== height) {
@@ -5846,11 +5876,13 @@
       }
       overlay.style.width = `${cssWidth}px`;
       overlay.style.height = `${cssHeight}px`;
+      overlay.style.left = `${bounds.left}px`;
+      overlay.style.top = `${bounds.top}px`;
       overlay.style.display = 'block';
       const oc = overlay.getContext('2d', { alpha: true });
       oc.setTransform(1, 0, 0, 1, 0, 0);
       oc.clearRect(0, 0, width, height);
-      oc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      oc.setTransform(dpr, 0, 0, dpr, -bounds.left * dpr, -bounds.top * dpr);
       return oc;
     }
     function strokeScreenCursorEllipse(t, x, y, rx, ry) {
@@ -5864,21 +5896,15 @@
       const size = Math.max(1, Math.round(state.animationBrushSize));
       const cx = point.x + .5, cy = point.y + .5;
       const left = Math.floor(cx - size / 2), top = Math.floor(cy - size / 2);
-      const centerX = left + size / 2, centerY = top + size / 2;
-      const radius = Math.max(.5, size / 2), r2 = radius * radius;
-      const cells = [], keys = new Set();
+      const rows = [];
       for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const px = left + x + .5, py = top + y + .5;
-          const dx = px - centerX, dy = py - centerY;
-          if (state.animationTool === 'eraser' && dx * dx + dy * dy > r2) continue;
-          const sx = left + x, sy = top + y;
-          if (sx < 0 || sy < 0 || sx >= state.cageWidth || sy >= state.cageHeight) continue;
-          cells.push({ x: sx, y: sy });
-          keys.add(`${sx},${sy}`);
-        }
+        const sy = top + y;
+        if (sy < 0 || sy >= state.cageHeight) continue;
+        const inset = state.animationTool === 'eraser' ? hardPencilRowInset(size, y) : 0;
+        const x1 = Math.max(0, left + inset), x2 = Math.min(state.cageWidth, left + size - inset);
+        if (x2 > x1) rows.push({ y: sy, left: x1, right: x2 });
       }
-      return cells.length ? { cells, keys } : null;
+      return rows.length ? rows : null;
     }
     function crispCursorLine(v) { return Math.round(v) + .5; }
     function crispCursorPoint(v) { return Math.round(v); }
@@ -5908,17 +5934,22 @@
       t.lineJoin = 'miter';
       t.strokeStyle = 'rgba(255,255,255,.96)';
       t.beginPath();
-      for (const cell of footprint.cells) {
-        const left = mainRect.left + cell.x * zoomX, top = mainRect.top + cell.y * zoomY;
-        const right = left + zoomX, bottom = top + zoomY;
-        const hasLeft = footprint.keys.has(`${cell.x - 1},${cell.y}`);
-        const hasRight = footprint.keys.has(`${cell.x + 1},${cell.y}`);
-        const hasTop = footprint.keys.has(`${cell.x},${cell.y - 1}`);
-        const hasBottom = footprint.keys.has(`${cell.x},${cell.y + 1}`);
-        if (!hasTop) strokeScreenPixelSegment(t, left, top, right, top);
-        if (!hasBottom) strokeScreenPixelSegment(t, left, bottom, right, bottom);
-        if (!hasLeft) strokeScreenPixelSegment(t, left, top, left, bottom);
-        if (!hasRight) strokeScreenPixelSegment(t, right, top, right, bottom);
+      const horizontal = (left, right, y) => {
+        if (right > left) strokeScreenPixelSegment(t, mainRect.left + left * zoomX, mainRect.top + y * zoomY, mainRect.left + right * zoomX, mainRect.top + y * zoomY);
+      };
+      for (let i = 0; i < footprint.length; i++) {
+        const row = footprint[i], before = footprint[i - 1], after = footprint[i + 1];
+        const left = mainRect.left + row.left * zoomX, right = mainRect.left + row.right * zoomX;
+        const top = mainRect.top + row.y * zoomY, bottom = top + zoomY;
+        strokeScreenPixelSegment(t, left, top, left, bottom);
+        strokeScreenPixelSegment(t, right, top, right, bottom);
+        for (const [neighbor, y] of [[before, row.y], [after, row.y + 1]]) {
+          if (!neighbor) horizontal(row.left, row.right, y);
+          else {
+            horizontal(row.left, Math.min(row.right, neighbor.left), y);
+            horizontal(Math.max(row.left, neighbor.right), row.right, y);
+          }
+        }
       }
       t.stroke();
       t.restore();
@@ -5937,18 +5968,21 @@
         clearBrushCursorOverlay();
         return;
       }
-      const t = resizeBrushCursorOverlay(shellRect);
+      const bounds = brushCursorOverlayBounds(shellRect, mainRect, frame, mode, builderSurface);
+      if (!bounds) { clearBrushCursorOverlay(); return; }
+      // Read layout before moving the overlay so hover does not force a second layout.
+      const menus = Array.from(document.querySelectorAll('.side-panels .group.inspector-active, .floating-tool-tabs, .canvas-info-row, .sprite-sheet-builder-cell-actions'), menu => menu.getBoundingClientRect());
+      const g = mode === 'pencil' && !builderSurface ? null : brushCursorGeometry();
+      const t = resizeBrushCursorOverlay(bounds);
       if (!t) return;
       els.canvasShell.classList.add('brush-cursor-visible');
       // Keep large footprints off floating controls even before the pointer reaches them.
       t.save();
       t.beginPath();t.rect(shellRect.left,shellRect.top,shellRect.width,shellRect.height);t.clip();
-      document.querySelectorAll('.side-panels .group.inspector-active, .floating-tool-tabs, .canvas-info-row, .sprite-sheet-builder-cell-actions').forEach(menu=>{
-        const r=menu.getBoundingClientRect();
-        if (!r.width || !r.height || r.right<shellRect.left || r.left>shellRect.right || r.bottom<shellRect.top || r.top>shellRect.bottom) return;
+      menus.forEach(r=>{
+        if (!r.width || !r.height || r.right<bounds.left || r.left>bounds.left+bounds.width || r.bottom<bounds.top || r.top>bounds.top+bounds.height) return;
         t.beginPath();t.rect(0,0,window.innerWidth,window.innerHeight);t.rect(r.left,r.top,r.width,r.height);t.clip('evenodd');
       });
-      const g = brushCursorGeometry();
       const zoomX = mainRect.width / Math.max(1, frame.width);
       const zoomY = mainRect.height / Math.max(1, frame.height);
       if (mode === 'pencil' && !builderSurface) {
@@ -16571,6 +16605,7 @@
       return x >= 0 && y >= 0 && x < state.cageWidth && y < state.cageHeight ? { x, y } : null;
     }
     function hideBrushCursor(redraw = true) {
+      cancelBrushCursorPreview();
       if (!state.brushCursorVisible) return;
       state.brushCursorVisible = false;
       if (redraw && spriteSheetBuilderPanelActive()) syncSpriteSheetBuilderCanvasPreview();
@@ -16593,11 +16628,28 @@
       const mode = activeRoundBrushMode();
       if (!mode) { hideBrushCursor(false); return false; }
       if (temporaryPencilColorPickerActive(e)) { hideBrushCursor(false); return false; }
+      const previousX = state.brushX, previousY = state.brushY, visible = state.brushCursorVisible, shift = animationPaintShiftHeld;
       const p = updateBrushCursorFromEvent(e);
       if (!p) return false;
+      if (!redraw && visible && previousX === p.x && previousY === p.y && shift === animationPaintShiftHeld) return true;
       if (redraw) drawFrame(state.currentFrame, { fast: true, skipThumb: true, skipIndexPreview: true });
       else renderBrushCursorOverlay();
       return true;
+    }
+    function cancelBrushCursorPreview() {
+      if (queueBrushCursorFromEvent.frame != null) cancelAnimationFrame(queueBrushCursorFromEvent.frame);
+      queueBrushCursorFromEvent.frame = null;
+      queueBrushCursorFromEvent.event = null;
+    }
+    function queueBrushCursorFromEvent(e) {
+      queueBrushCursorFromEvent.event = e;
+      if (queueBrushCursorFromEvent.frame != null) return;
+      queueBrushCursorFromEvent.frame = requestAnimationFrame(() => {
+        queueBrushCursorFromEvent.frame = null;
+        const event = queueBrushCursorFromEvent.event;
+        queueBrushCursorFromEvent.event = null;
+        if (event) syncBrushCursorFromEvent(event);
+      });
     }
     function activeBrushLineMode() {
       if (state.maskMode && state.brushAction !== 'wand') return `mask:${state.brushAction}`;
@@ -20408,7 +20460,7 @@
           if (p) { state.brushX = p.x; state.brushY = p.y; }
           hideBrushCursor(false);
         } else if ((state.maskMode && state.brushAction !== 'wand') || animationPixelBrushActive()) {
-          syncBrushCursorFromEvent(e);
+          queueBrushCursorFromEvent(e);
         } else if (state.paletteDropperMode) hideBrushCursor(false);
         return;
       }
@@ -20580,8 +20632,8 @@
         updateReferenceCompositorUi();
         return;
       }
-      if (!hasFrames() || state.dragging) return;
-      syncBrushCursorFromEvent(e);
+      if (!hasFrames() || state.dragging || els.canvasShell.contains(e.target)) return;
+      queueBrushCursorFromEvent(e);
     });
     const endReferenceCompositorClipDrag = e => {
       if (!referenceCompositorClipDrag || e.pointerId !== referenceCompositorClipDrag.pointerId) return;
@@ -20818,6 +20870,7 @@
       if ((e.key === 'Control' || e.key === 'Meta') && state.pencilCtrlPickMode) setPencilCtrlPickMode(e.ctrlKey || e.metaKey);
     });
     window.addEventListener('blur', () => {
+      hideBrushCursor(false);
       updateAnimationSelectionCursor({ shiftKey: false, altKey: false });
       setAnimationTransformAlt(false, true);
       setAnimationPaintShiftHeld(false);
